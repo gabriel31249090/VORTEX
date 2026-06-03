@@ -26,61 +26,106 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div style={{
+      minHeight: '100vh', background: '#0a0a0f',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '0 16px', fontFamily: "'Syne', sans-serif"
+    }}>
+      {/* Background glow */}
+      <div style={{
+        position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)',
+        width: 400, height: 400, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(200,242,60,0.06) 0%, transparent 70%)',
+        pointerEvents: 'none'
+      }} />
+
+      <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
         {/* Logo */}
-        <div className="text-center mb-10">
-          <span className="text-4xl font-black tracking-tighter text-white" style={{ fontFamily: 'sans-serif' }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{
+            fontSize: 36, fontWeight: 800, color: '#c8f23c', letterSpacing: '-1px',
+            textShadow: '0 0 30px rgba(200,242,60,0.6), 0 0 60px rgba(200,242,60,0.3)'
+          }}>
             ◈ VORTEX
-          </span>
-          <p className="text-zinc-500 mt-2 text-sm">Bem-vindo de volta</p>
+          </div>
+          <p style={{ color: '#555577', marginTop: 8, fontSize: 14 }}>Bem-vindo de volta</p>
         </div>
 
         {/* Card */}
-        <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-8 space-y-5">
-          <div>
-            <label className="text-zinc-400 text-sm mb-1 block">Email</label>
+        <div style={{
+          background: '#111118', border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 20, padding: 32
+        }}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 8 }}>Email</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="seu@email.com"
-              className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-[#c8f23c] transition-colors"
+              style={{
+                width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 12, padding: '12px 16px', color: '#f0f0f8', fontSize: 14,
+                outline: 'none', fontFamily: "'Syne', sans-serif", transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
             />
           </div>
 
-          <div>
-            <label className="text-zinc-400 text-sm mb-1 block">Senha</label>
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 8 }}>Senha</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-[#c8f23c] transition-colors"
+              style={{
+                width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 12, padding: '12px 16px', color: '#f0f0f8', fontSize: 14,
+                outline: 'none', fontFamily: "'Syne', sans-serif", transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
             />
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm">{error}</p>
+            <p style={{ color: '#ff4466', fontSize: 13, marginBottom: 16 }}>{error}</p>
           )}
 
           <button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full bg-[#c8f23c] text-black font-bold py-3 rounded-xl hover:bg-[#d4f554] transition-colors disabled:opacity-50"
+            style={{
+              width: '100%', background: '#c8f23c', color: '#000', fontWeight: 700,
+              padding: '13px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              fontSize: 15, fontFamily: "'Syne', sans-serif",
+              boxShadow: '0 0 20px rgba(200,242,60,0.3)',
+              transition: 'all 0.2s', opacity: loading ? 0.6 : 1
+            }}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.boxShadow = '0 0 30px rgba(200,242,60,0.6), 0 0 60px rgba(200,242,60,0.2)' }}
+            onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.3)')}
           >
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
 
-          <p className="text-center text-zinc-500 text-sm">
+          <p style={{ textAlign: 'center', color: '#555577', fontSize: 13, marginTop: 20 }}>
             Não tem conta?{' '}
-            <Link href="/register" className="text-[#c8f23c] hover:underline">
+            <Link href="/register" style={{ color: '#c8f23c', textDecoration: 'none', fontWeight: 600 }}>
               Criar conta
             </Link>
           </p>
         </div>
       </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+        input::placeholder { color: #333355; }
+      `}</style>
     </div>
   )
 }
