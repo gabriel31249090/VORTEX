@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 type Profile = {
   id: string
@@ -33,6 +34,13 @@ export default function ProfilePage() {
   const [bio, setBio] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Follow states
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [followersCount, setFollowersCount] = useState(0)
+  const [followingCount, setFollowingCount] = useState(0)
+  const [followLoading, setFollowLoading] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
   // Upload states
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
@@ -52,6 +60,7 @@ export default function ProfilePage() {
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id || null)
 
       const { data: profileData } = await supabase
         .from('profiles').select('*').eq('username', username).single()
@@ -62,6 +71,25 @@ export default function ProfilePage() {
       setDisplayName(profileData.display_name || '')
       setBio(profileData.bio || '')
       setIsOwner(user?.id === profileData.id)
+
+      // Contadores de seguidores
+      const [{ count: followers }, { count: following }] = await Promise.all([
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id),
+        supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id),
+      ])
+      setFollowersCount(followers || 0)
+      setFollowingCount(following || 0)
+
+      // Checar se já segue
+      if (user && user.id !== profileData.id) {
+        const { data: followData } = await supabase
+          .from('follows')
+          .select('follower_id')
+          .eq('follower_id', user.id)
+          .eq('following_id', profileData.id)
+          .single()
+        setIsFollowing(!!followData)
+      }
 
       const { data: postsData } = await supabase
         .from('posts')
@@ -75,10 +103,34 @@ export default function ProfilePage() {
     load()
   }, [username])
 
+  async function handleFollow() {
+    if (!currentUserId) { router.push('/login'); return }
+    if (!profile) return
+    setFollowLoading(true)
+
+    if (isFollowing) {
+      await supabase.from('follows')
+        .delete()
+        .eq('follower_id', currentUserId)
+        .eq('following_id', profile.id)
+      setIsFollowing(false)
+      setFollowersCount(c => c - 1)
+      toast('Você deixou de seguir @' + profile.username)
+    } else {
+      await supabase.from('follows')
+        .insert({ follower_id: currentUserId, following_id: profile.id })
+      setIsFollowing(true)
+      setFollowersCount(c => c + 1)
+      toast.success('Seguindo @' + profile.username)
+    }
+
+    setFollowLoading(false)
+  }
+
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { alert('Imagem deve ter no máximo 5MB'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return }
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
   }
@@ -86,7 +138,7 @@ export default function ProfilePage() {
   function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { alert('Imagem deve ter no máximo 5MB'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return }
     setBannerFile(file)
     setBannerPreview(URL.createObjectURL(file))
   }
@@ -94,15 +146,9 @@ export default function ProfilePage() {
   async function uploadImage(file: File, bucket: string, userId: string): Promise<string | null> {
     const ext = file.name.split('.').pop()
     const path = `${userId}/photo.${ext}`
-
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(path, file, { upsert: true })
-
+    const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
     if (error) { console.error(error); return null }
-
     const { data } = supabase.storage.from(bucket).getPublicUrl(path)
-    // Cache-bust para forçar refresh da imagem
     return `${data.publicUrl}?t=${Date.now()}`
   }
 
@@ -127,12 +173,7 @@ export default function ProfilePage() {
       setUploadingBanner(false)
     }
 
-    await supabase.from('profiles').update({
-      display_name: displayName,
-      bio,
-      avatar_url,
-      banner_url,
-    }).eq('id', profile.id)
+    await supabase.from('profiles').update({ display_name: displayName, bio, avatar_url, banner_url }).eq('id', profile.id)
 
     setProfile(prev => prev ? { ...prev, display_name: displayName, bio, avatar_url, banner_url } : prev)
     setAvatarFile(null)
@@ -141,6 +182,7 @@ export default function ProfilePage() {
     setBannerPreview(null)
     setEditMode(false)
     setSaving(false)
+    toast.success('Perfil atualizado!')
   }
 
   function handleCancel() {
@@ -196,50 +238,26 @@ export default function ProfilePage() {
       </header>
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Perfil */}
         <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }}>
 
           {/* Banner */}
           <div
             onClick={() => editMode && bannerInputRef.current?.click()}
             style={{
-              height: 120,
-              position: 'relative',
-              cursor: editMode ? 'pointer' : 'default',
-              overflow: 'hidden',
-              background: currentBanner
-                ? 'none'
-                : 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))',
+              height: 120, position: 'relative',
+              cursor: editMode ? 'pointer' : 'default', overflow: 'hidden',
+              background: currentBanner ? 'none' : 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))',
               borderBottom: '1px solid rgba(200,242,60,0.1)',
             }}
           >
-            {currentBanner && (
-              <img
-                src={currentBanner}
-                alt="banner"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            )}
+            {currentBanner && <img src={currentBanner} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
             {editMode && (
-              <div style={{
-                position: 'absolute', inset: 0,
-                background: 'rgba(0,0,0,0.45)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: 8, transition: 'opacity 0.2s',
-              }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 <span style={{ fontSize: 18 }}>🖼️</span>
-                <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
-                  {uploadingBanner ? 'Enviando...' : 'Alterar banner'}
-                </span>
+                <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{uploadingBanner ? 'Enviando...' : 'Alterar banner'}</span>
               </div>
             )}
-            <input
-              ref={bannerInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleBannerChange}
-            />
+            <input ref={bannerInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBannerChange} />
           </div>
 
           <div style={{ padding: 20 }}>
@@ -256,49 +274,26 @@ export default function ProfilePage() {
                   border: '4px solid #111118',
                   boxShadow: '0 0 20px rgba(200,242,60,0.3)',
                   cursor: editMode ? 'pointer' : 'default',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  flexShrink: 0,
+                  position: 'relative', overflow: 'hidden', flexShrink: 0,
                 }}
               >
-                {currentAvatar ? (
-                  <img
-                    src={currentAvatar}
-                    alt="avatar"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                  />
-                ) : (
-                  profile.username.charAt(0).toUpperCase()
-                )}
-
+                {currentAvatar
+                  ? <img src={currentAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                  : profile.username.charAt(0).toUpperCase()
+                }
                 {editMode && (
-                  <div style={{
-                    position: 'absolute', inset: 0, borderRadius: '50%',
-                    background: 'rgba(0,0,0,0.55)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexDirection: 'column', gap: 2,
-                  }}>
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: 16 }}>📷</span>
                   </div>
                 )}
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleAvatarChange}
-                />
+                <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
               </div>
 
               {/* Botões */}
               {isOwner && !editMode && (
                 <button
                   onClick={() => setEditMode(true)}
-                  style={{
-                    background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-                    color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer',
-                    fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s'
-                  }}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.4)'; e.currentTarget.style.color = '#c8f23c' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}
                 >
@@ -307,34 +302,37 @@ export default function ProfilePage() {
               )}
               {isOwner && editMode && (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={handleCancel}
-                    style={{
-                      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-                      color: '#8888aa', padding: '7px 14px', borderRadius: 50, cursor: 'pointer',
-                      fontSize: 13, fontFamily: "'Syne', sans-serif"
-                    }}
-                  >
+                  <button onClick={handleCancel} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 14px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif" }}>
                     Cancelar
                   </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    style={{
-                      background: '#c8f23c', color: '#000', fontWeight: 700,
-                      padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer',
-                      fontSize: 13, fontFamily: "'Syne', sans-serif",
-                      boxShadow: '0 0 12px rgba(200,242,60,0.3)',
-                      opacity: saving ? 0.7 : 1,
-                    }}
-                  >
+                  <button onClick={handleSave} disabled={saving} style={{ background: '#c8f23c', color: '#000', fontWeight: 700, padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: '0 0 12px rgba(200,242,60,0.3)', opacity: saving ? 0.7 : 1 }}>
                     {saving ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
               )}
+
+              {/* Botão Follow — só aparece para outros usuários */}
+              {!isOwner && !editMode && (
+                <button
+                  onClick={handleFollow}
+                  disabled={followLoading}
+                  style={{
+                    background: isFollowing ? 'transparent' : '#c8f23c',
+                    border: isFollowing ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                    color: isFollowing ? '#8888aa' : '#000',
+                    padding: '7px 18px', borderRadius: 50, cursor: followLoading ? 'wait' : 'pointer',
+                    fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif",
+                    transition: 'all 0.2s', opacity: followLoading ? 0.6 : 1,
+                    boxShadow: isFollowing ? 'none' : '0 0 12px rgba(200,242,60,0.3)',
+                  }}
+                  onMouseEnter={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,60,60,0.4)'; e.currentTarget.style.color = '#ff6060' } }}
+                  onMouseLeave={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' } }}
+                >
+                  {followLoading ? '...' : isFollowing ? 'Seguindo ✓' : 'Seguir'}
+                </button>
+              )}
             </div>
 
-            {/* Hint de upload no modo edição */}
             {editMode && (
               <p style={{ color: '#555577', fontSize: 12, marginBottom: 12 }}>
                 Clique no avatar ou banner para alterar • Máx. 5MB
@@ -344,27 +342,14 @@ export default function ProfilePage() {
             {editMode ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <input
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  placeholder="Nome de exibição"
-                  style={{
-                    background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14,
-                    outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box', width: '100%'
-                  }}
+                  value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Nome de exibição"
+                  style={{ background: '#18181f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14, outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box', width: '100%' }}
                   onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
                 <textarea
-                  value={bio}
-                  onChange={e => setBio(e.target.value)}
-                  placeholder="Bio..."
-                  rows={3}
-                  style={{
-                    background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14,
-                    outline: 'none', fontFamily: "'Syne', sans-serif", resize: 'none', boxSizing: 'border-box', width: '100%'
-                  }}
+                  value={bio} onChange={e => setBio(e.target.value)} placeholder="Bio..." rows={3}
+                  style={{ background: '#18181f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14, outline: 'none', fontFamily: "'Syne', sans-serif", resize: 'none', boxSizing: 'border-box', width: '100%' }}
                   onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
@@ -376,7 +361,19 @@ export default function ProfilePage() {
                 </h1>
                 <p style={{ color: '#555577', fontSize: 14, marginBottom: 8 }}>@{profile.username}</p>
                 {profile.bio && <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{profile.bio}</p>}
-                <p style={{ color: '#333355', fontSize: 12, marginTop: 12 }}>{posts.length} publicações</p>
+
+                {/* Contadores */}
+                <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
+                  <span style={{ color: '#555577', fontSize: 13 }}>
+                    <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followersCount}</span> seguidores
+                  </span>
+                  <span style={{ color: '#555577', fontSize: 13 }}>
+                    <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followingCount}</span> seguindo
+                  </span>
+                  <span style={{ color: '#555577', fontSize: 13 }}>
+                    <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{posts.length}</span> posts
+                  </span>
+                </div>
               </>
             )}
           </div>
@@ -390,19 +387,15 @@ export default function ProfilePage() {
           <article
             key={post.id}
             onClick={() => router.push(`/post/${post.id}`)}
-            style={{
-              background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s'
-            }}
+            style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
           >
             <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{post.title}</h2>
             {post.content && (
-              <p style={{
-                color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 12,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-              } as any}>{post.content}</p>
+              <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                {post.content}
+              </p>
             )}
             <div style={{ display: 'flex', gap: 16 }}>
               <span style={{ color: '#333355', fontSize: 12 }}>▲ {post.likes_count}</span>
