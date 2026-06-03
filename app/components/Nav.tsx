@@ -29,7 +29,7 @@ export default function Nav() {
     { icon: '⌂', label: 'Feed', path: '/feed' },
     { icon: '⊞', label: 'Comunidades', path: '/communities' },
     { icon: '＋', label: 'Publicar', path: '/post/new', accent: true },
-    { icon: '◉', label: 'Perfil', path: username ? `/profile/${username}` : '/feed' },
+    { icon: '◉', label: 'Perfil', path: username ? `/profile/${username}` : '' },
     { icon: '⚙', label: 'Config', path: '/settings' },
   ]
 
@@ -56,11 +56,11 @@ export default function Nav() {
         {/* Nav items */}
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px' }}>
           {items.map(item => {
-            const isActive = pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path))
+            const isActive = pathname === item.path || (item.path !== '/feed' && item.path !== '' && pathname.startsWith(item.path))
             return (
               <button
-                key={item.path}
-                onClick={() => router.push(item.path)}
+                key={item.label}
+                onClick={() => item.path && router.push(item.path)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -68,7 +68,8 @@ export default function Nav() {
                   color: item.accent ? '#000' : isActive ? '#c8f23c' : '#8888aa',
                   fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: item.accent || isActive ? 700 : 500,
                   transition: 'all 0.2s', textAlign: 'left',
-                  boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.3)' : isActive ? '0 0 8px rgba(200,242,60,0.1)' : 'none'
+                  boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.3)' : isActive ? '0 0 8px rgba(200,242,60,0.1)' : 'none',
+                  opacity: item.path === '' ? 0.5 : 1
                 }}
                 onMouseEnter={e => {
                   if (!item.accent && !isActive) {
@@ -118,11 +119,11 @@ export default function Nav() {
         padding: '8px 0 12px', zIndex: 100, fontFamily: "'Syne', sans-serif"
       }} className="nav-bottom">
         {items.map(item => {
-          const isActive = pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path))
+          const isActive = pathname === item.path || (item.path !== '/feed' && item.path !== '' && pathname.startsWith(item.path))
           return (
             <button
-              key={item.path}
-              onClick={() => router.push(item.path)}
+              key={item.label}
+              onClick={() => item.path && router.push(item.path)}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 background: item.accent ? '#c8f23c' : 'transparent',
@@ -130,7 +131,7 @@ export default function Nav() {
                 borderRadius: item.accent ? 50 : 8,
                 color: item.accent ? '#000' : isActive ? '#c8f23c' : '#555577',
                 boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.4)' : 'none',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s', opacity: item.path === '' ? 0.5 : 1
               }}
             >
               <span style={{ fontSize: 20 }}>{item.icon}</span>
