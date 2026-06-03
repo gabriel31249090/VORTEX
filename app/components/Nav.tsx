@@ -25,12 +25,26 @@ export default function Nav() {
     router.push('/login')
   }
 
+  async function handleProfileClick() {
+    if (username) {
+      router.push(`/profile/${username}`)
+      return
+    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase.from('profiles').select('username').eq('id', user.id).single()
+    if (data?.username) {
+      setUsername(data.username)
+      router.push(`/profile/${data.username}`)
+    }
+  }
+
   const items = [
-    { icon: '⌂', label: 'Feed', path: '/feed' },
-    { icon: '⊞', label: 'Comunidades', path: '/communities' },
-    { icon: '＋', label: 'Publicar', path: '/post/new', accent: true },
-    { icon: '◉', label: 'Perfil', path: username ? `/profile/${username}` : '' },
-    { icon: '⚙', label: 'Config', path: '/settings' },
+    { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
+    { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
+    { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
+    { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
+    { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
   ]
 
   return (
@@ -42,25 +56,17 @@ export default function Nav() {
         display: 'flex', flexDirection: 'column', padding: '24px 0',
         zIndex: 100, fontFamily: "'Syne', sans-serif"
       }} className="nav-sidebar">
-        {/* Logo */}
-        <div
-          onClick={() => router.push('/feed')}
-          style={{ padding: '0 20px 32px', cursor: 'pointer' }}
-        >
-          <span style={{
-            fontSize: 20, fontWeight: 800, color: '#c8f23c',
-            textShadow: '0 0 20px rgba(200,242,60,0.5)'
-          }}>◈ VORTEX</span>
+        <div onClick={() => router.push('/feed')} style={{ padding: '0 20px 32px', cursor: 'pointer' }}>
+          <span style={{ fontSize: 20, fontWeight: 800, color: '#c8f23c', textShadow: '0 0 20px rgba(200,242,60,0.5)' }}>◈ VORTEX</span>
         </div>
 
-        {/* Nav items */}
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px' }}>
           {items.map(item => {
-            const isActive = pathname === item.path || (item.path !== '/feed' && item.path !== '' && pathname.startsWith(item.path))
+            const isActive = pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path))
             return (
               <button
                 key={item.label}
-                onClick={() => item.path && router.push(item.path)}
+                onClick={item.onClick}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -68,8 +74,7 @@ export default function Nav() {
                   color: item.accent ? '#000' : isActive ? '#c8f23c' : '#8888aa',
                   fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: item.accent || isActive ? 700 : 500,
                   transition: 'all 0.2s', textAlign: 'left',
-                  boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.3)' : isActive ? '0 0 8px rgba(200,242,60,0.1)' : 'none',
-                  opacity: item.path === '' ? 0.5 : 1
+                  boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.3)' : isActive ? '0 0 8px rgba(200,242,60,0.1)' : 'none'
                 }}
                 onMouseEnter={e => {
                   if (!item.accent && !isActive) {
@@ -91,7 +96,6 @@ export default function Nav() {
           })}
         </nav>
 
-        {/* Logout */}
         <div style={{ padding: '0 12px' }}>
           <button
             onClick={handleLogout}
@@ -119,11 +123,11 @@ export default function Nav() {
         padding: '8px 0 12px', zIndex: 100, fontFamily: "'Syne', sans-serif"
       }} className="nav-bottom">
         {items.map(item => {
-          const isActive = pathname === item.path || (item.path !== '/feed' && item.path !== '' && pathname.startsWith(item.path))
+          const isActive = pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path))
           return (
             <button
               key={item.label}
-              onClick={() => item.path && router.push(item.path)}
+              onClick={item.onClick}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                 background: item.accent ? '#c8f23c' : 'transparent',
@@ -131,7 +135,7 @@ export default function Nav() {
                 borderRadius: item.accent ? 50 : 8,
                 color: item.accent ? '#000' : isActive ? '#c8f23c' : '#555577',
                 boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.4)' : 'none',
-                transition: 'all 0.2s', opacity: item.path === '' ? 0.5 : 1
+                transition: 'all 0.2s'
               }}
             >
               <span style={{ fontSize: 20 }}>{item.icon}</span>
