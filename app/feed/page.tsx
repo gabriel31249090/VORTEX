@@ -13,14 +13,8 @@ type Post = {
   comments_count: number
   created_at: string
   author_id: string
-  profiles: {
-    username: string
-    avatar_url: string | null
-  } | null
-  communities: {
-    name: string
-    slug: string
-  } | null
+  profiles: { username: string; avatar_url: string | null } | null
+  communities: { name: string; slug: string } | null
 }
 
 export default function FeedPage() {
@@ -51,10 +45,7 @@ export default function FeedPage() {
       setPosts((data as any) || [])
 
       const { data: likes } = await supabase
-        .from('likes')
-        .select('post_id')
-        .eq('user_id', user.id)
-
+        .from('likes').select('post_id').eq('user_id', user.id)
       if (likes) setLikedPosts(new Set(likes.map((l: any) => l.post_id)))
       setLoading(false)
     }
@@ -64,7 +55,6 @@ export default function FeedPage() {
   async function handleLike(postId: string) {
     if (!userId) return
     const isLiked = likedPosts.has(postId)
-
     if (isLiked) {
       await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', userId)
       await supabase.from('posts').update({ likes_count: posts.find(p => p.id === postId)!.likes_count - 1 }).eq('id', postId)
@@ -96,20 +86,40 @@ export default function FeedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0f]">
-      <header className="sticky top-0 z-50 bg-[#0d0d0f]/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="text-xl font-black tracking-tighter text-white">◈ VORTEX</span>
-          <div className="flex items-center gap-3">
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
+
+      {/* Header */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(200,242,60,0.2)',
+        boxShadow: '0 1px 0 rgba(200,242,60,0.1)'
+      }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{
+            fontSize: 22, fontWeight: 800, color: '#c8f23c', letterSpacing: '-0.5px',
+            textShadow: '0 0 20px rgba(200,242,60,0.5), 0 0 40px rgba(200,242,60,0.2)'
+          }}>
+            ◈ VORTEX
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button
               onClick={() => router.push('/post/new')}
-              className="bg-[#c8f23c] text-black text-sm font-bold px-4 py-1.5 rounded-full hover:bg-[#d4f554] transition-colors"
+              style={{
+                background: '#c8f23c', color: '#000', fontWeight: 700,
+                padding: '8px 18px', borderRadius: 50, border: 'none', cursor: 'pointer',
+                fontSize: 13, fontFamily: "'Syne', sans-serif",
+                boxShadow: '0 0 12px rgba(200,242,60,0.4)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 0 24px rgba(200,242,60,0.7), 0 0 48px rgba(200,242,60,0.3)')}
+              onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 0 12px rgba(200,242,60,0.4)')}
             >
               + Publicar
             </button>
             <button
               onClick={handleLogout}
-              className="text-zinc-500 text-sm hover:text-white transition-colors"
+              style={{ background: 'none', border: 'none', color: '#555577', cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif' " }}
             >
               Sair
             </button>
@@ -117,83 +127,139 @@ export default function FeedPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {loading && (
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-[#141416] border border-zinc-800 rounded-2xl p-5 animate-pulse">
-                <div className="h-4 bg-zinc-800 rounded w-1/3 mb-3" />
-                <div className="h-6 bg-zinc-800 rounded w-2/3 mb-2" />
-                <div className="h-4 bg-zinc-800 rounded w-full" />
-              </div>
-            ))}
+      {/* Feed */}
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {loading && [1, 2, 3].map(i => (
+          <div key={i} style={{
+            background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 16, padding: 20, opacity: 0.5
+          }}>
+            <div style={{ height: 12, background: '#222230', borderRadius: 6, width: '30%', marginBottom: 12 }} />
+            <div style={{ height: 18, background: '#222230', borderRadius: 6, width: '60%', marginBottom: 8 }} />
+            <div style={{ height: 12, background: '#222230', borderRadius: 6, width: '90%' }} />
           </div>
-        )}
+        ))}
 
         {!loading && posts.length === 0 && (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-4">🌀</p>
-            <p className="text-zinc-400">Nenhum post ainda. Seja o primeiro!</p>
+          <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🌀</div>
+            <p style={{ fontSize: 15 }}>Nenhum post ainda. Seja o primeiro!</p>
           </div>
         )}
 
-        {posts.map(post => (
+        {posts.map((post, i) => (
           <article
             key={post.id}
-            className="bg-[#141416] border border-zinc-800 rounded-2xl p-5 hover:border-zinc-600 transition-colors"
+            style={{
+              background: '#111118',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 16, padding: 20,
+              animation: `fadeUp 0.4s ease ${i * 0.05}s both`,
+              transition: 'border-color 0.2s, box-shadow 0.2s',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'
+              e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
           >
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-full bg-[#c8f23c] flex items-center justify-center text-black text-xs font-bold">
+            {/* Meta */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
+                boxShadow: '0 0 8px rgba(200,242,60,0.3)'
+              }}>
                 {getInitial(post.profiles?.username || '?')}
               </div>
-              <span className="text-zinc-400 text-sm">
+              <div style={{ flex: 1 }}>
                 <span
-                  className="text-white font-medium cursor-pointer hover:underline"
+                  style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
                   onClick={(e) => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
                 >
                   @{post.profiles?.username || 'usuário'}
                 </span>
                 {post.communities && (
-                  <> em <span className="text-[#c8f23c]">v/{post.communities.name}</span></>
+                  <span style={{ color: '#c8f23c', fontSize: 13 }}> em v/{post.communities.name}</span>
                 )}
-                {' · '}{timeAgo(post.created_at)}
-              </span>
+                <span style={{ color: '#444466', fontSize: 13 }}> · {timeAgo(post.created_at)}</span>
+              </div>
             </div>
 
-            <div className="cursor-pointer" onClick={() => router.push(`/post/${post.id}`)}>
-              <h2 className="text-white font-semibold text-lg mb-1">{post.title}</h2>
+            {/* Conteúdo */}
+            <div onClick={() => router.push(`/post/${post.id}`)}>
+              <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3 }}>
+                {post.title}
+              </h2>
               {post.content && (
-                <p className="text-zinc-400 text-sm line-clamp-3">{post.content}</p>
+                <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {post.content}
+                </p>
               )}
             </div>
 
-            <div className="flex items-center gap-4 mt-4">
+            {/* Ações */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <button
                 onClick={() => handleLike(post.id)}
-                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                  likedPosts.has(post.id)
-                    ? 'text-[#c8f23c]'
-                    : 'text-zinc-500 hover:text-[#c8f23c]'
-                }`}
+                style={{
+                  background: likedPosts.has(post.id) ? 'rgba(200,242,60,0.12)' : 'transparent',
+                  border: `1px solid ${likedPosts.has(post.id) ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  color: likedPosts.has(post.id) ? '#c8f23c' : '#555577',
+                  padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                  fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                  boxShadow: likedPosts.has(post.id) ? '0 0 10px rgba(200,242,60,0.2)' : 'none'
+                }}
               >
-                <span>▲</span>
-                <span>{post.likes_count}</span>
+                ▲ {post.likes_count}
               </button>
               <button
                 onClick={() => router.push(`/post/${post.id}`)}
-                className="flex items-center gap-1.5 text-zinc-500 hover:text-white transition-colors text-sm"
+                style={{
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                  fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
               >
-                <span>💬</span>
-                <span>{post.comments_count}</span>
+                💬 {post.comments_count}
               </button>
-              <button className="flex items-center gap-1.5 text-zinc-500 hover:text-white transition-colors text-sm">
-                <span>↗</span>
-                <span>Compartilhar</span>
+              <button
+                style={{
+                  background: 'transparent', border: 'none',
+                  color: '#555577', cursor: 'pointer',
+                  fontSize: 13, fontFamily: "'Syne', sans-serif",
+                  marginLeft: 'auto', transition: 'color 0.2s'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+              >
+                ↗ Compartilhar
               </button>
             </div>
           </article>
         ))}
       </main>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }
