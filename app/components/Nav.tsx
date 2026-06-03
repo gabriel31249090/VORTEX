@@ -14,7 +14,7 @@ export default function Nav() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('username').eq('id', user.id).single()
+      const { data } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle()
       if (data) setUsername(data.username)
     }
     load()
@@ -32,7 +32,7 @@ export default function Nav() {
     }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data } = await supabase.from('profiles').select('username').eq('id', user.id).single()
+    const { data } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle()
     if (data?.username) {
       setUsername(data.username)
       router.push(`/profile/${data.username}`)
