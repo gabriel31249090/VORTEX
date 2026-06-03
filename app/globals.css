@@ -1,26 +1,80 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #18181f;
+  --surface3: #222230;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.12);
+  --text: #f0f0f8;
+  --text2: #8888aa;
+  --text3: #444466;
+  --green: #c8f23c;
+  --green-dim: rgba(200,242,60,0.15);
+  --green-glow: 0 0 20px rgba(200,242,60,0.4), 0 0 40px rgba(200,242,60,0.2);
+  --green-glow-sm: 0 0 10px rgba(200,242,60,0.3);
+  --font: 'Syne', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
 }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+/* Neon glow utilities */
+.neon-text {
+  color: var(--green);
+  text-shadow: var(--green-glow-sm);
+}
+
+.neon-border {
+  border-color: var(--green) !important;
+  box-shadow: var(--green-glow-sm);
+}
+
+.neon-btn {
+  background: var(--green);
+  color: #000;
+  font-weight: 700;
+  font-family: var(--font);
+  box-shadow: var(--green-glow-sm);
+  transition: all 0.2s;
+}
+
+.neon-btn:hover {
+  box-shadow: var(--green-glow);
+  transform: translateY(-1px);
+}
+
+/* Glass card */
+.glass {
+  background: rgba(17,17,24,0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border2);
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes neonPulse {
+  0%, 100% { text-shadow: 0 0 10px rgba(200,242,60,0.4); }
+  50% { text-shadow: 0 0 20px rgba(200,242,60,0.8), 0 0 40px rgba(200,242,60,0.4); }
+}
+
+.fade-up { animation: fadeUp 0.4s ease forwards; }
+.neon-pulse { animation: neonPulse 2s ease infinite; }
