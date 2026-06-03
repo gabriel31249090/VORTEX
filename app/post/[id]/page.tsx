@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
+import Nav from '../../components/Nav'
 
 type Post = {
   id: string
   title: string
   content: string
+  media_url: string | null
   likes_count: number
   comments_count: number
   created_at: string
@@ -43,7 +45,7 @@ export default function PostPage() {
 
       const { data: postData } = await supabase
         .from('posts')
-        .select('id, title, content, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url)')
+        .select('id, title, content, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url)')
         .eq('id', postId)
         .single()
 
@@ -80,6 +82,19 @@ export default function PostPage() {
     setSubmitting(false)
   }
 
+  async function handleDeleteComment(commentId: string) {
+    await supabase.from('comments').delete().eq('id', commentId)
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    await supabase.from('posts').update({ comments_count: Math.max((post?.comments_count || 1) - 1, 0) }).eq('id', postId)
+    setPost(prev => prev ? { ...prev, comments_count: Math.max(prev.comments_count - 1, 0) } : prev)
+  }
+
+  async function handleDeletePost() {
+    if (!confirm('Deletar este post?')) return
+    await supabase.from('posts').delete().eq('id', postId)
+    router.push('/feed')
+  }
+
   function timeAgo(date: string) {
     const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
     if (diff < 60) return `${diff}s`
@@ -93,92 +108,244 @@ export default function PostPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
-      <p className="text-zinc-500">Carregando...</p>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
+      <p style={{ color: '#555577' }}>Carregando...</p>
     </div>
   )
 
   if (!post) return (
-    <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
-      <p className="text-zinc-500">Post não encontrado.</p>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
+      <p style={{ color: '#555577' }}>Post não encontrado.</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#0d0d0f]">
-      <header className="sticky top-0 z-50 bg-[#0d0d0f]/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
+      <Nav />
+
+      {/* Header */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(200,242,60,0.2)',
+      }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
-            onClick={() => router.push('/feed')}
-            className="text-zinc-400 hover:text-white transition-colors"
+            onClick={() => router.back()}
+            style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif', transition: 'color 0.2s'" }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#8888aa')}
           >
             ← Voltar
           </button>
-          <span className="text-white font-bold">Post</span>
+          <span style={{ color: '#f0f0f8', fontWeight: 700 }}>Post</span>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <main style={{
+        maxWidth: 680, margin: '0 auto',
+        padding: '24px 16px 80px',
+        paddingLeft: 'max(16px, calc(220px + 32px))',
+        display: 'flex', flexDirection: 'column', gap: 16
+      }}>
+
         {/* Post */}
-        <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-full bg-[#c8f23c] flex items-center justify-center text-black text-xs font-bold">
-              {getInitial(post.profiles?.username || '?')}
+        <div style={{
+          background: '#111118',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 16, overflow: 'hidden'
+        }}>
+          {/* Imagem do post */}
+          {post.media_url && (
+            <img
+              src={post.media_url}
+              alt="post"
+              style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }}
+            />
+          )}
+
+          <div style={{ padding: 20 }}>
+            {/* Autor */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#000', fontWeight: 800, fontSize: 14, flexShrink: 0,
+                  overflow: 'hidden', boxShadow: '0 0 10px rgba(200,242,60,0.2)'
+                }}>
+                  {post.profiles?.avatar_url
+                    ? <img src={post.profiles.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : getInitial(post.profiles?.username || '?')
+                  }
+                </div>
+                <div>
+                  <p
+                    onClick={() => router.push(`/profile/${post.profiles?.username}`)}
+                    style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
+                  >
+                    @{post.profiles?.username || 'usuário'}
+                  </p>
+                  <p style={{ color: '#555577', fontSize: 12 }}>{timeAgo(post.created_at)}</p>
+                </div>
+              </div>
+
+              {userId === post.author_id && (
+                <button
+                  onClick={handleDeletePost}
+                  style={{
+                    background: 'transparent', border: '1px solid rgba(255,50,50,0.3)',
+                    color: '#ff4466', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                    fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,50,50,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  Deletar
+                </button>
+              )}
             </div>
-            <span className="text-zinc-400 text-sm">
-              <span className="text-white font-medium">@{post.profiles?.username || 'usuário'}</span>
-              {' · '}{timeAgo(post.created_at)}
-            </span>
-          </div>
-          <h1 className="text-white font-bold text-xl mb-2">{post.title}</h1>
-          {post.content && <p className="text-zinc-300 text-sm leading-relaxed">{post.content}</p>}
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-800">
-            <span className="text-zinc-500 text-sm">▲ {post.likes_count} curtidas</span>
-            <span className="text-zinc-500 text-sm">💬 {post.comments_count} comentários</span>
+
+            <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 22, marginBottom: 12, lineHeight: 1.3 }}>
+              {post.title}
+            </h1>
+            {post.content && (
+              <p style={{ color: '#8888aa', fontSize: 15, lineHeight: 1.7, marginBottom: 16 }}>
+                {post.content}
+              </p>
+            )}
+
+            <div style={{
+              display: 'flex', gap: 20, paddingTop: 16,
+              borderTop: '1px solid rgba(255,255,255,0.06)'
+            }}>
+              <span style={{ color: '#555577', fontSize: 13 }}>▲ {post.likes_count} curtidas</span>
+              <span style={{ color: '#555577', fontSize: 13 }}>💬 {post.comments_count} comentários</span>
+            </div>
           </div>
         </div>
 
         {/* Caixa de comentário */}
-        <div className="bg-[#141416] border border-zinc-800 rounded-2xl p-4">
+        <div style={{
+          background: '#111118',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 16, padding: 16,
+          transition: 'border-color 0.2s'
+        }}>
+          <p style={{ color: '#8888aa', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
+            Comentários
+          </p>
           <textarea
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
             placeholder="Escreva um comentário..."
             rows={3}
-            className="w-full bg-transparent text-zinc-300 placeholder-zinc-600 focus:outline-none resize-none text-sm"
+            style={{
+              width: '100%', background: '#18181f',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 10, padding: '10px 14px',
+              color: '#f0f0f8', fontSize: 14, outline: 'none',
+              fontFamily: "'Syne', sans-serif", resize: 'none',
+              boxSizing: 'border-box', transition: 'border-color 0.2s'
+            }}
+            onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+            onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
           />
-          <div className="flex justify-end mt-2">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
             <button
               onClick={handleComment}
               disabled={submitting || !newComment.trim()}
-              className="bg-[#c8f23c] text-black text-sm font-bold px-4 py-1.5 rounded-full hover:bg-[#d4f554] transition-colors disabled:opacity-50"
+              style={{
+                background: '#c8f23c', color: '#000', fontWeight: 700,
+                padding: '8px 20px', borderRadius: 50, border: 'none',
+                cursor: submitting || !newComment.trim() ? 'not-allowed' : 'pointer',
+                fontSize: 13, fontFamily: "'Syne', sans-serif",
+                boxShadow: '0 0 12px rgba(200,242,60,0.3)',
+                opacity: submitting || !newComment.trim() ? 0.5 : 1,
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { if (!submitting && newComment.trim()) e.currentTarget.style.boxShadow = '0 0 24px rgba(200,242,60,0.6)' }}
+              onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 0 12px rgba(200,242,60,0.3)')}
             >
               {submitting ? 'Enviando...' : 'Comentar'}
             </button>
           </div>
         </div>
 
-        {/* Comentários */}
-        <div className="space-y-3">
+        {/* Lista de comentários */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {comments.length === 0 && (
-            <p className="text-center text-zinc-600 text-sm py-6">Nenhum comentário ainda. Seja o primeiro!</p>
+            <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '32px 0' }}>
+              Nenhum comentário ainda. Seja o primeiro!
+            </p>
           )}
           {comments.map(comment => (
-            <div key={comment.id} className="bg-[#141416] border border-zinc-800 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full bg-[#c8f23c] flex items-center justify-center text-black text-xs font-bold">
-                  {getInitial(comment.profiles?.username || '?')}
+            <div
+              key={comment.id}
+              style={{
+                background: '#111118',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 14, padding: 16,
+                transition: 'border-color 0.2s'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: comment.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#000', fontWeight: 800, fontSize: 11, flexShrink: 0, overflow: 'hidden'
+                  }}>
+                    {comment.profiles?.avatar_url
+                      ? <img src={comment.profiles.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : getInitial(comment.profiles?.username || '?')
+                    }
+                  </div>
+                  <div>
+                    <span
+                      onClick={() => router.push(`/profile/${comment.profiles?.username}`)}
+                      style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
+                    >
+                      @{comment.profiles?.username || 'usuário'}
+                    </span>
+                    <span style={{ color: '#444466', fontSize: 11, marginLeft: 8 }}>{timeAgo(comment.created_at)}</span>
+                  </div>
                 </div>
-                <span className="text-zinc-400 text-xs">
-                  <span className="text-white font-medium">@{comment.profiles?.username || 'usuário'}</span>
-                  {' · '}{timeAgo(comment.created_at)}
-                </span>
+
+                {userId === comment.author_id && (
+                  <button
+                    onClick={() => handleDeleteComment(comment.id)}
+                    style={{
+                      background: 'none', border: 'none', color: '#444466',
+                      cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif",
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#ff4466')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#444466')}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
-              <p className="text-zinc-300 text-sm">{comment.content}</p>
+              <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{comment.content}</p>
             </div>
           ))}
         </div>
       </main>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+        textarea::placeholder { color: #333355; }
+        @media (max-width: 767px) { main { padding-left: 16px !important; } }
+      `}</style>
     </div>
   )
 }
