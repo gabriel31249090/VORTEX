@@ -42,10 +42,7 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('username', username)
-        .single()
+        .from('profiles').select('*').eq('username', username).single()
 
       if (!profileData) { setLoading(false); return }
 
@@ -69,10 +66,7 @@ export default function ProfilePage() {
   async function handleSave() {
     if (!profile) return
     setSaving(true)
-    await supabase.from('profiles').update({
-      display_name: displayName,
-      bio: bio
-    }).eq('id', profile.id)
+    await supabase.from('profiles').update({ display_name: displayName, bio }).eq('id', profile.id)
     setProfile(prev => prev ? { ...prev, display_name: displayName, bio } : prev)
     setEditMode(false)
     setSaving(false)
@@ -87,57 +81,96 @@ export default function ProfilePage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
-      <p className="text-zinc-500">Carregando...</p>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
+      <p style={{ color: '#555577' }}>Carregando...</p>
     </div>
   )
 
   if (!profile) return (
-    <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
-      <p className="text-zinc-500">Usuário não encontrado.</p>
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
+      <p style={{ color: '#555577' }}>Usuário não encontrado.</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#0d0d0f]">
-      <header className="sticky top-0 z-50 bg-[#0d0d0f]/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center gap-3">
-          <button onClick={() => router.push('/feed')} className="text-zinc-400 hover:text-white transition-colors">
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
+      {/* Header */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(200,242,60,0.2)',
+      }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => router.push('/feed')}
+            style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}
+          >
             ← Voltar
           </button>
-          <span className="text-white font-bold">@{profile.username}</span>
+          <span style={{ color: '#f0f0f8', fontWeight: 700 }}>@{profile.username}</span>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {/* Banner */}
-        <div className="bg-[#141416] border border-zinc-800 rounded-2xl overflow-hidden">
-          <div className="h-24 bg-gradient-to-r from-[#c8f23c]/20 to-zinc-800" />
-          <div className="px-5 pb-5">
-            <div className="flex items-end justify-between -mt-8 mb-4">
-              <div className="w-16 h-16 rounded-full bg-[#c8f23c] flex items-center justify-center text-black text-2xl font-black border-4 border-[#141416]">
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Perfil */}
+        <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }}>
+          {/* Banner */}
+          <div style={{
+            height: 100,
+            background: 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))',
+            borderBottom: '1px solid rgba(200,242,60,0.1)'
+          }} />
+
+          <div style={{ padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -48, marginBottom: 16 }}>
+              {/* Avatar */}
+              <div style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#000', fontWeight: 800, fontSize: 28,
+                border: '4px solid #111118',
+                boxShadow: '0 0 20px rgba(200,242,60,0.3)'
+              }}>
                 {profile.username.charAt(0).toUpperCase()}
               </div>
+
+              {/* Botões */}
               {isOwner && !editMode && (
                 <button
                   onClick={() => setEditMode(true)}
-                  className="text-zinc-400 text-sm border border-zinc-700 px-3 py-1 rounded-full hover:border-zinc-500 transition-colors"
+                  style={{
+                    background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer',
+                    fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.4)'; e.currentTarget.style.color = '#c8f23c' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}
                 >
                   Editar perfil
                 </button>
               )}
               {isOwner && editMode && (
-                <div className="flex gap-2">
+                <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     onClick={() => setEditMode(false)}
-                    className="text-zinc-400 text-sm border border-zinc-700 px-3 py-1 rounded-full hover:border-zinc-500 transition-colors"
+                    style={{
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                      color: '#8888aa', padding: '7px 14px', borderRadius: 50, cursor: 'pointer',
+                      fontSize: 13, fontFamily: "'Syne', sans-serif"
+                    }}
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="bg-[#c8f23c] text-black text-sm font-bold px-3 py-1 rounded-full hover:bg-[#d4f554] transition-colors disabled:opacity-50"
+                    style={{
+                      background: '#c8f23c', color: '#000', fontWeight: 700,
+                      padding: '7px 16px', borderRadius: 50, border: 'none', cursor: 'pointer',
+                      fontSize: 13, fontFamily: "'Syne', sans-serif",
+                      boxShadow: '0 0 12px rgba(200,242,60,0.3)'
+                    }}
                   >
                     {saving ? 'Salvando...' : 'Salvar'}
                   </button>
@@ -146,56 +179,76 @@ export default function ProfilePage() {
             </div>
 
             {editMode ? (
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <input
                   value={displayName}
                   onChange={e => setDisplayName(e.target.value)}
                   placeholder="Nome de exibição"
-                  className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-2 text-white placeholder-zinc-600 focus:outline-none focus:border-[#c8f23c] text-sm"
+                  style={{
+                    background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14,
+                    outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box', width: '100%'
+                  }}
+                  onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
                 <textarea
                   value={bio}
                   onChange={e => setBio(e.target.value)}
                   placeholder="Bio..."
                   rows={3}
-                  className="w-full bg-[#1c1c1f] border border-zinc-700 rounded-xl px-4 py-2 text-white placeholder-zinc-600 focus:outline-none focus:border-[#c8f23c] text-sm resize-none"
+                  style={{
+                    background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14,
+                    outline: 'none', fontFamily: "'Syne', sans-serif", resize: 'none', boxSizing: 'border-box', width: '100%'
+                  }}
+                  onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
               </div>
             ) : (
               <>
-                <h1 className="text-white font-bold text-xl">
+                <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 20, marginBottom: 4 }}>
                   {profile.display_name || profile.username}
                 </h1>
-                <p className="text-zinc-500 text-sm">@{profile.username}</p>
-                {profile.bio && <p className="text-zinc-400 text-sm mt-2">{profile.bio}</p>}
-                <p className="text-zinc-600 text-xs mt-2">{posts.length} publicações</p>
+                <p style={{ color: '#555577', fontSize: 14, marginBottom: 8 }}>@{profile.username}</p>
+                {profile.bio && <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{profile.bio}</p>}
+                <p style={{ color: '#333355', fontSize: 12, marginTop: 12 }}>{posts.length} publicações</p>
               </>
             )}
           </div>
         </div>
 
-        {/* Posts do usuário */}
-        <div className="space-y-3">
-          {posts.length === 0 && (
-            <p className="text-center text-zinc-600 text-sm py-6">Nenhuma publicação ainda.</p>
-          )}
-          {posts.map(post => (
-            <article
-              key={post.id}
-              onClick={() => router.push(`/post/${post.id}`)}
-              className="bg-[#141416] border border-zinc-800 rounded-2xl p-5 hover:border-zinc-600 transition-colors cursor-pointer"
-            >
-              <h2 className="text-white font-semibold mb-1">{post.title}</h2>
-              {post.content && <p className="text-zinc-400 text-sm line-clamp-2">{post.content}</p>}
-              <div className="flex items-center gap-4 mt-3">
-                <span className="text-zinc-600 text-xs">▲ {post.likes_count}</span>
-                <span className="text-zinc-600 text-xs">💬 {post.comments_count}</span>
-                <span className="text-zinc-600 text-xs">{timeAgo(post.created_at)}</span>
-              </div>
-            </article>
-          ))}
-        </div>
+        {/* Posts */}
+        {posts.length === 0 && (
+          <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '40px 0' }}>Nenhuma publicação ainda.</p>
+        )}
+        {posts.map(post => (
+          <article
+            key={post.id}
+            onClick={() => router.push(`/post/${post.id}`)}
+            style={{
+              background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
+          >
+            <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{post.title}</h2>
+            {post.content && <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>{post.content}</p>}
+            <div style={{ display: 'flex', gap: 16 }}>
+              <span style={{ color: '#333355', fontSize: 12 }}>▲ {post.likes_count}</span>
+              <span style={{ color: '#333355', fontSize: 12 }}>💬 {post.comments_count}</span>
+              <span style={{ color: '#333355', fontSize: 12 }}>{timeAgo(post.created_at)}</span>
+            </div>
+          </article>
+        ))}
       </main>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+        input::placeholder, textarea::placeholder { color: #333355; }
+      `}</style>
     </div>
   )
 }
