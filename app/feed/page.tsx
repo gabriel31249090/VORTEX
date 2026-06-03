@@ -10,6 +10,7 @@ type Post = {
   title: string
   content: string
   type: string
+  media_url: string | null
   likes_count: number
   comments_count: number
   created_at: string
@@ -35,7 +36,7 @@ export default function FeedPage() {
       const { data, error } = await supabase
         .from('posts')
         .select(`
-          id, title, content, type, likes_count, comments_count, created_at, author_id,
+          id, title, content, type, media_url, likes_count, comments_count, created_at, author_id,
           profiles(username, avatar_url),
           communities(name, slug)
         `)
@@ -85,13 +86,11 @@ export default function FeedPage() {
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
 
-      {/* Feed */}
       <main style={{
         maxWidth: 680, margin: '0 auto',
         padding: '24px 16px 80px',
         paddingLeft: 'max(16px, calc(220px + 32px))'
       }}>
-
         {loading && [1, 2, 3].map(i => (
           <div key={i} style={{
             background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
@@ -117,10 +116,9 @@ export default function FeedPage() {
               style={{
                 background: '#111118',
                 border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 16, padding: 20,
+                borderRadius: 16, overflow: 'hidden',
                 animation: `fadeUp 0.4s ease ${i * 0.05}s both`,
                 transition: 'border-color 0.2s, box-shadow 0.2s',
-                cursor: 'pointer'
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'
@@ -131,83 +129,102 @@ export default function FeedPage() {
                 e.currentTarget.style.boxShadow = 'none'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-                  boxShadow: '0 0 8px rgba(200,242,60,0.3)'
-                }}>
-                  {getInitial(post.profiles?.username || '?')}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <span
-                    style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                    onClick={(e) => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-                  >
-                    @{post.profiles?.username || 'usuário'}
-                  </span>
-                  {post.communities && (
-                    <span style={{ color: '#c8f23c', fontSize: 13 }}> em v/{post.communities.name}</span>
-                  )}
-                  <span style={{ color: '#444466', fontSize: 13 }}> · {timeAgo(post.created_at)}</span>
-                </div>
-              </div>
-
-              <div onClick={() => router.push(`/post/${post.id}`)}>
-                <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3 }}>
-                  {post.title}
-                </h2>
-                {post.content && (
-                  <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {post.content}
-                  </p>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <button
-                  onClick={() => handleLike(post.id)}
-                  style={{
-                    background: likedPosts.has(post.id) ? 'rgba(200,242,60,0.12)' : 'transparent',
-                    border: `1px solid ${likedPosts.has(post.id) ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                    color: likedPosts.has(post.id) ? '#c8f23c' : '#555577',
-                    padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                    fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-                    boxShadow: likedPosts.has(post.id) ? '0 0 10px rgba(200,242,60,0.2)' : 'none'
-                  }}
-                >
-                  ▲ {post.likes_count}
-                </button>
-                <button
+              {/* Imagem do post */}
+              {post.media_url && (
+                <div
                   onClick={() => router.push(`/post/${post.id}`)}
-                  style={{
-                    background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                    fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                  style={{ cursor: 'pointer' }}
                 >
-                  💬 {post.comments_count}
-                </button>
-                <button
-                  style={{
-                    background: 'transparent', border: 'none',
-                    color: '#555577', cursor: 'pointer',
-                    fontSize: 13, fontFamily: "'Syne', sans-serif",
-                    marginLeft: 'auto', transition: 'color 0.2s'
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                >
-                  ↗ Compartilhar
-                </button>
+                  <img
+                    src={post.media_url}
+                    alt={post.title}
+                    style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+              )}
+
+              <div style={{ padding: 20 }}>
+                {/* Meta */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
+                    boxShadow: '0 0 8px rgba(200,242,60,0.3)'
+                  }}>
+                    {getInitial(post.profiles?.username || '?')}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <span
+                      style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
+                    >
+                      @{post.profiles?.username || 'usuário'}
+                    </span>
+                    {post.communities && (
+                      <span style={{ color: '#c8f23c', fontSize: 13 }}> em v/{post.communities.name}</span>
+                    )}
+                    <span style={{ color: '#444466', fontSize: 13 }}> · {timeAgo(post.created_at)}</span>
+                  </div>
+                </div>
+
+                {/* Conteúdo */}
+                <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                  <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3 }}>
+                    {post.title}
+                  </h2>
+                  {post.content && (
+                    <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {post.content}
+                    </p>
+                  )}
+                </div>
+
+                {/* Ações */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <button
+                    onClick={() => handleLike(post.id)}
+                    style={{
+                      background: likedPosts.has(post.id) ? 'rgba(200,242,60,0.12)' : 'transparent',
+                      border: `1px solid ${likedPosts.has(post.id) ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                      color: likedPosts.has(post.id) ? '#c8f23c' : '#555577',
+                      padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                      fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                      boxShadow: likedPosts.has(post.id) ? '0 0 10px rgba(200,242,60,0.2)' : 'none'
+                    }}
+                  >
+                    ▲ {post.likes_count}
+                  </button>
+                  <button
+                    onClick={() => router.push(`/post/${post.id}`)}
+                    style={{
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                      fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                  >
+                    💬 {post.comments_count}
+                  </button>
+                  <button
+                    style={{
+                      background: 'transparent', border: 'none',
+                      color: '#555577', cursor: 'pointer',
+                      fontSize: 13, fontFamily: "'Syne', sans-serif",
+                      marginLeft: 'auto', transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                  >
+                    ↗ Compartilhar
+                  </button>
+                </div>
               </div>
             </article>
           ))}
