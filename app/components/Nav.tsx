@@ -45,6 +45,7 @@ export default function Nav() {
     { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
     { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
     { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
+    { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
   ]
 
   return (
