@@ -54,7 +54,7 @@ export default function CommunitiesPage() {
     const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 
     const { data: existing } = await supabase
-      .from('communities').select('slug').eq('slug', slug).single()
+      .from('communities').select('slug').eq('slug', slug).maybeSingle()
 
     if (existing) { setError('Já existe uma comunidade com esse nome.'); setCreating(false); return }
 
@@ -84,7 +84,6 @@ export default function CommunitiesPage() {
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
 
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 24 }}>Comunidades</h1>
           <button
@@ -102,7 +101,6 @@ export default function CommunitiesPage() {
           </button>
         </div>
 
-        {/* Form criar comunidade */}
         {showForm && (
           <div style={{
             background: '#111118', border: '1px solid rgba(200,242,60,0.2)',
@@ -186,7 +184,6 @@ export default function CommunitiesPage() {
           </div>
         )}
 
-        {/* Lista */}
         {loading && [1,2,3].map(i => (
           <div key={i} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, marginBottom: 12, opacity: 0.5 }}>
             <div style={{ height: 16, background: '#222230', borderRadius: 6, width: '40%', marginBottom: 8 }} />
@@ -205,12 +202,19 @@ export default function CommunitiesPage() {
           {communities.map(community => (
             <div
               key={community.id}
+              onClick={() => router.push(`/community/${community.slug}`)}
               style={{
                 background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
                 borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'all 0.2s'
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{
@@ -235,6 +239,7 @@ export default function CommunitiesPage() {
                     <p style={{ color: '#8888aa', fontSize: 13, marginTop: 4 }}>{community.description}</p>
                   )}
                 </div>
+                <span style={{ color: '#333355', fontSize: 18 }}>→</span>
               </div>
             </div>
           ))}
