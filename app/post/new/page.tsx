@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 
 type FormatType = 'bold' | 'italic' | 'strikeThrough' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock'
 
-export default function NewPostPage() {
+function NewPostInner() {
   const [title, setTitle] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -424,5 +424,14 @@ export default function NewPostPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+
+export default function NewPostPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#0a0a0f' }} />}>
+      <NewPostInner />
+    </Suspense>
   )
 }
