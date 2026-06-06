@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
+import toast from 'react-hot-toast'
 
 type Post = {
   id: string
@@ -24,6 +25,7 @@ type Comment = {
   content: string
   created_at: string
   author_id: string
+  parent_id: string | null
   profiles: { username: string; avatar_url: string | null } | null
 }
 
@@ -31,10 +33,140 @@ function isVideo(url: string) {
   return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)
 }
 
+function buildTree(comments: Comment[]) {
+  const map: Record<string, Comment & { replies: Comment[] }> = {}
+  const roots: (Comment & { replies: Comment[] })[] = []
+
+  comments.forEach(c => { map[c.id] = { ...c, replies: [] } })
+  comments.forEach(c => {
+    if (c.parent_id && map[c.parent_id]) {
+      map[c.parent_id].replies.push(map[c.id])
+    } else {
+      roots.push(map[c.id])
+    }
+  })
+  return roots
+}
+
+function CommentNode({
+  comment,
+  userId,
+  onDelete,
+  onReply,
+  router,
+  depth = 0,
+}: {
+  comment: Comment & { replies: (Comment & { replies: any[] })[] }
+  userId: string | null
+  onDelete: (id: string) => void
+  onReply: (parentId: string, username: string) => void
+  router: any
+  depth?: number
+}) {
+  function timeAgo(date: string) {
+    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    if (diff < 60) return `${diff}s`
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+    return `${Math.floor(diff / 86400)}d`
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {/* Linha vertical de thread */}
+      {depth > 0 && (
+        <div style={{
+          position: 'absolute', left: -16, top: 0, bottom: 0,
+          width: 2, background: 'rgba(200,242,60,0.1)', borderRadius: 2,
+        }} />
+      )}
+
+      <div
+        style={{
+          background: depth === 0 ? '#111118' : '#0e0e18',
+          border: `1px solid ${depth === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(200,242,60,0.06)'}`,
+          borderRadius: 14, padding: 14, transition: 'border-color 0.2s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = depth === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(200,242,60,0.12)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = depth === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(200,242,60,0.06)')}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: depth === 0 ? 28 : 22, height: depth === 0 ? 28 : 22, borderRadius: '50%',
+              background: comment.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#000', fontWeight: 800, fontSize: depth === 0 ? 11 : 9,
+              overflow: 'hidden', flexShrink: 0,
+            }}>
+              {comment.profiles?.avatar_url
+                ? <img src={comment.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : comment.profiles?.username?.charAt(0).toUpperCase()
+              }
+            </div>
+            <div>
+              <span
+                onClick={() => router.push(`/profile/${comment.profiles?.username}`)}
+                style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
+              >
+                @{comment.profiles?.username || 'usuário'}
+              </span>
+              <span style={{ color: '#444466', fontSize: 11, marginLeft: 8 }}>{timeAgo(comment.created_at)}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {depth < 3 && (
+              <button
+                onClick={() => onReply(comment.id, comment.profiles?.username || '')}
+                style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'color 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#444466')}
+              >
+                ↩ Responder
+              </button>
+            )}
+            {userId === comment.author_id && (
+              <button
+                onClick={() => onDelete(comment.id)}
+                style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, transition: 'color 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#ff4466')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#444466')}
+              >✕</button>
+            )}
+          </div>
+        </div>
+
+        <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{comment.content}</p>
+      </div>
+
+      {/* Respostas aninhadas */}
+      {comment.replies.length > 0 && (
+        <div style={{ marginTop: 8, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
+          {comment.replies.map((reply: any) => (
+            <CommentNode
+              key={reply.id}
+              comment={reply}
+              userId={userId}
+              onDelete={onDelete}
+              onReply={onReply}
+              router={router}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PostPage() {
   const [post, setPost] = useState<Post | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
+  const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
@@ -64,7 +196,7 @@ export default function PostPage() {
 
       const { data: commentsData } = await supabase
         .from('comments')
-        .select('id, content, created_at, author_id, profiles(username, avatar_url)')
+        .select('id, content, created_at, author_id, parent_id, profiles(username, avatar_url)')
         .eq('post_id', postId)
         .order('created_at', { ascending: true })
 
@@ -86,6 +218,7 @@ export default function PostPage() {
       await supabase.from('posts').update({ likes_count: post.likes_count + 1 }).eq('id', postId)
       setLiked(true)
       setPost(prev => prev ? { ...prev, likes_count: prev.likes_count + 1 } : prev)
+      toast.success('Post curtido!')
     }
   }
 
@@ -96,14 +229,17 @@ export default function PostPage() {
     const { data, error } = await supabase.from('comments').insert({
       post_id: postId,
       author_id: userId,
-      content: newComment.trim()
-    }).select('id, content, created_at, author_id, profiles(username, avatar_url)').single()
+      content: newComment.trim(),
+      parent_id: replyTo?.id || null,
+    }).select('id, content, created_at, author_id, parent_id, profiles(username, avatar_url)').single()
 
     if (!error && data) {
       setComments(prev => [...prev, data as any])
       await supabase.from('posts').update({ comments_count: (post?.comments_count || 0) + 1 }).eq('id', postId)
       setPost(prev => prev ? { ...prev, comments_count: prev.comments_count + 1 } : prev)
       setNewComment('')
+      setReplyTo(null)
+      toast.success(replyTo ? 'Resposta enviada!' : 'Comentário enviado!')
     }
     setSubmitting(false)
   }
@@ -113,6 +249,7 @@ export default function PostPage() {
     setComments(prev => prev.filter(c => c.id !== commentId))
     await supabase.from('posts').update({ comments_count: Math.max((post?.comments_count || 1) - 1, 0) }).eq('id', postId)
     setPost(prev => prev ? { ...prev, comments_count: Math.max(prev.comments_count - 1, 0) } : prev)
+    toast('Comentário removido.')
   }
 
   async function handleDeletePost() {
@@ -120,7 +257,14 @@ export default function PostPage() {
     await supabase.from('comments').delete().eq('post_id', postId)
     await supabase.from('likes').delete().eq('post_id', postId)
     await supabase.from('posts').delete().eq('id', postId)
+    toast.success('Post deletado.')
     router.push('/feed')
+  }
+
+  function handleReply(parentId: string, username: string) {
+    setReplyTo({ id: parentId, username })
+    setNewComment(`@${username} `)
+    setTimeout(() => document.getElementById('comment-input')?.focus(), 100)
   }
 
   function timeAgo(date: string) {
@@ -131,9 +275,7 @@ export default function PostPage() {
     return `${Math.floor(diff / 86400)}d`
   }
 
-  function getInitial(username: string) {
-    return username?.charAt(0).toUpperCase() || '?'
-  }
+  const commentTree = buildTree(comments)
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
@@ -157,7 +299,8 @@ export default function PostPage() {
         borderBottom: '1px solid rgba(200,242,60,0.2)',
       }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 'max(16px, calc(220px + 32px))' }}>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}
+          <button onClick={() => router.back()}
+            style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}
             onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
             onMouseLeave={e => (e.currentTarget.style.color = '#8888aa')}
           >← Voltar</button>
@@ -169,8 +312,6 @@ export default function PostPage() {
 
         {/* Post card */}
         <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }}>
-
-          {/* Mídia */}
           {post.media_url && (
             isVideo(post.media_url)
               ? <video src={post.media_url} controls style={{ width: '100%', maxHeight: 480, display: 'block', background: '#000' }} />
@@ -178,7 +319,6 @@ export default function PostPage() {
           )}
 
           <div style={{ padding: 20 }}>
-            {/* Autor */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
@@ -190,7 +330,7 @@ export default function PostPage() {
                 }}>
                   {post.profiles?.avatar_url
                     ? <img src={post.profiles.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : getInitial(post.profiles?.username || '?')
+                    : post.profiles?.username?.charAt(0).toUpperCase()
                   }
                 </div>
                 <div>
@@ -211,23 +351,14 @@ export default function PostPage() {
               )}
             </div>
 
-            {/* Título */}
             <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 22, marginBottom: 16, lineHeight: 1.3 }}>{post.title}</h1>
 
-            {/* Conteúdo — HTML rico se disponível, senão texto puro */}
             {post.html_content ? (
-              <div
-                className="post-content"
-                dangerouslySetInnerHTML={{ __html: post.html_content }}
-                style={{ color: '#8888aa', fontSize: 15, lineHeight: 1.75, marginBottom: 16 }}
-              />
+              <div className="post-content" dangerouslySetInnerHTML={{ __html: post.html_content }} style={{ color: '#8888aa', fontSize: 15, lineHeight: 1.75, marginBottom: 16 }} />
             ) : post.content ? (
-              <p style={{ color: '#8888aa', fontSize: 15, lineHeight: 1.75, marginBottom: 16, whiteSpace: 'pre-wrap' }}>
-                {post.content}
-              </p>
+              <p style={{ color: '#8888aa', fontSize: 15, lineHeight: 1.75, marginBottom: 16, whiteSpace: 'pre-wrap' }}>{post.content}</p>
             ) : null}
 
-            {/* Ações */}
             <div style={{ display: 'flex', gap: 12, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <button
                 onClick={handleLike}
@@ -250,17 +381,38 @@ export default function PostPage() {
 
         {/* Caixa de comentário */}
         <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 16 }}>
-          <p style={{ color: '#8888aa', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>Comentários</p>
+          <p style={{ color: '#8888aa', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
+            {post.comments_count} Comentários
+          </p>
+
+          {/* Banner de resposta */}
+          {replyTo && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'rgba(200,242,60,0.06)', border: '1px solid rgba(200,242,60,0.15)',
+              borderRadius: 8, padding: '8px 12px', marginBottom: 10,
+            }}>
+              <span style={{ color: '#c8f23c', fontSize: 13 }}>↩ Respondendo @{replyTo.username}</span>
+              <button
+                onClick={() => { setReplyTo(null); setNewComment('') }}
+                style={{ background: 'none', border: 'none', color: '#555577', cursor: 'pointer', fontSize: 14 }}
+              >✕</button>
+            </div>
+          )}
+
           <textarea
+            id="comment-input"
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
-            placeholder="Escreva um comentário..."
+            placeholder={replyTo ? `Respondendo @${replyTo.username}...` : 'Escreva um comentário...'}
             rows={3}
             style={{ width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14, outline: 'none', fontFamily: "'Syne', sans-serif", resize: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
             onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
             onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleComment() }}
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+            <span style={{ color: '#333355', fontSize: 11 }}>Ctrl+Enter para enviar</span>
             <button
               onClick={handleComment}
               disabled={submitting || !newComment.trim()}
@@ -272,53 +424,25 @@ export default function PostPage() {
                 boxShadow: '0 0 12px rgba(200,242,60,0.3)',
                 opacity: submitting || !newComment.trim() ? 0.5 : 1, transition: 'all 0.2s'
               }}
-            >{submitting ? 'Enviando...' : 'Comentar'}</button>
+            >{submitting ? 'Enviando...' : replyTo ? 'Responder' : 'Comentar'}</button>
           </div>
         </div>
 
-        {/* Comentários */}
+        {/* Árvore de comentários */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {comments.length === 0 && (
+          {commentTree.length === 0 && (
             <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '32px 0' }}>Nenhum comentário ainda.</p>
           )}
-          {comments.map(comment => (
-            <div key={comment.id}
-              style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: 16, transition: 'border-color 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: comment.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#000', fontWeight: 800, fontSize: 11, overflow: 'hidden', flexShrink: 0
-                  }}>
-                    {comment.profiles?.avatar_url
-                      ? <img src={comment.profiles.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : getInitial(comment.profiles?.username || '?')
-                    }
-                  </div>
-                  <div>
-                    <span onClick={() => router.push(`/profile/${comment.profiles?.username}`)}
-                      style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-                      onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
-                      onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-                    >@{comment.profiles?.username || 'usuário'}</span>
-                    <span style={{ color: '#444466', fontSize: 11, marginLeft: 8 }}>{timeAgo(comment.created_at)}</span>
-                  </div>
-                </div>
-                {userId === comment.author_id && (
-                  <button onClick={() => handleDeleteComment(comment.id)}
-                    style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, transition: 'color 0.2s' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#ff4466')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#444466')}
-                  >✕</button>
-                )}
-              </div>
-              <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{comment.content}</p>
-            </div>
+          {commentTree.map(comment => (
+            <CommentNode
+              key={comment.id}
+              comment={comment}
+              userId={userId}
+              onDelete={handleDeleteComment}
+              onReply={handleReply}
+              router={router}
+              depth={0}
+            />
           ))}
         </div>
       </main>
@@ -326,7 +450,6 @@ export default function PostPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
         textarea::placeholder { color: #333355; }
-
         .post-content h2 { font-size: 20px; font-weight: 800; color: #f0f0f8; margin: 16px 0 8px; line-height: 1.3; }
         .post-content h3 { font-size: 17px; font-weight: 700; color: #f0f0f8; margin: 14px 0 6px; line-height: 1.3; }
         .post-content blockquote { border-left: 3px solid rgba(200,242,60,0.5); padding: 4px 0 4px 14px; margin: 12px 0; color: #8888aa; font-style: italic; }
@@ -338,7 +461,6 @@ export default function PostPage() {
         .post-content em { color: #aaaacc; }
         .post-content s { color: #555577; }
         .post-content p { margin: 8px 0; }
-
         @media (max-width: 767px) { main { padding-left: 16px !important; } }
       `}</style>
     </div>
