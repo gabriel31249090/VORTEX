@@ -29,13 +29,15 @@ type Comment = {
   profiles: { username: string; avatar_url: string | null } | null
 }
 
+type CommentWithReplies = Comment & { replies: CommentWithReplies[] }
+
 function isVideo(url: string) {
   return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)
 }
 
-function buildTree(comments: Comment[]) {
-  const map: Record<string, Comment & { replies: Comment[] }> = {}
-  const roots: (Comment & { replies: Comment[] })[] = []
+function buildTree(comments: Comment[]): CommentWithReplies[] {
+  const map: Record<string, CommentWithReplies> = {}
+  const roots: CommentWithReplies[] = []
 
   comments.forEach(c => { map[c.id] = { ...c, replies: [] } })
   comments.forEach(c => {
@@ -56,7 +58,7 @@ function CommentNode({
   router,
   depth = 0,
 }: {
-  comment: Comment & { replies: (Comment & { replies: any[] })[] }
+  comment: CommentWithReplies
   userId: string | null
   onDelete: (id: string) => void
   onReply: (parentId: string, username: string) => void
@@ -73,7 +75,6 @@ function CommentNode({
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Linha vertical de thread */}
       {depth > 0 && (
         <div style={{
           position: 'absolute', left: -16, top: 0, bottom: 0,
@@ -142,10 +143,9 @@ function CommentNode({
         <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{comment.content}</p>
       </div>
 
-      {/* Respostas aninhadas */}
       {comment.replies.length > 0 && (
         <div style={{ marginTop: 8, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
-          {comment.replies.map((reply: any) => (
+          {comment.replies.map(reply => (
             <CommentNode
               key={reply.id}
               comment={reply}
@@ -385,7 +385,6 @@ export default function PostPage() {
             {post.comments_count} Comentários
           </p>
 
-          {/* Banner de resposta */}
           {replyTo && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
