@@ -19,6 +19,10 @@ type Post = {
   communities: { name: string; slug: string } | null
 }
 
+function isVideo(url: string) {
+  return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)
+}
+
 export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,18 +133,24 @@ export default function FeedPage() {
                 e.currentTarget.style.boxShadow = 'none'
               }}
             >
-              {/* Imagem do post */}
+              {/* Mídia do post */}
               {post.media_url && (
-                <div
-                  onClick={() => router.push(`/post/${post.id}`)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <img
+                isVideo(post.media_url) ? (
+                  <video
                     src={post.media_url}
-                    alt={post.title}
-                    style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }}
+                    controls
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }}
                   />
-                </div>
+                ) : (
+                  <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                    <img
+                      src={post.media_url}
+                      alt={post.title}
+                      style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }}
+                    />
+                  </div>
+                )
               )}
 
               <div style={{ padding: 20 }}>
