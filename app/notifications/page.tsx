@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Nav from '../components/Nav'
 
 type Notification = {
   id: string
@@ -11,21 +12,12 @@ type Notification = {
   created_at: string
   post_id: string | null
   actor: {
-    id: string
     username: string
-    display_name: string | null
     avatar_url: string | null
-  }
-  post?: {
-    id: string
+  } | null
+  post: {
     title: string
   } | null
-}
-
-const TYPE_CONFIG = {
-  like: { icon: '▲', label: 'curtiu sua publicação', color: '#c8f23c' },
-  comment: { icon: '💬', label: 'comentou em sua publicação', color: '#60a5fa' },
-  follow: { icon: '→', label: 'começou a te seguir', color: '#a78bfa' },
 }
 
 export default function NotificationsPage() {
@@ -36,34 +28,34 @@ export default function NotificationsPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    loadNotifications()
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      const { data } = await supabase
+        .from('notifications')
+        .select(`
+          id, type, read, created_at, post_id,
+          actor:actor_id(username, avatar_url),
+          post:post_id(title)
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      setNotifications((data as any) || [])
+
+      // marca todas como lidas
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', user.id)
+        .eq('read', false)
+
+      setLoading(false)
+    }
+    load()
   }, [])
-
-  async function loadNotifications() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-
-    const { data } = await supabase
-      .from('notifications')
-      .select(`
-        id, type, read, created_at, post_id,
-        actor:actor_id ( id, username, display_name, avatar_url ),
-        post:post_id ( id, title )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(60)
-
-    setNotifications((data as any) || [])
-    setLoading(false)
-
-    // Marca todas como lidas
-    await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('user_id', user.id)
-      .eq('read', false)
-  }
 
   async function clearAll() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -78,36 +70,42 @@ export default function NotificationsPage() {
     if (diff < 3600) return `${Math.floor(diff / 60)}m`
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`
     if (diff < 604800) return `${Math.floor(diff / 86400)}d`
-    return new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+    return new Date(date).toLocaleDateString('pt-BR')
   }
 
-  const filtered = filter === 'unread'
-    ? notifications.filter(n => !n.read)
-    : notifications
+  function getIcon(type: string) {
+    if (type === 'like') return { icon: '▲', color: '#c8f23c', bg: 'rgba(200,242,60,0.15)' }
+    if (type === 'comment') return { icon: '💬', color: '#60aaff', bg: 'rgba(96,170,255,0.15)' }
+    if (type === 'follow') return { icon: '◉', color: '#ff88cc', bg: 'rgba(255,136,204,0.15)' }
+    return { icon: '•', color: '#8888aa', bg: 'rgba(136,136,170,0.15)' }
+  }
+
+  function getMessage(n: Notification) {
+    const name = n.actor?.username || 'alguém'
+    if (n.type === 'like') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> curtiu seu post{n.post ? <> "<span style={{ color: '#8888aa' }}>{n.post.title}</span>"</> : ''}</>
+    if (n.type === 'comment') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> comentou no seu post{n.post ? <> "<span style={{ color: '#8888aa' }}>{n.post.title}</span>"</> : ''}</>
+    if (n.type === 'follow') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> começou a te seguir</>
+    return <span>Nova notificação</span>
+  }
 
   const unreadCount = notifications.filter(n => !n.read).length
+  const filtered = filter === 'unread' ? notifications.filter(n => !n.read) : notifications
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
-      {/* Header */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(200,242,60,0.2)',
-      }}>
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Nav />
+
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => router.push('/feed')}
-              style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}
-            >
-              ← Voltar
-            </button>
-            <span style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16 }}>Notificações</span>
+            <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 24 }}>Notificações</h1>
             {unreadCount > 0 && (
               <span style={{
-                background: '#c8f23c', color: '#000', fontSize: 11, fontWeight: 800,
-                borderRadius: 999, padding: '2px 7px',
+                background: '#c8f23c', color: '#000', fontSize: 12, fontWeight: 800,
+                borderRadius: 999, padding: '2px 8px',
+                boxShadow: '0 0 10px rgba(200,242,60,0.4)'
               }}>
                 {unreadCount}
               </span>
@@ -116,118 +114,122 @@ export default function NotificationsPage() {
           {notifications.length > 0 && (
             <button
               onClick={clearAll}
-              style={{ background: 'none', border: 'none', color: '#333355', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif" }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#8888aa')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#333355')}
+              style={{
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#555577', padding: '6px 14px', borderRadius: 50, cursor: 'pointer',
+                fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,50,50,0.4)'; e.currentTarget.style.color = '#ff4466' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#555577' }}
             >
               Limpar tudo
             </button>
           )}
         </div>
-      </header>
 
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '16px' }}>
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: '#111118', borderRadius: 12, padding: 4, border: '1px solid rgba(255,255,255,0.06)' }}>
-          {(['all', 'unread'] as const).map(tab => (
+        {/* Filtros */}
+        <div style={{
+          display: 'flex', background: '#111118', borderRadius: 10,
+          padding: 3, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 20
+        }}>
+          {(['all', 'unread'] as const).map(f => (
             <button
-              key={tab}
-              onClick={() => setFilter(tab)}
+              key={f}
+              onClick={() => setFilter(f)}
               style={{
-                flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
+                flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
                 fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-                background: filter === tab ? '#c8f23c' : 'transparent',
-                color: filter === tab ? '#000' : '#555577',
+                background: filter === f ? 'rgba(200,242,60,0.12)' : 'transparent',
+                color: filter === f ? '#c8f23c' : '#555577',
               }}
             >
-              {tab === 'all' ? 'Todas' : `Não lidas${unreadCount > 0 ? ` (${unreadCount})` : ''}`}
+              {f === 'all' ? 'Todas' : 'Não lidas'}
             </button>
           ))}
         </div>
 
-        {loading && (
-          <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '60px 0' }}>Carregando...</p>
-        )}
+        {/* Loading */}
+        {loading && [1,2,3,4].map(i => (
+          <div key={i} style={{ background: '#111118', borderRadius: 14, padding: 16, marginBottom: 10, opacity: 0.5, display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#222230', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ height: 12, background: '#222230', borderRadius: 6, width: '70%', marginBottom: 8 }} />
+              <div style={{ height: 10, background: '#222230', borderRadius: 6, width: '30%' }} />
+            </div>
+          </div>
+        ))}
 
+        {/* Empty */}
         {!loading && filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '80px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 40, opacity: 0.3 }}>🔔</div>
-            <p style={{ color: '#333355', fontSize: 14 }}>
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#444466' }}>
+            <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>🔔</div>
+            <p style={{ fontSize: 14 }}>
               {filter === 'unread' ? 'Nenhuma notificação não lida.' : 'Nenhuma notificação ainda.'}
             </p>
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {filtered.map((notif, i) => {
-            const config = TYPE_CONFIG[notif.type]
-            const actor = notif.actor as any
-            const post = notif.post as any
-
+        {/* Lista */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map((n, i) => {
+            const { icon, color, bg } = getIcon(n.type)
             return (
               <div
-                key={notif.id}
+                key={n.id}
                 onClick={() => {
-                  if (notif.type === 'follow') router.push(`/profile/${actor.username}`)
-                  else if (post) router.push(`/post/${post.id}`)
+                  if (n.type === 'follow' && n.actor?.username) router.push(`/profile/${n.actor.username}`)
+                  else if (n.post_id) router.push(`/post/${n.post_id}`)
                 }}
                 style={{
-                  display: 'flex', gap: 12, alignItems: 'flex-start',
-                  padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
-                  background: notif.read ? 'transparent' : 'rgba(200,242,60,0.04)',
-                  border: `1px solid ${notif.read ? 'transparent' : 'rgba(200,242,60,0.08)'}`,
-                  transition: 'all 0.15s',
+                  background: n.read ? '#111118' : 'rgba(200,242,60,0.04)',
+                  border: `1px solid ${n.read ? 'rgba(255,255,255,0.06)' : 'rgba(200,242,60,0.15)'}`,
+                  borderRadius: 14, padding: '14px 16px',
+                  cursor: 'pointer', transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', gap: 14,
                   animation: `fadeIn 0.3s ease ${i * 0.03}s both`,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = notif.read ? 'transparent' : 'rgba(200,242,60,0.04)' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.3)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = n.read ? 'rgba(255,255,255,0.06)' : 'rgba(200,242,60,0.15)' }}
               >
-                {/* Avatar + ícone do tipo */}
+                {/* Avatar + ícone */}
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <div style={{
-                    width: 44, height: 44, borderRadius: '50%', overflow: 'hidden',
-                    background: actor?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                    width: 40, height: 40, borderRadius: '50%', overflow: 'hidden',
+                    background: n.actor?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#000', fontWeight: 800, fontSize: 18,
-                    border: '2px solid rgba(255,255,255,0.06)',
+                    fontSize: 16, fontWeight: 800, color: '#000',
                   }}>
-                    {actor?.avatar_url
-                      ? <img src={actor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : actor?.username?.charAt(0).toUpperCase()
+                    {n.actor?.avatar_url
+                      ? <img src={n.actor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : n.actor?.username?.charAt(0).toUpperCase() || '?'
                     }
                   </div>
                   <div style={{
                     position: 'absolute', bottom: -2, right: -2,
-                    width: 20, height: 20, borderRadius: '50%',
-                    background: '#0a0a0f',
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: bg, border: '2px solid #0a0a0f',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, border: `1.5px solid ${config.color}`,
-                    color: config.color,
+                    fontSize: 9, color,
                   }}>
-                    {config.icon}
+                    {icon}
                   </div>
                 </div>
 
-                {/* Texto */}
+                {/* Mensagem */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ color: '#c8c8e0', fontSize: 14, lineHeight: 1.5, margin: 0 }}>
-                    <span style={{ fontWeight: 700, color: '#f0f0f8' }}>@{actor?.username}</span>
-                    {' '}{config.label}
-                    {post && (
-                      <>
-                        {': '}
-                        <span style={{ color: '#8888aa', fontStyle: 'italic' }}>
-                          {post.title.length > 40 ? post.title.slice(0, 40) + '…' : post.title}
-                        </span>
-                      </>
-                    )}
+                  <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.5 }}>
+                    {getMessage(n)}
                   </p>
-                  <p style={{ color: '#333355', fontSize: 12, marginTop: 4 }}>{timeAgo(notif.created_at)}</p>
+                  <p style={{ color: '#444466', fontSize: 12, marginTop: 2 }}>{timeAgo(n.created_at)}</p>
                 </div>
 
-                {/* Dot não lida */}
-                {!notif.read && (
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#c8f23c', flexShrink: 0, marginTop: 6 }} />
+                {/* Indicador não lida */}
+                {!n.read && (
+                  <div style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: '#c8f23c', flexShrink: 0,
+                    boxShadow: '0 0 6px rgba(200,242,60,0.6)'
+                  }} />
                 )}
               </div>
             )
@@ -237,7 +239,8 @@ export default function NotificationsPage() {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 767px) { main { padding-left: 16px !important; } }
       `}</style>
     </div>
   )

@@ -20,7 +20,7 @@ type Post = {
 }
 
 function isVideo(url: string) {
-  return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)
+  return /\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(url)
 }
 
 export default function FeedPage() {
@@ -133,7 +133,7 @@ export default function FeedPage() {
                 e.currentTarget.style.boxShadow = 'none'
               }}
             >
-              {/* Mídia do post */}
+              {/* Mídia do post — imagem ou vídeo */}
               {post.media_url && (
                 isVideo(post.media_url) ? (
                   <video
@@ -143,7 +143,10 @@ export default function FeedPage() {
                     style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }}
                   />
                 ) : (
-                  <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                  <div
+                    onClick={() => router.push(`/post/${post.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <img
                       src={post.media_url}
                       alt={post.title}
@@ -158,12 +161,16 @@ export default function FeedPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                   <div style={{
                     width: 32, height: 32, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                    background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-                    boxShadow: '0 0 8px rgba(200,242,60,0.3)'
+                    boxShadow: '0 0 8px rgba(200,242,60,0.3)',
+                    overflow: 'hidden',
                   }}>
-                    {getInitial(post.profiles?.username || '?')}
+                    {post.profiles?.avatar_url
+                      ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : getInitial(post.profiles?.username || '?')
+                    }
                   </div>
                   <div style={{ flex: 1 }}>
                     <span
@@ -175,7 +182,12 @@ export default function FeedPage() {
                       @{post.profiles?.username || 'usuário'}
                     </span>
                     {post.communities && (
-                      <span style={{ color: '#c8f23c', fontSize: 13 }}> em v/{post.communities.name}</span>
+                      <span
+                        style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
+                        onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
+                      >
+                        {' '}em v/{post.communities.name}
+                      </span>
                     )}
                     <span style={{ color: '#444466', fontSize: 13 }}> · {timeAgo(post.created_at)}</span>
                   </div>
@@ -249,6 +261,12 @@ export default function FeedPage() {
         }
         @media (max-width: 767px) {
           main { padding-left: 16px !important; }
+        }
+        video {
+          border-radius: 0;
+        }
+        video::-webkit-media-controls {
+          background: rgba(0,0,0,0.6);
         }
       `}</style>
     </div>
