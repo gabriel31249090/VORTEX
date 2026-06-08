@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
+import toast from 'react-hot-toast'
 
 type Post = {
   id: string
@@ -19,48 +20,150 @@ type Post = {
   communities: { name: string; slug: string } | null
 }
 
+type FeedTab = 'geral' | 'seguindo'
+
+const PAGE_SIZE = 15
+
 function isVideo(url: string) {
   return /\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(url)
+}
+
+function SkeletonCard() {
+  return (
+    <div style={{
+      background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
+      borderRadius: 16, padding: 20, marginBottom: 0,
+      animation: 'pulse 1.5s ease infinite',
+    }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1a1a28', flexShrink: 0 }} />
+        <div style={{ height: 12, background: '#1a1a28', borderRadius: 6, width: '25%' }} />
+      </div>
+      <div style={{ height: 16, background: '#1a1a28', borderRadius: 6, width: '65%', marginBottom: 10 }} />
+      <div style={{ height: 12, background: '#1a1a28', borderRadius: 6, width: '90%', marginBottom: 6 }} />
+      <div style={{ height: 12, background: '#1a1a28', borderRadius: 6, width: '75%', marginBottom: 16 }} />
+      <div style={{ height: 1, background: '#1a1a28', marginBottom: 14 }} />
+      <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ height: 28, background: '#1a1a28', borderRadius: 50, width: 64 }} />
+        <div style={{ height: 28, background: '#1a1a28', borderRadius: 50, width: 64 }} />
+      </div>
+    </div>
+  )
 }
 
 export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
+  const [likingPost, setLikingPost] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [tab, setTab] = useState<FeedTab>('geral')
+  const [followingIds, setFollowingIds] = useState<string[]>([])
+  const [page, setPage] = useState(0)
+  const loaderRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    async function load() {
+    async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
 
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          id, title, content, type, media_url, likes_count, comments_count, created_at, author_id,
-          profiles(username, avatar_url),
-          communities(name, slug)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(30)
-
-      if (error) console.error(error)
-      setPosts((data as any) || [])
-
       const { data: likes } = await supabase
         .from('likes').select('post_id').eq('user_id', user.id)
       if (likes) setLikedPosts(new Set(likes.map((l: any) => l.post_id)))
-      setLoading(false)
+
+      const { data: follows } = await supabase
+        .from('follows').select('following_id').eq('follower_id', user.id)
+      const ids = follows?.map((f: any) => f.following_id) || []
+      setFollowingIds(ids)
+
+      await loadPosts(user.id, 'geral', ids, 0)
     }
-    load()
+    init()
   }, [])
 
+  // Realtime — novos posts aparecem no topo
+  useEffect(() => {
+    const channel = supabase
+      .channel('feed-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'posts'
+      }, async (payload) => {
+        const { data: newPost } = await supabase
+          .from('posts')
+          .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url), communities(name, slug)')
+          .eq('id', payload.new.id)
+          .single()
+        if (newPost) setPosts(prev => [newPost as any, ...prev])
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  async function loadPosts(uid: string, feedTab: FeedTab, followIds: string[], pageNum: number) {
+    if (pageNum === 0) setLoading(true)
+    else setLoadingMore(true)
+
+    let query = supabase
+      .from('posts')
+      .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url), communities(name, slug)')
+      .order('created_at', { ascending: false })
+      .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1)
+
+    if (feedTab === 'seguindo' && followIds.length > 0) {
+      query = query.in('author_id', followIds)
+    } else if (feedTab === 'seguindo' && followIds.length === 0) {
+      setPosts([])
+      setLoading(false)
+      setLoadingMore(false)
+      setHasMore(false)
+      return
+    }
+
+    const { data, error } = await query
+    if (error) console.error(error)
+
+    const newPosts = (data as any) || []
+    if (pageNum === 0) setPosts(newPosts)
+    else setPosts(prev => [...prev, ...newPosts])
+
+    setHasMore(newPosts.length === PAGE_SIZE)
+    setLoading(false)
+    setLoadingMore(false)
+  }
+
+  // Infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+        const nextPage = page + 1
+        setPage(nextPage)
+        loadPosts(userId!, tab, followingIds, nextPage)
+      }
+    }, { threshold: 0.1 })
+
+    if (loaderRef.current) observer.observe(loaderRef.current)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, loading, page, userId, tab, followingIds])
+
+  function switchTab(newTab: FeedTab) {
+    setTab(newTab)
+    setPage(0)
+    setHasMore(true)
+    setPosts([])
+    if (userId) loadPosts(userId, newTab, followingIds, 0)
+  }
+
   async function handleLike(postId: string) {
-    if (!userId) return
+    if (!userId || likingPost) return
+    setLikingPost(postId)
     const isLiked = likedPosts.has(postId)
+
     if (isLiked) {
       await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', userId)
       await supabase.from('posts').update({ likes_count: posts.find(p => p.id === postId)!.likes_count - 1 }).eq('id', postId)
@@ -72,6 +175,13 @@ export default function FeedPage() {
       setLikedPosts(prev => new Set(prev).add(postId))
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: p.likes_count + 1 } : p))
     }
+    setTimeout(() => setLikingPost(null), 300)
+  }
+
+  async function handleShare(postId: string) {
+    const url = `${window.location.origin}/post/${postId}`
+    await navigator.clipboard.writeText(url)
+    toast.success('Link copiado!')
   }
 
   function getInitial(username: string) {
@@ -90,184 +200,204 @@ export default function FeedPage() {
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
 
-      <main style={{
-        maxWidth: 680, margin: '0 auto',
-        padding: '24px 16px 80px',
-        paddingLeft: 'max(16px, calc(220px + 32px))'
-      }}>
-        {loading && [1, 2, 3].map(i => (
-          <div key={i} style={{
-            background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 16, padding: 20, opacity: 0.5, marginBottom: 16
-          }}>
-            <div style={{ height: 12, background: '#222230', borderRadius: 6, width: '30%', marginBottom: 12 }} />
-            <div style={{ height: 18, background: '#222230', borderRadius: 6, width: '60%', marginBottom: 8 }} />
-            <div style={{ height: 12, background: '#222230', borderRadius: 6, width: '90%' }} />
-          </div>
-        ))}
+      <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
 
-        {!loading && posts.length === 0 && (
+        {/* Tabs */}
+        <div style={{
+          display: 'flex', background: '#111118', borderRadius: 12, padding: 4,
+          border: '1px solid rgba(255,255,255,0.06)', marginBottom: 20, gap: 4,
+        }}>
+          {(['geral', 'seguindo'] as FeedTab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => switchTab(t)}
+              style={{
+                flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
+                fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
+                background: tab === t ? '#c8f23c' : 'transparent',
+                color: tab === t ? '#000' : '#555577',
+              }}
+            >
+              {t === 'geral' ? '🌐 Geral' : '👥 Seguindo'}
+            </button>
+          ))}
+        </div>
+
+        {/* Skeletons */}
+        {loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+          </div>
+        )}
+
+        {/* Empty state seguindo */}
+        {!loading && tab === 'seguindo' && posts.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
+            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>👥</div>
+            <p style={{ fontSize: 15, marginBottom: 8 }}>Você ainda não segue ninguém.</p>
+            <p style={{ fontSize: 13, color: '#333355' }}>Siga pessoas para ver os posts delas aqui.</p>
+          </div>
+        )}
+
+        {/* Empty state geral */}
+        {!loading && tab === 'geral' && posts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🌀</div>
             <p style={{ fontSize: 15 }}>Nenhum post ainda. Seja o primeiro!</p>
           </div>
         )}
 
+        {/* Posts */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {posts.map((post, i) => (
-            <article
-              key={post.id}
-              style={{
-                background: '#111118',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 16, overflow: 'hidden',
-                animation: `fadeUp 0.4s ease ${i * 0.05}s both`,
-                transition: 'border-color 0.2s, box-shadow 0.2s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'
-                e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            >
-              {/* Mídia do post — imagem ou vídeo */}
-              {post.media_url && (
-                isVideo(post.media_url) ? (
-                  <video
-                    src={post.media_url}
-                    controls
-                    onClick={e => e.stopPropagation()}
-                    style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }}
-                  />
-                ) : (
-                  <div
-                    onClick={() => router.push(`/post/${post.id}`)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <img
-                      src={post.media_url}
-                      alt={post.title}
-                      style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }}
-                    />
-                  </div>
-                )
-              )}
+          {posts.map((post, i) => {
+            const isLiked = likedPosts.has(post.id)
+            const isLiking = likingPost === post.id
 
-              <div style={{ padding: 20 }}>
-                {/* Meta */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-                    boxShadow: '0 0 8px rgba(200,242,60,0.3)',
-                    overflow: 'hidden',
-                  }}>
-                    {post.profiles?.avatar_url
-                      ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : getInitial(post.profiles?.username || '?')
-                    }
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <span
-                      style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                      onClick={(e) => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
-                      onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
-                      onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-                    >
-                      @{post.profiles?.username || 'usuário'}
-                    </span>
-                    {post.communities && (
+            return (
+              <article
+                key={post.id}
+                style={{
+                  background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 16, overflow: 'hidden',
+                  animation: `fadeUp 0.4s ease ${Math.min(i, 5) * 0.05}s both`,
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
+              >
+                {/* Mídia */}
+                {post.media_url && (
+                  isVideo(post.media_url) ? (
+                    <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
+                  ) : (
+                    <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                      <img src={post.media_url} alt={post.title} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} />
+                    </div>
+                  )
+                )}
+
+                <div style={{ padding: 20 }}>
+                  {/* Meta */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
+                      boxShadow: '0 0 8px rgba(200,242,60,0.3)', overflow: 'hidden',
+                    }}>
+                      {post.profiles?.avatar_url
+                        ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : getInitial(post.profiles?.username || '?')
+                      }
+                    </div>
+                    <div style={{ flex: 1 }}>
                       <span
-                        style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
-                        onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
+                        style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                        onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
                       >
-                        {' '}em v/{post.communities.name}
+                        @{post.profiles?.username || 'usuário'}
                       </span>
+                      {post.communities && (
+                        <span
+                          style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
+                          onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
+                        >
+                          {' '}em v/{post.communities.name}
+                        </span>
+                      )}
+                      <span style={{ color: '#444466', fontSize: 13 }}> · {timeAgo(post.created_at)}</span>
+                    </div>
+                  </div>
+
+                  {/* Conteúdo */}
+                  <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                    <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3 }}>
+                      {post.title}
+                    </h2>
+                    {post.content && (
+                      <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                        {post.content}
+                      </p>
                     )}
-                    <span style={{ color: '#444466', fontSize: 13 }}> · {timeAgo(post.created_at)}</span>
+                  </div>
+
+                  {/* Ações */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <button
+                      onClick={() => handleLike(post.id)}
+                      style={{
+                        background: isLiked ? 'rgba(200,242,60,0.12)' : 'transparent',
+                        border: `1px solid ${isLiked ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                        color: isLiked ? '#c8f23c' : '#555577',
+                        padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                        fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                        boxShadow: isLiked ? '0 0 10px rgba(200,242,60,0.2)' : 'none',
+                        transform: isLiking ? 'scale(1.2)' : 'scale(1)',
+                      }}
+                    >
+                      ▲ {post.likes_count}
+                    </button>
+                    <button
+                      onClick={() => router.push(`/post/${post.id}`)}
+                      style={{
+                        background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                        color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                        fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                    >
+                      💬 {post.comments_count}
+                    </button>
+                    <button
+                      onClick={() => handleShare(post.id)}
+                      style={{
+                        background: 'transparent', border: 'none',
+                        color: '#555577', cursor: 'pointer',
+                        fontSize: 13, fontFamily: "'Syne', sans-serif",
+                        marginLeft: 'auto', transition: 'color 0.2s'
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                    >
+                      ↗ Compartilhar
+                    </button>
                   </div>
                 </div>
+              </article>
+            )
+          })}
+        </div>
 
-                {/* Conteúdo */}
-                <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                  <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3 }}>
-                    {post.title}
-                  </h2>
-                  {post.content && (
-                    <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {post.content}
-                    </p>
-                  )}
-                </div>
-
-                {/* Ações */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <button
-                    onClick={() => handleLike(post.id)}
-                    style={{
-                      background: likedPosts.has(post.id) ? 'rgba(200,242,60,0.12)' : 'transparent',
-                      border: `1px solid ${likedPosts.has(post.id) ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                      color: likedPosts.has(post.id) ? '#c8f23c' : '#555577',
-                      padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                      fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                      display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-                      boxShadow: likedPosts.has(post.id) ? '0 0 10px rgba(200,242,60,0.2)' : 'none'
-                    }}
-                  >
-                    ▲ {post.likes_count}
-                  </button>
-                  <button
-                    onClick={() => router.push(`/post/${post.id}`)}
-                    style={{
-                      background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                      color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                      fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                      display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                  >
-                    💬 {post.comments_count}
-                  </button>
-                  <button
-                    style={{
-                      background: 'transparent', border: 'none',
-                      color: '#555577', cursor: 'pointer',
-                      fontSize: 13, fontFamily: "'Syne', sans-serif",
-                      marginLeft: 'auto', transition: 'color 0.2s'
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                  >
-                    ↗ Compartilhar
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
+        {/* Infinite scroll loader */}
+        <div ref={loaderRef} style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
+          {loadingMore && (
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  width: 6, height: 6, borderRadius: '50%', background: '#c8f23c',
+                  animation: `bounce 0.8s ease ${i * 0.15}s infinite`,
+                }} />
+              ))}
+            </div>
+          )}
+          {!hasMore && posts.length > 0 && (
+            <p style={{ color: '#222240', fontSize: 13 }}>Você chegou ao fim ✦</p>
+          )}
         </div>
       </main>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @media (max-width: 767px) {
-          main { padding-left: 16px !important; }
-        }
-        video {
-          border-radius: 0;
-        }
-        video::-webkit-media-controls {
-          background: rgba(0,0,0,0.6);
-        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @media (max-width: 767px) { main { padding-left: 16px !important; } }
       `}</style>
     </div>
   )
