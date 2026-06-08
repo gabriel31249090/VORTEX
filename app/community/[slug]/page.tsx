@@ -146,7 +146,7 @@ export default function CommunityPage() {
         <div style={{
           background: 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))',
           borderBottom: '1px solid rgba(200,242,60,0.15)',
-          padding: '32px 0 24px',
+          padding: '32px 1 24px',
           marginBottom: 24,
         }}>
           <div style={{ maxWidth: 680, margin: '0 auto' }}>
