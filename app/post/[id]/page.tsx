@@ -156,9 +156,10 @@ export default function PostPage() {
     if (!error && data) {
       const newC: Comment = { ...(data as any), replies: [] }
       if (replyTo) {
+        const replyToId = replyTo.id
         setComments(prev => {
           function addReply(list: Comment[]): Comment[] {
-            return list.map(c => c.id === replyTo.id
+            return list.map(c => c.id === replyToId
               ? { ...c, replies: [...(c.replies || []), newC] }
               : { ...c, replies: addReply(c.replies || []) }
             )
