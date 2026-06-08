@@ -338,10 +338,28 @@ export default function ProfilePage() {
                 <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 20, marginBottom: 4 }}>{profile.display_name || profile.username}</h1>
                 <p style={{ color: '#555577', fontSize: 14, marginBottom: 8 }}>@{profile.username}</p>
                 {profile.bio && <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{profile.bio}</p>}
+                
+                {/* Stats com links clicáveis */}
                 <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
-                  <span style={{ color: '#555577', fontSize: 13 }}><span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followersCount}</span> seguidores</span>
-                  <span style={{ color: '#555577', fontSize: 13 }}><span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followingCount}</span> seguindo</span>
-                  <span style={{ color: '#555577', fontSize: 13 }}><span style={{ color: '#f0f0f8', fontWeight: 700 }}>{posts.length}</span> posts</span>
+                  <span
+                    onClick={() => router.push(`/profile/${profile.username}/follows?tab=followers`)}
+                    style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                  >
+                    <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followersCount}</span> seguidores
+                  </span>
+                  <span
+                    onClick={() => router.push(`/profile/${profile.username}/follows?tab=following`)}
+                    style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                  >
+                    <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followingCount}</span> seguindo
+                  </span>
+                  <span style={{ color: '#555577', fontSize: 13 }}>
+                    <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{posts.length}</span> posts
+                  </span>
                 </div>
               </>
             )}
