@@ -1,347 +1,403 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
-import Nav from '../components/Nav'
-import toast from 'react-hot-toast'
+import { useEffect, useState } from 'react'
 
-type Community = {
+type Notification = {
   id: string
-  name: string
-  slug: string
-  description: string | null
-  icon_url: string | null
-  is_private: boolean
+  type: 'like' | 'comment' | 'follow'
+  read: boolean
   created_at: string
-  owner_id: string
-  members_count?: number
+  post_id: string | null
+  actor: { id: string; username: string; display_name: string | null; avatar_url: string | null }
+  post?: { id: string; title: string } | null
 }
 
-export default function CommunitiesPage() {
-  const [communities, setCommunities] = useState<Community[]>([])
-  const [memberOf, setMemberOf] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [isPrivate, setIsPrivate] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const [search, setSearch] = useState('')
+const TYPE_CONFIG = {
+  like: { icon: '▲', label: 'curtiu sua publicação', color: '#c8f23c' },
+  comment: { icon: '💬', label: 'comentou em sua publicação', color: '#60a5fa' },
+  follow: { icon: '→', label: 'começou a te seguir', color: '#a78bfa' },
+}
+
+function timeAgo(date: string) {
+  const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (diff < 60) return `${diff}s`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`
+  return new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+}
+
+export default function Nav() {
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
+  const [username, setUsername] = useState<string | null>(null)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifLoading, setNotifLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUserId(user.id)
+      if (!user) return
+      const { data } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle()
+      if (data) setUsername(data.username)
 
-      const { data } = await supabase
-        .from('communities')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      setCommunities(data || [])
-
-      // Comunidades que o usuário é membro
-      const { data: memberships } = await supabase
-        .from('community_members')
-        .select('community_id')
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-
-      setMemberOf(new Set(memberships?.map(m => m.community_id) || []))
-      setLoading(false)
+        .eq('read', false)
+      setUnreadCount(count || 0)
     }
     load()
-  }, [])
+  }, [pathname])
 
-  async function handleCreate() {
-    if (!name.trim()) { toast.error('Nome obrigatório.'); return }
-    setCreating(true)
+  async function openNotifications() {
+    setNotifOpen(true)
+    setNotifLoading(true)
 
-    const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setNotifLoading(false); return }
 
-    const { data: existing } = await supabase
-      .from('communities').select('slug').eq('slug', slug).maybeSingle()
+    const { data } = await supabase
+      .from('notifications')
+      .select(`
+        id, type, read, created_at, post_id,
+        actor:actor_id ( id, username, display_name, avatar_url ),
+        post:post_id ( id, title )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(40)
 
-    if (existing) { toast.error('Já existe uma comunidade com esse nome.'); setCreating(false); return }
+    setNotifications((data as any) || [])
+    setNotifLoading(false)
 
-    const { data, error: err } = await supabase.from('communities').insert({
-      name: name.trim(), slug, description: description.trim() || null,
-      is_private: isPrivate, owner_id: userId
-    }).select().single()
-
-    if (err) { toast.error(err.message); setCreating(false); return }
-
-    if (data) {
-      await supabase.from('community_members').insert({
-        user_id: userId, community_id: data.id, role: 'owner'
-      })
-      setCommunities(prev => [data, ...prev])
-      setMemberOf(prev => new Set([...prev, data.id]))
-      toast.success(`Comunidade v/${data.name} criada!`)
-    }
-
-    setName('')
-    setDescription('')
-    setShowForm(false)
-    setCreating(false)
+    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
+    setUnreadCount(0)
   }
 
-  const filtered = communities.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.description?.toLowerCase().includes(search.toLowerCase())
-  )
+  function closeNotifications() {
+    setNotifOpen(false)
+  }
 
-  const myComms = filtered.filter(c => memberOf.has(c.id))
-  const otherComms = filtered.filter(c => !memberOf.has(c.id))
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  async function handleProfileClick() {
+    if (username) { router.push(`/profile/${username}`); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle()
+    if (data?.username) { setUsername(data.username); router.push(`/profile/${data.username}`) }
+  }
+
+  const items = [
+    { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
+    { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
+    { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
+    { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
+    { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
+    { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
+    { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
+  ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
-      <Nav />
+    <>
+      {/* SIDEBAR — Desktop */}
+      <aside style={{
+        position: 'fixed', left: 0, top: 0, bottom: 0, width: 220,
+        background: '#0d0d12', borderRight: '1px solid rgba(200,242,60,0.1)',
+        display: 'flex', flexDirection: 'column', padding: '24px 0',
+        zIndex: 100, fontFamily: "'Syne', sans-serif"
+      }} className="nav-sidebar">
+        <div onClick={() => router.push('/feed')} style={{ padding: '0 20px 32px', cursor: 'pointer' }}>
+          <span style={{ fontSize: 20, fontWeight: 800, color: '#c8f23c', textShadow: '0 0 20px rgba(200,242,60,0.5)' }}>◈ VORTEX</span>
+        </div>
 
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px' }}>
+          {items.map(item => {
+            const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
+            const isNotif = item.path === '__notif__'
+            return (
+              <button
+                key={item.label}
+                onClick={item.onClick}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, position: 'relative',
+                  padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: item.accent ? '#c8f23c' : isActive ? 'rgba(200,242,60,0.1)' : 'transparent',
+                  color: item.accent ? '#000' : isActive ? '#c8f23c' : '#8888aa',
+                  fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: item.accent || isActive ? 700 : 500,
+                  transition: 'all 0.2s', textAlign: 'left',
+                  boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.3)' : isActive ? '0 0 8px rgba(200,242,60,0.1)' : 'none'
+                }}
+                onMouseEnter={e => {
+                  if (!item.accent && !isActive) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                    e.currentTarget.style.color = '#f0f0f8'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!item.accent && !isActive) {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = '#8888aa'
+                  }
+                }}
+              >
+                <span style={{ fontSize: 18, position: 'relative' }}>
+                  {item.icon}
+                  {isNotif && unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -6, right: -8,
+                      background: '#c8f23c', color: '#000',
+                      fontSize: 9, fontWeight: 800, borderRadius: 999,
+                      padding: '1px 4px', minWidth: 14, textAlign: 'center', lineHeight: 1.5,
+                    }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </span>
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </nav>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 24 }}>Comunidades</h1>
+        <div style={{ padding: '0 12px' }}>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={handleLogout}
             style={{
-              background: '#c8f23c', color: '#000', fontWeight: 700,
-              padding: '8px 18px', borderRadius: 50, border: 'none', cursor: 'pointer',
-              fontSize: 13, fontFamily: "'Syne', sans-serif",
-              boxShadow: '0 0 12px rgba(200,242,60,0.4)', transition: 'all 0.2s'
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: 'transparent', color: '#555577',
+              fontFamily: "'Syne', sans-serif", fontSize: 14, width: '100%', transition: 'all 0.2s'
             }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 0 24px rgba(200,242,60,0.7)')}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 0 12px rgba(200,242,60,0.4)')}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ff4466' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#555577' }}
           >
-            + Criar
+            <span style={{ fontSize: 18 }}>⏻</span>
+            <span>Sair</span>
           </button>
         </div>
+      </aside>
 
-        {/* Busca */}
-        <div style={{ position: 'relative', marginBottom: 20 }}>
-          <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#555577', fontSize: 15, pointerEvents: 'none' }}>⌕</span>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar comunidades..."
-            style={{
-              width: '100%', background: '#111118', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 12, padding: '10px 14px 10px 40px', color: '#f0f0f8', fontSize: 14,
-              outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box', transition: 'border-color 0.2s'
-            }}
-            onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
-            onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
-          />
-        </div>
-
-        {/* Formulário de criação */}
-        {showForm && (
-          <div style={{
-            background: '#111118', border: '1px solid rgba(200,242,60,0.2)',
-            borderRadius: 16, padding: 20, marginBottom: 24,
-            boxShadow: '0 0 20px rgba(200,242,60,0.05)',
-            animation: 'fadeIn 0.2s ease',
-          }}>
-            <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nova comunidade</h2>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 6 }}>Nome</label>
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="ex: tecnologia"
-                style={{
-                  width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14,
-                  outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box'
-                }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
-              />
-              {name && (
-                <p style={{ color: '#555577', fontSize: 12, marginTop: 6 }}>
-                  slug: <span style={{ color: '#c8f23c' }}>
-                    v/{name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}
+      {/* BOTTOM NAV — Mobile */}
+      <nav style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: 'rgba(13,13,18,0.95)', backdropFilter: 'blur(20px)',
+        borderTop: '1px solid rgba(200,242,60,0.15)',
+        display: 'flex', justifyContent: 'space-around', alignItems: 'center',
+        padding: '8px 0 12px', zIndex: 100, fontFamily: "'Syne', sans-serif"
+      }} className="nav-bottom">
+        {items.map(item => {
+          const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
+          const isNotif = item.path === '__notif__'
+          return (
+            <button
+              key={item.label}
+              onClick={item.onClick}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                background: item.accent ? '#c8f23c' : 'transparent',
+                border: 'none', cursor: 'pointer', padding: item.accent ? '8px 16px' : '4px 12px',
+                borderRadius: item.accent ? 50 : 8, position: 'relative',
+                color: item.accent ? '#000' : isActive ? '#c8f23c' : '#555577',
+                boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.4)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              <span style={{ fontSize: 20, position: 'relative' }}>
+                {item.icon}
+                {isNotif && unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -8,
+                    background: '#c8f23c', color: '#000',
+                    fontSize: 9, fontWeight: 800, borderRadius: 999,
+                    padding: '1px 4px', minWidth: 14, textAlign: 'center', lineHeight: 1.5,
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
-                </p>
-              )}
-            </div>
+                )}
+              </span>
+              {!item.accent && <span style={{ fontSize: 10, fontWeight: 600 }}>{item.label}</span>}
+            </button>
+          )
+        })}
+      </nav>
 
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 6 }}>Descrição</label>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Sobre o que é essa comunidade?"
-                rows={3}
-                style={{
-                  width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14,
-                  outline: 'none', fontFamily: "'Syne', sans-serif", resize: 'none', boxSizing: 'border-box'
-                }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
-              />
-            </div>
+      {/* PAINEL DE NOTIFICAÇÕES */}
+      {notifOpen && (
+        <>
+          <div
+            onClick={closeNotifications}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+              zIndex: 200, backdropFilter: 'blur(4px)',
+              animation: 'fadeIn 0.2s ease',
+            }}
+          />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <input
-                type="checkbox" checked={isPrivate}
-                onChange={e => setIsPrivate(e.target.checked)}
-                id="private" style={{ accentColor: '#c8f23c', width: 16, height: 16 }}
-              />
-              <label htmlFor="private" style={{ color: '#8888aa', fontSize: 14, cursor: 'pointer' }}>
-                Comunidade privada
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => { setShowForm(false); setName(''); setDescription('') }}
-                style={{
-                  background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#8888aa', padding: '8px 16px', borderRadius: 50, cursor: 'pointer',
-                  fontSize: 13, fontFamily: "'Syne', sans-serif"
-                }}
-              >Cancelar</button>
-              <button
-                onClick={handleCreate}
-                disabled={creating}
-                style={{
-                  background: '#c8f23c', color: '#000', fontWeight: 700,
-                  padding: '8px 18px', borderRadius: 50, border: 'none', cursor: 'pointer',
-                  fontSize: 13, fontFamily: "'Syne', sans-serif",
-                  boxShadow: '0 0 12px rgba(200,242,60,0.3)', opacity: creating ? 0.6 : 1
-                }}
-              >{creating ? 'Criando...' : 'Criar comunidade'}</button>
-            </div>
-          </div>
-        )}
-
-        {/* Skeletons */}
-        {loading && [1, 2, 3].map(i => (
-          <div key={i} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, marginBottom: 12, animation: 'pulse 1.5s ease infinite' }}>
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#1a1a28', flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ height: 14, background: '#1a1a28', borderRadius: 6, width: '40%', marginBottom: 8 }} />
-                <div style={{ height: 12, background: '#1a1a28', borderRadius: 6, width: '70%' }} />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 400,
+            background: '#0d0d12', borderLeft: '1px solid rgba(200,242,60,0.15)',
+            zIndex: 201, display: 'flex', flexDirection: 'column',
+            fontFamily: "'Syne', sans-serif",
+            animation: 'slideIn 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
+          }}>
+            <div style={{
+              padding: '20px 20px 16px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <h2 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 18, margin: 0 }}>Notificações</h2>
+                {unreadCount === 0 && notifications.length > 0 && (
+                  <p style={{ color: '#333355', fontSize: 12, marginTop: 2 }}>Tudo lido</p>
+                )}
               </div>
+              <button
+                onClick={closeNotifications}
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: 'none', color: '#8888aa',
+                  width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                  fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f0f0f8' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#8888aa' }}
+              >✕</button>
             </div>
-          </div>
-        ))}
 
-        {!loading && filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#444466' }}>
-            <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>⊞</div>
-            <p style={{ fontSize: 14 }}>{search ? 'Nenhuma comunidade encontrada.' : 'Nenhuma comunidade ainda. Crie a primeira!'}</p>
-          </div>
-        )}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+              {notifLoading && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 16px' }}>
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 0', alignItems: 'center', animation: 'pulse 1.5s ease infinite' }}>
+                      <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#1a1a28', flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ height: 13, background: '#1a1a28', borderRadius: 6, width: '70%', marginBottom: 8 }} />
+                        <div style={{ height: 11, background: '#1a1a28', borderRadius: 6, width: '40%' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-        {/* Minhas comunidades */}
-        {!loading && myComms.length > 0 && (
-          <>
-            <p style={{ color: '#555577', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
-              Minhas comunidades
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-              {myComms.map((community, i) => (
-                <CommunityCard key={community.id} community={community} isMember={true} index={i} router={router} />
-              ))}
+              {!notifLoading && notifications.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 40, opacity: 0.2 }}>🔔</div>
+                  <p style={{ color: '#333355', fontSize: 14 }}>Nenhuma notificação ainda.</p>
+                </div>
+              )}
+
+              {!notifLoading && notifications.map((notif, i) => {
+                const config = TYPE_CONFIG[notif.type]
+                const actor = notif.actor as any
+                const post = notif.post as any
+
+                return (
+                  <div
+                    key={notif.id}
+                    onClick={() => {
+                      closeNotifications()
+                      if (notif.type === 'follow') router.push(`/profile/${actor.username}`)
+                      else if (post) router.push(`/post/${post.id}`)
+                    }}
+                    style={{
+                      display: 'flex', gap: 12, alignItems: 'flex-start',
+                      padding: '12px 20px', cursor: 'pointer',
+                      background: notif.read ? 'transparent' : 'rgba(200,242,60,0.04)',
+                      borderLeft: `3px solid ${notif.read ? 'transparent' : '#c8f23c'}`,
+                      transition: 'all 0.15s',
+                      animation: `fadeIn 0.3s ease ${i * 0.03}s both`,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = notif.read ? 'transparent' : 'rgba(200,242,60,0.04)' }}
+                  >
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div style={{
+                        width: 42, height: 42, borderRadius: '50%', overflow: 'hidden',
+                        background: actor?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#000', fontWeight: 800, fontSize: 16,
+                      }}>
+                        {actor?.avatar_url
+                          ? <img src={actor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : actor?.username?.charAt(0).toUpperCase()
+                        }
+                      </div>
+                      <div style={{
+                        position: 'absolute', bottom: -2, right: -2,
+                        width: 18, height: 18, borderRadius: '50%',
+                        background: '#0d0d12', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 9, border: `1.5px solid ${config.color}`, color: config.color,
+                      }}>
+                        {config.icon}
+                      </div>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ color: '#c8c8e0', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+                        <span style={{ fontWeight: 700, color: '#f0f0f8' }}>@{actor?.username}</span>
+                        {' '}{config.label}
+                        {post && (
+                          <span style={{ color: '#8888aa', fontStyle: 'italic' }}>
+                            {': '}{post.title.length > 35 ? post.title.slice(0, 35) + '…' : post.title}
+                          </span>
+                        )}
+                      </p>
+                      <p style={{ color: '#333355', fontSize: 11, marginTop: 3 }}>{timeAgo(notif.created_at)}</p>
+                    </div>
+
+                    {!notif.read && (
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c8f23c', flexShrink: 0, marginTop: 6 }} />
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          </>
-        )}
 
-        {/* Outras comunidades */}
-        {!loading && otherComms.length > 0 && (
-          <>
-            {myComms.length > 0 && (
-              <p style={{ color: '#555577', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
-                Descobrir
-              </p>
+            {notifications.length > 0 && (
+              <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <button
+                  onClick={() => { closeNotifications(); router.push('/notifications') }}
+                  style={{
+                    width: '100%', padding: '10px 0', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
+                    background: 'transparent', color: '#8888aa', cursor: 'pointer',
+                    fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.3)'; e.currentTarget.style.color = '#c8f23c' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8888aa' }}
+                >
+                  Ver todas as notificações →
+                </button>
+              </div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {otherComms.map((community, i) => (
-                <CommunityCard key={community.id} community={community} isMember={false} index={i} router={router} />
-              ))}
-            </div>
-          </>
-        )}
-      </main>
+          </div>
+        </>
+      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
-        input::placeholder, textarea::placeholder { color: #333355; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @media (max-width: 767px) { main { padding-left: 16px !important; } }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @media (min-width: 768px) {
+          .nav-bottom { display: none !important; }
+          .nav-sidebar { display: flex !important; }
+        }
+        @media (max-width: 767px) {
+          .nav-bottom { display: flex !important; }
+          .nav-sidebar { display: none !important; }
+        }
       `}</style>
-    </div>
-  )
-}
-
-function CommunityCard({ community, isMember, index, router }: {
-  community: Community
-  isMember: boolean
-  index: number
-  router: any
-}) {
-  return (
-    <div
-      onClick={() => router.push(`/community/${community.slug}`)}
-      style={{
-        background: '#111118', border: `1px solid ${isMember ? 'rgba(200,242,60,0.1)' : 'rgba(255,255,255,0.06)'}`,
-        borderRadius: 16, padding: 18, cursor: 'pointer', transition: 'all 0.2s',
-        animation: `fadeIn 0.3s ease ${index * 0.05}s both`,
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'
-        e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = isMember ? 'rgba(200,242,60,0.1)' : 'rgba(255,255,255,0.06)'
-        e.currentTarget.style.boxShadow = 'none'
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-          background: 'linear-gradient(135deg, rgba(200,242,60,0.2), rgba(200,242,60,0.05))',
-          border: '1px solid rgba(200,242,60,0.15)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#c8f23c', fontWeight: 800, fontSize: 18,
-        }}>
-          {community.name.charAt(0).toUpperCase()}
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 15 }}>v/{community.name}</h2>
-            {community.is_private && (
-              <span style={{ background: 'rgba(255,255,255,0.06)', color: '#555577', fontSize: 10, padding: '2px 7px', borderRadius: 50 }}>
-                privada
-              </span>
-            )}
-            {isMember && (
-              <span style={{ background: 'rgba(200,242,60,0.1)', color: '#c8f23c', fontSize: 10, padding: '2px 7px', borderRadius: 50, fontWeight: 700 }}>
-                membro ✓
-              </span>
-            )}
-          </div>
-          {community.description && (
-            <p style={{ color: '#8888aa', fontSize: 13, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {community.description}
-            </p>
-          )}
-        </div>
-
-        <span style={{ color: '#333355', fontSize: 16, flexShrink: 0 }}>→</span>
-      </div>
-    </div>
+    </>
   )
 }
