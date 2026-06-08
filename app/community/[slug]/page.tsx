@@ -142,15 +142,12 @@ export default function CommunityPage() {
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
 
-        {/* Banner da comunidade */}
+        {/* Banner da comunidade - SEM GAP */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))',
           borderBottom: '1px solid rgba(200,242,60,0.15)',
-          padding: '32px 24px 24px',
+          padding: '32px 0 24px',
           marginBottom: 24,
-          marginLeft: 'calc(-1 * max(16px, calc(220px + 32px)))',
-          paddingLeft: 'max(16px, calc(220px + 32px))',
-          width: '100vw',
         }}>
           <div style={{ maxWidth: 680, margin: '0 auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
