@@ -16,6 +16,7 @@ type Profile = {
   id: string
   username: string
   display_name: string | null
+  avatar_url: string | null
 }
 
 export default function ConversationPage() {
@@ -37,14 +38,22 @@ export default function ConversationPage() {
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
 
-      const { data: other } = await supabase
+      // Busca o outro participante sem join
+      const { data: others } = await supabase
         .from('conversation_participants')
-        .select('profiles(id, username, display_name)')
+        .select('user_id')
         .eq('conversation_id', convId)
         .neq('user_id', user.id)
-        .single()
 
-      if (other?.profiles) setOtherUser(other.profiles as any)
+      const otherUserId = others?.[0]?.user_id
+      if (otherUserId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .eq('id', otherUserId)
+          .single()
+        if (profile) setOtherUser(profile)
+      }
 
       const { data: msgs } = await supabase
         .from('messages')
@@ -124,14 +133,21 @@ export default function ConversationPage() {
           <>
             <div style={{
               width: 36, height: 36, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+              background: otherUser.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#000', fontWeight: 800, fontSize: 14,
-              boxShadow: '0 0 8px rgba(200,242,60,0.2)'
+              boxShadow: '0 0 8px rgba(200,242,60,0.2)',
+              overflow: 'hidden', flexShrink: 0,
             }}>
-              {getInitial(otherUser.username)}
+              {otherUser.avatar_url
+                ? <img src={otherUser.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : getInitial(otherUser.username)
+              }
             </div>
-            <div>
+            <div
+              onClick={() => router.push(`/profile/${otherUser.username}`)}
+              style={{ cursor: 'pointer' }}
+            >
               <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 15 }}>{otherUser.display_name || otherUser.username}</p>
               <p style={{ color: '#555577', fontSize: 12 }}>@{otherUser.username}</p>
             </div>
@@ -166,7 +182,8 @@ export default function ConversationPage() {
               )}
               <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
                 <div style={{
-                  maxWidth: '70%', padding: '10px 14px', borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                  maxWidth: '70%', padding: '10px 14px',
+                  borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                   background: isMe ? '#c8f23c' : '#111118',
                   border: isMe ? 'none' : '1px solid rgba(255,255,255,0.08)',
                   color: isMe ? '#000' : '#f0f0f8',

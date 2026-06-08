@@ -54,7 +54,7 @@ export default function MessagesPage() {
     await Promise.all(convIds.map(async convId => {
       const [{ data: others }, { data: lastMsg }, { count }] = await Promise.all([
         supabase.from('conversation_participants')
-          .select('user_id, profiles(id, username, display_name, avatar_url)')
+          .select('user_id')
           .eq('conversation_id', convId)
           .neq('user_id', uid),
         supabase.from('messages')
@@ -70,11 +70,19 @@ export default function MessagesPage() {
           .neq('sender_id', uid)
       ])
 
-      const other = others?.[0]
-      if (other?.profiles) {
+      const otherUserId = others?.[0]?.user_id
+      if (!otherUserId) return
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .eq('id', otherUserId)
+        .single()
+
+      if (profile) {
         convs.push({
           id: convId,
-          other_user: other.profiles as any,
+          other_user: profile,
           last_message: lastMsg?.content || null,
           last_message_at: lastMsg?.created_at || null,
           unread: count || 0
@@ -105,7 +113,6 @@ export default function MessagesPage() {
     setShowResults(false)
     setSearchQuery('')
 
-    // Verifica se já existe conversa
     const { data: myConvs } = await supabase
       .from('conversation_participants')
       .select('conversation_id')
@@ -126,14 +133,16 @@ export default function MessagesPage() {
       }
     }
 
-    // Cria nova conversa
     const { data: newConv, error } = await supabase
       .from('conversations')
       .insert({})
       .select()
       .single()
 
-    if (error || !newConv) { console.error('Erro ao criar conversa:', error); return }
+    if (error || !newConv) {
+      console.error('Erro ao criar conversa:', error)
+      return
+    }
 
     await supabase.from('conversation_participants').insert([
       { conversation_id: newConv.id, user_id: userId },
@@ -228,7 +237,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Lista de conversas */}
-        {loading && [1,2,3].map(i => (
+        {loading && [1, 2, 3].map(i => (
           <div key={i} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 16, marginBottom: 8, opacity: 0.5, display: 'flex', gap: 12 }}>
             <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#222230', flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
