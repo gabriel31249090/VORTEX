@@ -76,21 +76,20 @@ export default function ConversationPage() {
     load()
   }, [convId])
 
-  // Polling com logs de debug
+  // Polling a cada 3 segundos
   useEffect(() => {
     const interval = setInterval(async () => {
-      console.log('[Polling] buscando mensagens...')
-      const { data: msgs, error } = await supabase
+      const { data: msgs } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', convId)
         .order('created_at', { ascending: true })
 
-      console.log('[Polling] resultado:', msgs?.length, error)
-
       if (msgs) {
         setMessages(prev => {
-          if (msgs.length === prev.length) return prev
+          const lastPrev = prev[prev.length - 1]?.id
+          const lastNew = msgs[msgs.length - 1]?.id
+          if (lastPrev === lastNew) return prev
           return msgs
         })
       }
