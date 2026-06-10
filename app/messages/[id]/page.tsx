@@ -34,7 +34,6 @@ export default function ConversationPage() {
   const supabase = createClient()
   const convId = params.id as string
 
-  // Carrega dados iniciais
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -77,24 +76,25 @@ export default function ConversationPage() {
     load()
   }, [convId])
 
-  // Polling a cada 3 segundos
+  // Polling com logs de debug
   useEffect(() => {
     const interval = setInterval(async () => {
-      const { data: msgs } = await supabase
+      console.log('[Polling] buscando mensagens...')
+      const { data: msgs, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', convId)
         .order('created_at', { ascending: true })
 
+      console.log('[Polling] resultado:', msgs?.length, error)
+
       if (msgs) {
         setMessages(prev => {
-          // Só atualiza se tiver mensagem nova
           if (msgs.length === prev.length) return prev
           return msgs
         })
       }
 
-      // Marca novas mensagens como lidas
       if (userIdRef.current) {
         await supabase.from('messages')
           .update({ read: true })
@@ -107,7 +107,6 @@ export default function ConversationPage() {
     return () => clearInterval(interval)
   }, [convId])
 
-  // Scroll automático só se estiver no fundo
   useEffect(() => {
     if (isAtBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -130,7 +129,6 @@ export default function ConversationPage() {
       console.error('Erro ao enviar mensagem:', error)
       setNewMessage(content)
     } else {
-      // Força scroll ao enviar
       isAtBottomRef.current = true
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
@@ -149,7 +147,6 @@ export default function ConversationPage() {
   return (
     <div style={{ height: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif", display: 'flex', flexDirection: 'column' }}>
 
-      {/* Header */}
       <header style={{
         background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(200,242,60,0.15)',
@@ -188,7 +185,6 @@ export default function ConversationPage() {
         )}
       </header>
 
-      {/* Mensagens */}
       <div
         style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}
         onScroll={e => {
@@ -238,13 +234,14 @@ export default function ConversationPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div style={{
         background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(20px)',
         borderTop: '1px solid rgba(255,255,255,0.06)',
         padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0
       }}>
         <textarea
+          id="message-input"
+          name="message"
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
