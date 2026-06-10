@@ -39,7 +39,6 @@ export default function MessagesPage() {
     load()
   }, [])
 
-  // Polling a cada 5 segundos para atualizar a lista
   useEffect(() => {
     if (!userId) return
     const interval = setInterval(() => {
@@ -121,6 +120,7 @@ export default function MessagesPage() {
     setShowResults(false)
     setSearchQuery('')
 
+    // Busca todas as conversas do usuário atual
     const { data: myConvs } = await supabase
       .from('conversation_participants')
       .select('conversation_id')
@@ -128,19 +128,22 @@ export default function MessagesPage() {
 
     if (myConvs?.length) {
       const myConvIds = myConvs.map(c => c.conversation_id)
-      const { data: existing } = await supabase
+
+      // Busca conversas que o outro usuário também participa
+      const { data: shared } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
         .eq('user_id', otherUserId)
         .in('conversation_id', myConvIds)
-        .maybeSingle()
+        .limit(1)
 
-      if (existing) {
-        router.push(`/messages/${existing.conversation_id}`)
+      if (shared && shared.length > 0) {
+        router.push(`/messages/${shared[0].conversation_id}`)
         return
       }
     }
 
+    // Só cria nova conversa se não existir nenhuma
     const { data: newConv, error } = await supabase
       .from('conversations')
       .insert({})
@@ -180,9 +183,11 @@ export default function MessagesPage() {
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
         <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 24, marginBottom: 20 }}>Mensagens</h1>
 
-        {/* Buscar usuário */}
         <div ref={searchRef} style={{ position: 'relative', marginBottom: 24 }}>
           <input
+            id="user-search"
+            name="user-search"
+            autoComplete="off"
             value={searchQuery}
             onChange={e => searchUsers(e.target.value)}
             onFocus={e => {
@@ -244,7 +249,6 @@ export default function MessagesPage() {
           )}
         </div>
 
-        {/* Lista de conversas */}
         {loading && [1, 2, 3].map(i => (
           <div key={i} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 16, marginBottom: 8, opacity: 0.5, display: 'flex', gap: 12 }}>
             <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#222230', flexShrink: 0 }} />
