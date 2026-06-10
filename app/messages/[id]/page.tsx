@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 
@@ -8,6 +8,7 @@ type Message = {
   id: string
   content: string
   sender_id: string
+  conversation_id: string
   created_at: string
   read: boolean
 }
@@ -76,7 +77,7 @@ export default function ConversationPage() {
     load()
   }, [convId])
 
-  // Realtime — canal separado do load async
+  // Realtime — sem filtro server-side (necessário no plano free)
   useEffect(() => {
     const channel = supabase
       .channel(`conv-${convId}`)
@@ -84,15 +85,14 @@ export default function ConversationPage() {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
-        filter: `conversation_id=eq.${convId}`
       }, (payload) => {
         const newMsg = payload.new as Message
+        // Filtra no cliente — ignora mensagens de outras conversas
+        if (newMsg.conversation_id !== convId) return
         setMessages(prev => {
-          // Evita duplicata se a mensagem já veio do insert otimista
           if (prev.find(m => m.id === newMsg.id)) return prev
           return [...prev, newMsg]
         })
-        // Marca como lida se não for do usuário atual
         if (newMsg.sender_id !== userIdRef.current) {
           supabase.from('messages')
             .update({ read: true })
@@ -125,7 +125,7 @@ export default function ConversationPage() {
 
     if (error) {
       console.error('Erro ao enviar mensagem:', error)
-      setNewMessage(content) // Restaura se falhar
+      setNewMessage(content)
     }
 
     setSending(false)
