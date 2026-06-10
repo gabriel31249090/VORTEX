@@ -8,7 +8,6 @@ type Message = {
   id: string
   content: string
   sender_id: string
-  conversation_id: string
   created_at: string
   read: boolean
 }
@@ -29,6 +28,7 @@ export default function ConversationPage() {
   const [otherUser, setOtherUser] = useState<Profile | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const userIdRef = useRef<string | null>(null)
+  const isAtBottomRef = useRef(true)
   const router = useRouter()
   const params = useParams()
   const supabase = createClient()
@@ -77,38 +77,41 @@ export default function ConversationPage() {
     load()
   }, [convId])
 
-  // Realtime — sem filtro server-side (necessário no plano free)
+  // Polling a cada 3 segundos
   useEffect(() => {
-    const channel = supabase
-      .channel(`conv-${convId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-      }, (payload) => {
-        const newMsg = payload.new as Message
-        // Filtra no cliente — ignora mensagens de outras conversas
-        if (newMsg.conversation_id !== convId) return
-        setMessages(prev => {
-          if (prev.find(m => m.id === newMsg.id)) return prev
-          return [...prev, newMsg]
-        })
-        if (newMsg.sender_id !== userIdRef.current) {
-          supabase.from('messages')
-            .update({ read: true })
-            .eq('id', newMsg.id)
-            .then(() => {})
-        }
-      })
-      .subscribe((status) => {
-        console.log('[DM Realtime]', status)
-      })
+    const interval = setInterval(async () => {
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: true })
 
-    return () => { supabase.removeChannel(channel) }
+      if (msgs) {
+        setMessages(prev => {
+          // Só atualiza se tiver mensagem nova
+          if (msgs.length === prev.length) return prev
+          return msgs
+        })
+      }
+
+      // Marca novas mensagens como lidas
+      if (userIdRef.current) {
+        await supabase.from('messages')
+          .update({ read: true })
+          .eq('conversation_id', convId)
+          .neq('sender_id', userIdRef.current)
+          .eq('read', false)
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
   }, [convId])
 
+  // Scroll automático só se estiver no fundo
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (isAtBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   async function handleSend() {
@@ -126,6 +129,10 @@ export default function ConversationPage() {
     if (error) {
       console.error('Erro ao enviar mensagem:', error)
       setNewMessage(content)
+    } else {
+      // Força scroll ao enviar
+      isAtBottomRef.current = true
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
 
     setSending(false)
@@ -182,7 +189,13 @@ export default function ConversationPage() {
       </header>
 
       {/* Mensagens */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div
+        style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}
+        onScroll={e => {
+          const el = e.currentTarget
+          isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+        }}
+      >
         {loading && (
           <div style={{ textAlign: 'center', color: '#555577', padding: '40px 0' }}>Carregando...</div>
         )}
