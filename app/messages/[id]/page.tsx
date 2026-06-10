@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 
@@ -27,18 +27,20 @@ export default function ConversationPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [otherUser, setOtherUser] = useState<Profile | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const userIdRef = useRef<string | null>(null)
   const router = useRouter()
   const params = useParams()
   const supabase = createClient()
   const convId = params.id as string
 
+  // Carrega dados iniciais
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
+      userIdRef.current = user.id
 
-      // Busca o outro participante sem join
       const { data: others } = await supabase
         .from('conversation_participants')
         .select('user_id')
@@ -70,8 +72,12 @@ export default function ConversationPage() {
 
       setLoading(false)
     }
-    load()
 
+    load()
+  }, [convId])
+
+  // Realtime — canal separado do load async
+  useEffect(() => {
     const channel = supabase
       .channel(`conv-${convId}`)
       .on('postgres_changes', {
@@ -80,9 +86,23 @@ export default function ConversationPage() {
         table: 'messages',
         filter: `conversation_id=eq.${convId}`
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new as Message])
+        const newMsg = payload.new as Message
+        setMessages(prev => {
+          // Evita duplicata se a mensagem já veio do insert otimista
+          if (prev.find(m => m.id === newMsg.id)) return prev
+          return [...prev, newMsg]
+        })
+        // Marca como lida se não for do usuário atual
+        if (newMsg.sender_id !== userIdRef.current) {
+          supabase.from('messages')
+            .update({ read: true })
+            .eq('id', newMsg.id)
+            .then(() => {})
+        }
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('[DM Realtime]', status)
+      })
 
     return () => { supabase.removeChannel(channel) }
   }, [convId])
@@ -97,11 +117,17 @@ export default function ConversationPage() {
     const content = newMessage.trim()
     setNewMessage('')
 
-    await supabase.from('messages').insert({
+    const { error } = await supabase.from('messages').insert({
       conversation_id: convId,
       sender_id: userId,
       content
     })
+
+    if (error) {
+      console.error('Erro ao enviar mensagem:', error)
+      setNewMessage(content) // Restaura se falhar
+    }
+
     setSending(false)
   }
 

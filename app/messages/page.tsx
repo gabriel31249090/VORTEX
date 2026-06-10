@@ -39,6 +39,26 @@ export default function MessagesPage() {
     load()
   }, [])
 
+  // Realtime — atualiza a lista quando chega mensagem nova em qualquer conversa
+  useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel('messages-list-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      }, () => {
+        loadConversations(userId)
+      })
+      .subscribe((status) => {
+        console.log('[Messages List Realtime]', status)
+      })
+
+    return () => { supabase.removeChannel(channel) }
+  }, [userId])
+
   async function loadConversations(uid: string) {
     setLoading(true)
     const { data: participants } = await supabase
