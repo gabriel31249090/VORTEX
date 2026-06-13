@@ -77,7 +77,6 @@ export default function Nav() {
     setNotifications((data as any) || [])
     setNotifLoading(false)
 
-    // Marca como lidas
     await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
     setUnreadCount(0)
   }
@@ -106,7 +105,6 @@ export default function Nav() {
     { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
     { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
     { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
-    { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
   ]
 
   return (
@@ -233,10 +231,9 @@ export default function Nav() {
         })}
       </nav>
 
-      {/* PAINEL DE NOTIFICAÇÕES — desliza da direita */}
+      {/* PAINEL DE NOTIFICAÇÕES */}
       {notifOpen && (
         <>
-          {/* Backdrop */}
           <div
             onClick={closeNotifications}
             style={{
@@ -246,7 +243,6 @@ export default function Nav() {
             }}
           />
 
-          {/* Painel */}
           <div style={{
             position: 'fixed', top: 0, right: 0, bottom: 0, width: 400,
             background: '#0d0d12', borderLeft: '1px solid rgba(200,242,60,0.15)',
@@ -254,7 +250,6 @@ export default function Nav() {
             fontFamily: "'Syne', sans-serif",
             animation: 'slideIn 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
           }}>
-            {/* Header do painel */}
             <div style={{
               padding: '20px 20px 16px',
               borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -279,7 +274,6 @@ export default function Nav() {
               >✕</button>
             </div>
 
-            {/* Lista */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
               {notifLoading && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 16px' }}>
@@ -326,7 +320,6 @@ export default function Nav() {
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = notif.read ? 'transparent' : 'rgba(200,242,60,0.04)' }}
                   >
-                    {/* Avatar + ícone */}
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       <div style={{
                         width: 42, height: 42, borderRadius: '50%', overflow: 'hidden',
@@ -349,7 +342,6 @@ export default function Nav() {
                       </div>
                     </div>
 
-                    {/* Texto */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ color: '#c8c8e0', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
                         <span style={{ fontWeight: 700, color: '#f0f0f8' }}>@{actor?.username}</span>
@@ -363,7 +355,6 @@ export default function Nav() {
                       <p style={{ color: '#333355', fontSize: 11, marginTop: 3 }}>{timeAgo(notif.created_at)}</p>
                     </div>
 
-                    {/* Dot não lida */}
                     {!notif.read && (
                       <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#c8f23c', flexShrink: 0, marginTop: 6 }} />
                     )}
@@ -372,7 +363,6 @@ export default function Nav() {
               })}
             </div>
 
-            {/* Footer */}
             {notifications.length > 0 && (
               <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <button
