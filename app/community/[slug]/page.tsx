@@ -77,7 +77,7 @@ export default function CommunityPage() {
 
       const { data: memberData } = await supabase
         .from('community_members')
-        .select('user_id, role, profiles(username, display_name, avatar_url)')
+        .select('user_id, role, profiles:user_id(username, display_name, avatar_url)')
         .eq('community_id', communityData.id)
 
       setMembers((memberData as any) || [])
@@ -313,7 +313,6 @@ export default function CommunityPage() {
                         </span>
                       </div>
 
-                      {/* Botão remover post — só pro dono */}
                       {isOwner && post.author_id !== userId && (
                         <button
                           onClick={() => handleRemovePost(post.id)}
@@ -429,7 +428,6 @@ export default function CommunityPage() {
                     <p style={{ color: '#555577', fontSize: 13 }}>@{profile.username}</p>
                   </div>
 
-                  {/* Botão banir — só pro dono, não pode banir a si mesmo */}
                   {isOwner && !isOwnerMember && member.user_id !== userId && (
                     <button
                       onClick={() => handleBanMember(member.user_id, profile.username)}
