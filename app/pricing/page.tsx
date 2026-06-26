@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import Nav from '../components/Nav'
 
+const PIX_KEY = '5565996688341'
+const PIX_QR = 'iVBORw0KGgoAAAANSUhEUgAAASIAAAEiAQAAAAB1xeIbAAABgUlEQVR4nO2awW3DMAxFHysDPTpABsgo8mZFR+oG1ijZQD4GsPF7sNwm6aG9xE4t8mTJD9AHQdMkIRO/W3r5AwROOeWUU049O2XFGkjWAMOy022qqwoqSpIyQHsxIEiSdEutr6sKalhiPJ4brAPmz2BrXVVR6TSifs0Tnbo269Y+sUpqSSutgAEsZgQDXDddz6p+F1QyM7MDwNBgHdNc5myta9fUHPffMa50COg26p9X/R4o65iMZA32pouZHSb7Sa2va98Ucx3fA0SNZa9vS7FT3j6r+v9NFe8qBxFzkKSR0mUtDZb7/jEU1+1rK6knfC1Hj/vHU8XjQwO0F5vTTT+8yrpNde2bKvV9XEqbUt/PT8ftdNVA3eQcSr4n5iDPOY+miu/j3Q83L3kouu8fTi1zTL2fRkqHy+R97ZqUvZ0bn2OuQzV3a6XTxQRhJObjaFvpqoG6n2POs7SoyYgfk2krXTVQxfdpDvCA0WZIhyyDMG6mqwbK/G6UU0455VQV1CdQfchZA3/ZoAAAAABJRU5ErkJggg=='
+
 const plans = [
   {
     id: 'free',
@@ -53,7 +56,7 @@ const plans = [
       'Destaque visual nos posts',
     ],
     limits: [],
-    cta: 'Assinar BOOST',
+    cta: 'Assinar por R$10/mês',
     ctaDisabled: false,
   },
   {
@@ -80,7 +83,7 @@ const plans = [
       'Suporte prioritário',
     ],
     limits: [],
-    cta: 'Assinar MEGA BOOST',
+    cta: 'Assinar por R$15/mês',
     ctaDisabled: false,
   },
 ]
@@ -88,6 +91,14 @@ const plans = [
 export default function PricingPage() {
   const router = useRouter()
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null)
+  const [payingPlan, setPayingPlan] = useState<typeof plans[0] | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(PIX_KEY)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
@@ -138,18 +149,21 @@ export default function PricingPage() {
                 onMouseEnter={() => setHoveredPlan(plan.id)}
                 onMouseLeave={() => setHoveredPlan(null)}
                 style={{
-                  background: isFeatured ? 'linear-gradient(180deg, rgba(200,242,60,0.06) 0%, #111118 100%)' :
-                    isUltimate ? 'linear-gradient(180deg, rgba(167,139,250,0.06) 0%, #111118 100%)' : '#111118',
+                  background: isFeatured
+                    ? 'linear-gradient(180deg, rgba(200,242,60,0.06) 0%, #111118 100%)'
+                    : isUltimate
+                    ? 'linear-gradient(180deg, rgba(167,139,250,0.06) 0%, #111118 100%)'
+                    : '#111118',
                   border: `1.5px solid ${isHovered ? plan.borderColor : plan.id === 'free' ? 'rgba(255,255,255,0.06)' : plan.borderColor}`,
-                  borderRadius: 20,
-                  padding: 28,
-                  position: 'relative',
+                  borderRadius: 20, padding: 28, position: 'relative',
                   transition: 'all 0.25s',
-                  boxShadow: isHovered ? `0 0 40px ${plan.glowColor}` : isFeatured ? `0 0 24px rgba(200,242,60,0.1)` : isUltimate ? `0 0 24px rgba(167,139,250,0.1)` : 'none',
+                  boxShadow: isHovered
+                    ? `0 0 40px ${plan.glowColor}`
+                    : isFeatured ? `0 0 24px rgba(200,242,60,0.1)`
+                    : isUltimate ? `0 0 24px rgba(167,139,250,0.1)` : 'none',
                   transform: isHovered ? 'translateY(-4px)' : 'none',
                 }}
               >
-                {/* Label badge */}
                 {plan.label && (
                   <div style={{
                     position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
@@ -162,34 +176,20 @@ export default function PricingPage() {
                   </div>
                 )}
 
-                {/* Plan name */}
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                    {plan.badge && (
-                      <span style={{ fontSize: 22 }}>{plan.badge}</span>
-                    )}
+                    {plan.badge && <span style={{ fontSize: 22 }}>{plan.badge}</span>}
                     <h2 style={{
-                      color: plan.color, fontWeight: 800, fontSize: 22,
-                      margin: 0, letterSpacing: '-0.5px',
+                      color: plan.color, fontWeight: 800, fontSize: 22, margin: 0,
                       textShadow: plan.id !== 'free' ? `0 0 20px ${plan.glowColor}` : 'none',
-                    }}>
-                      {plan.name}
-                    </h2>
+                    }}>{plan.name}</h2>
                   </div>
-                  <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-                    {plan.description}
-                  </p>
+                  <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, margin: 0 }}>{plan.description}</p>
                 </div>
 
-                {/* Price */}
-                <div style={{
-                  marginBottom: 24, paddingBottom: 24,
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
-                }}>
+                <div style={{ marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   {plan.price === 0 ? (
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                      <span style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 40 }}>Grátis</span>
-                    </div>
+                    <span style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 40 }}>Grátis</span>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                       <span style={{ color: '#555577', fontSize: 16, fontWeight: 600 }}>R$</span>
@@ -199,57 +199,39 @@ export default function PricingPage() {
                   )}
                 </div>
 
-                {/* Features */}
                 <div style={{ marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {plan.features.map((feature, i) => (
+                  {plan.features.map((f, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                      <span style={{
-                        color: plan.id === 'free' ? '#555577' : plan.color,
-                        fontSize: 14, flexShrink: 0, marginTop: 1,
-                        textShadow: plan.id !== 'free' ? `0 0 8px ${plan.glowColor}` : 'none',
-                      }}>✓</span>
-                      <span style={{ color: '#c8c8e0', fontSize: 13, lineHeight: 1.5 }}>{feature}</span>
+                      <span style={{ color: plan.id === 'free' ? '#555577' : plan.color, fontSize: 14, flexShrink: 0, marginTop: 1 }}>✓</span>
+                      <span style={{ color: '#c8c8e0', fontSize: 13, lineHeight: 1.5 }}>{f}</span>
                     </div>
                   ))}
-                  {plan.limits.map((limit, i) => (
+                  {plan.limits.map((l, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                       <span style={{ color: '#333355', fontSize: 14, flexShrink: 0, marginTop: 1 }}>—</span>
-                      <span style={{ color: '#555577', fontSize: 13, lineHeight: 1.5 }}>{limit}</span>
+                      <span style={{ color: '#555577', fontSize: 13, lineHeight: 1.5 }}>{l}</span>
                     </div>
                   ))}
                 </div>
 
-                {/* CTA */}
                 <button
-                  onClick={() => !plan.ctaDisabled && router.push(`/checkout?plan=${plan.id}`)}
+                  onClick={() => !plan.ctaDisabled && setPayingPlan(plan)}
                   disabled={plan.ctaDisabled}
                   style={{
                     width: '100%', padding: '13px 0', borderRadius: 50,
-                    border: plan.ctaDisabled ? '1px solid rgba(255,255,255,0.08)' :
-                      plan.id === 'boost' ? 'none' : `1.5px solid ${plan.borderColor}`,
-                    background: plan.ctaDisabled ? 'transparent' :
-                      plan.id === 'boost' ? '#c8f23c' :
-                      plan.id === 'mega' ? 'linear-gradient(135deg, #a78bfa, #7c5cbf)' : 'transparent',
-                    color: plan.ctaDisabled ? '#333355' :
-                      plan.id === 'boost' ? '#000' : '#f0f0f8',
-                    fontFamily: "'Syne', sans-serif",
-                    fontWeight: 700, fontSize: 14, cursor: plan.ctaDisabled ? 'default' : 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: plan.ctaDisabled ? 'none' :
-                      plan.id === 'boost' ? '0 0 20px rgba(200,242,60,0.3)' :
-                      plan.id === 'mega' ? '0 0 20px rgba(167,139,250,0.3)' : 'none',
-                  }}
-                  onMouseEnter={e => {
-                    if (!plan.ctaDisabled) {
-                      if (plan.id === 'boost') e.currentTarget.style.boxShadow = '0 0 30px rgba(200,242,60,0.5)'
-                      if (plan.id === 'mega') e.currentTarget.style.boxShadow = '0 0 30px rgba(167,139,250,0.5)'
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!plan.ctaDisabled) {
-                      if (plan.id === 'boost') e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.3)'
-                      if (plan.id === 'mega') e.currentTarget.style.boxShadow = '0 0 20px rgba(167,139,250,0.3)'
-                    }
+                    border: plan.ctaDisabled ? '1px solid rgba(255,255,255,0.08)'
+                      : plan.id === 'boost' ? 'none'
+                      : `1.5px solid ${plan.borderColor}`,
+                    background: plan.ctaDisabled ? 'transparent'
+                      : plan.id === 'boost' ? '#c8f23c'
+                      : plan.id === 'mega' ? 'linear-gradient(135deg, #a78bfa, #7c5cbf)'
+                      : 'transparent',
+                    color: plan.ctaDisabled ? '#333355' : plan.id === 'boost' ? '#000' : '#f0f0f8',
+                    fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14,
+                    cursor: plan.ctaDisabled ? 'default' : 'pointer', transition: 'all 0.2s',
+                    boxShadow: plan.ctaDisabled ? 'none'
+                      : plan.id === 'boost' ? '0 0 20px rgba(200,242,60,0.3)'
+                      : plan.id === 'mega' ? '0 0 20px rgba(167,139,250,0.3)' : 'none',
                   }}
                 >
                   {plan.cta}
@@ -259,26 +241,142 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* FAQ / nota */}
+        {/* Nota Pix */}
         <div style={{
           marginTop: 60, padding: '28px 32px',
           background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: 16, display: 'flex', alignItems: 'center', gap: 20,
         }}>
-          <span style={{ fontSize: 28, flexShrink: 0 }}>🔒</span>
+          <span style={{ fontSize: 28, flexShrink: 0 }}>🔑</span>
           <div>
             <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 15, margin: '0 0 4px' }}>
-              Pagamento seguro via Stripe
+              Pagamento via Pix
             </p>
             <p style={{ color: '#8888aa', fontSize: 13, margin: 0, lineHeight: 1.6 }}>
-              Cancele quando quiser, sem taxas ocultas. Sua assinatura é mensal e pode ser cancelada a qualquer momento pelo painel de configurações.
+              Após o pagamento, envie o comprovante para nosso suporte. Seu plano será ativado em até 24 horas.
             </p>
           </div>
         </div>
       </main>
 
+      {/* MODAL PIX */}
+      {payingPlan && (
+        <>
+          <div
+            onClick={() => setPayingPlan(null)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+              zIndex: 200, backdropFilter: 'blur(6px)', animation: 'fadeIn 0.2s ease',
+            }}
+          />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: '#111118',
+            border: `1.5px solid ${payingPlan.borderColor}`,
+            borderRadius: 24, padding: '32px 28px',
+            width: '90%', maxWidth: 400, zIndex: 201,
+            fontFamily: "'Syne', sans-serif",
+            animation: 'popIn 0.2s cubic-bezier(0.34,1.56,0.64,1)',
+            boxShadow: `0 0 60px ${payingPlan.glowColor}`,
+          }}>
+            {/* Header modal */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div>
+                <p style={{ color: '#555577', fontSize: 12, fontWeight: 600, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Assinatura
+                </p>
+                <h2 style={{ color: payingPlan.color, fontWeight: 800, fontSize: 20, margin: 0 }}>
+                  {payingPlan.badge} {payingPlan.name}
+                </h2>
+              </div>
+              <button
+                onClick={() => setPayingPlan(null)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: 'none', color: '#8888aa',
+                  width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                  fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >✕</button>
+            </div>
+
+            {/* Valor */}
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 14, padding: '14px 18px', marginBottom: 20,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ color: '#8888aa', fontSize: 13 }}>Valor mensal</span>
+              <span style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 22 }}>R$ {payingPlan.price},00</span>
+            </div>
+
+            {/* QR Code */}
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <p style={{ color: '#8888aa', fontSize: 12, marginBottom: 12, fontWeight: 600 }}>
+                ESCANEIE O QR CODE
+              </p>
+              <div style={{
+                display: 'inline-block',
+                background: '#fff', borderRadius: 16, padding: 12,
+                boxShadow: `0 0 24px ${payingPlan.glowColor}`,
+              }}>
+                <img
+                  src={`data:image/png;base64,${PIX_QR}`}
+                  alt="QR Code Pix"
+                  style={{ width: 160, height: 160, display: 'block' }}
+                />
+              </div>
+            </div>
+
+            {/* Chave Pix */}
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ color: '#8888aa', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+                OU COPIE A CHAVE PIX
+              </p>
+              <div style={{
+                display: 'flex', gap: 8, alignItems: 'center',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10, padding: '10px 14px',
+              }}>
+                <span style={{ color: '#f0f0f8', fontSize: 14, flex: 1, fontWeight: 600, letterSpacing: '0.05em' }}>
+                  {PIX_KEY}
+                </span>
+                <button
+                  onClick={handleCopy}
+                  style={{
+                    background: copied ? 'rgba(200,242,60,0.15)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${copied ? 'rgba(200,242,60,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                    color: copied ? '#c8f23c' : '#8888aa',
+                    borderRadius: 8, padding: '5px 12px', cursor: 'pointer',
+                    fontSize: 12, fontFamily: "'Syne', sans-serif", fontWeight: 700,
+                    transition: 'all 0.2s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {copied ? '✓ Copiado' : 'Copiar'}
+                </button>
+              </div>
+            </div>
+
+            {/* Instrução */}
+            <div style={{
+              background: 'rgba(200,242,60,0.04)',
+              border: '1px solid rgba(200,242,60,0.12)',
+              borderRadius: 12, padding: '12px 16px',
+            }}>
+              <p style={{ color: '#8888aa', fontSize: 12, lineHeight: 1.7, margin: 0 }}>
+                Após o pagamento, envie o <span style={{ color: '#c8f23c', fontWeight: 700 }}>comprovante</span> via mensagem direta para o admin do VORTEX. Seu plano será ativado em até <span style={{ color: '#c8f23c', fontWeight: 700 }}>24 horas</span>.
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { opacity: 0; transform: translate(-50%,-48%) scale(0.96); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
         @media (max-width: 767px) {
           .pricing-main { padding-left: 24px !important; }
           .pricing-grid { grid-template-columns: 1fr !important; }
