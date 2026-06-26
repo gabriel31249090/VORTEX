@@ -273,7 +273,7 @@ export default function CommunityPage() {
 
               {/* Stats row */}
               <div style={{ display: 'flex', gap: 20, marginTop: 10, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', align: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ color: '#c8f23c', fontWeight: 800, fontSize: 15 }}>{memberCount}</span>
                   <span style={{ color: '#555577', fontSize: 13, marginTop: 1 }}>membros</span>
                 </div>
