@@ -99,6 +99,7 @@ export default function Nav() {
   }
 
   const items = [
+    { icon: '◆', label: 'Planos', path: '/pricing', onClick: () => router.push('/pricing') },
     { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
     { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
     { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
