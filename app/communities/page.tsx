@@ -110,7 +110,7 @@ export default function CommunitiesPage() {
     setNewName('')
     setNewDesc('')
     setNewPrivate(false)
-    router.push(`/communities/${slug}`)
+    router.push(`/community/${slug}`)
   }
 
   const filtered = communities.filter(c =>
