@@ -190,7 +190,7 @@ export default function CommunitiesPage() {
               Participando
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {joined.map(c => <CommunityCard key={c.id} community={c} isMember onJoin={handleJoin} onClick={() => router.push(`/communities/${c.slug}`)} />)}
+              {joined.map(c => <CommunityCard key={c.id} community={c} isMember onJoin={handleJoin} onClick={() => router.push(`/community/${c.slug}`)} />)}
             </div>
           </section>
         )}
@@ -202,7 +202,7 @@ export default function CommunitiesPage() {
               {joined.length > 0 ? 'Descobrir' : 'Todas as comunidades'}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {discover.map(c => <CommunityCard key={c.id} community={c} isMember={false} onJoin={handleJoin} onClick={() => router.push(`/communities/${c.slug}`)} />)}
+              {discover.map(c => <CommunityCard key={c.id} community={c} isMember={false} onJoin={handleJoin} onClick={() => router.push(`/community/${c.slug}`)} />)}
             </div>
           </section>
         )}
