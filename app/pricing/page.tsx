@@ -1,15 +1,19 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Nav from '../components/Nav'
+import { createClient } from '@/lib/supabase'
+import toast from 'react-hot-toast'
 
 const PIX_KEY = '5565996688341'
 const PIX_QR = 'iVBORw0KGgoAAAANSUhEUgAAASIAAAEiAQAAAAB1xeIbAAABgUlEQVR4nO2awW3DMAxFHysDPTpABsgo8mZFR+oG1ijZQD4GsPF7sNwm6aG9xE4t8mTJD9AHQdMkIRO/W3r5AwROOeWUU049O2XFGkjWAMOy022qqwoqSpIyQHsxIEiSdEutr6sKalhiPJ4brAPmz2BrXVVR6TSifs0Tnbo269Y+sUpqSSutgAEsZgQDXDddz6p+F1QyM7MDwNBgHdNc5myta9fUHPffMa50COg26p9X/R4o65iMZA32pouZHSb7Sa2va98Ucx3fA0SNZa9vS7FT3j6r+v9NFe8qBxFzkKSR0mUtDZb7/jEU1+1rK6knfC1Hj/vHU8XjQwO0F5vTTT+8yrpNde2bKvV9XEqbUt/PT8ftdNVA3eQcSr4n5iDPOY+miu/j3Q83L3kouu8fTi1zTL2fRkqHy+R97ZqUvZ0bn2OuQzV3a6XTxQRhJObjaFvpqoG6n2POs7SoyYgfk2krXTVQxfdpDvCA0WZIhyyDMG6mqwbK/G6UU0455VQV1CdQfchZA3/ZoAAAAABJRU5ErkJggg=='
 
+type PlanId = 'free' | 'boost' | 'mega'
+
 const plans = [
   {
-    id: 'free',
+    id: 'free' as PlanId,
     name: 'Free',
     price: 0,
     label: null,
@@ -32,11 +36,9 @@ const plans = [
       'Vídeos: até 10MB',
       'Sem personalização de cor',
     ],
-    cta: 'Plano atual',
-    ctaDisabled: true,
   },
   {
-    id: 'boost',
+    id: 'boost' as PlanId,
     name: 'BOOST',
     price: 10,
     label: 'Popular',
@@ -56,11 +58,9 @@ const plans = [
       'Destaque visual nos posts',
     ],
     limits: [],
-    cta: 'Assinar por R$10/mês',
-    ctaDisabled: false,
   },
   {
-    id: 'mega',
+    id: 'mega' as PlanId,
     name: 'MEGA BOOST',
     price: 15,
     label: 'Ultimate',
@@ -83,8 +83,6 @@ const plans = [
       'Suporte prioritário',
     ],
     limits: [],
-    cta: 'Assinar por R$15/mês',
-    ctaDisabled: false,
   },
 ]
 
@@ -93,11 +91,118 @@ export default function PricingPage() {
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null)
   const [payingPlan, setPayingPlan] = useState<typeof plans[0] | null>(null)
   const [copied, setCopied] = useState(false)
+  const [currentPlan, setCurrentPlan] = useState<PlanId>('free')
+  const [userId, setUserId] = useState<string | null>(null)
+  const [pendingRequest, setPendingRequest] = useState<PlanId | null>(null)
+  const [receipt, setReceipt] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    async function loadProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      setUserId(user.id)
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) setCurrentPlan(profile.plan as PlanId)
+
+      // Verifica se tem pedido pendente
+      const { data: requests } = await supabase
+        .from('plan_requests')
+        .select('plan, status')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (requests && requests.length > 0) {
+        setPendingRequest(requests[0].plan as PlanId)
+      }
+    }
+    loadProfile()
+  }, [])
 
   function handleCopy() {
     navigator.clipboard.writeText(PIX_KEY)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function getCtaLabel(plan: typeof plans[0]) {
+    if (plan.id === 'free') {
+      return currentPlan === 'free' ? 'Plano atual' : 'Fazer downgrade'
+    }
+    if (plan.id === currentPlan) return 'Plano atual'
+    if (pendingRequest === plan.id) return '⏳ Aguardando aprovação'
+    if (plan.id === 'boost' && currentPlan === 'mega') return 'Fazer downgrade'
+    return `Assinar por R$${plan.price}/mês`
+  }
+
+  function isCtaDisabled(plan: typeof plans[0]) {
+    if (plan.id === currentPlan) return true
+    if (pendingRequest === plan.id) return true
+    if (plan.id === 'free') return currentPlan === 'free'
+    return false
+  }
+
+  async function handleSubmitReceipt() {
+    if (!receipt || !payingPlan || !userId) return
+    setUploading(true)
+
+    try {
+      const supabase = createClient()
+
+      // Upload do comprovante
+      const ext = receipt.name.split('.').pop()
+      const filePath = `${userId}/${Date.now()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(filePath, receipt, { upsert: false })
+
+      if (uploadError) throw uploadError
+
+      // Pega a URL do arquivo
+      const { data: urlData } = supabase.storage
+        .from('receipts')
+        .getPublicUrl(filePath)
+
+      // Salva o pedido
+      const { error: insertError } = await supabase
+        .from('plan_requests')
+        .insert({
+          user_id: userId,
+          plan: payingPlan.id,
+          receipt_url: urlData.publicUrl,
+          status: 'pending',
+        })
+
+      if (insertError) throw insertError
+
+      setPendingRequest(payingPlan.id as PlanId)
+      setPayingPlan(null)
+      setReceipt(null)
+      toast.success('Comprovante enviado! Seu plano será ativado em até 24h.')
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao enviar comprovante. Tente novamente.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const planOrder: PlanId[] = ['free', 'boost', 'mega']
+
+  function isUpgrade(planId: PlanId) {
+    return planOrder.indexOf(planId) > planOrder.indexOf(currentPlan)
   }
 
   return (
@@ -129,6 +234,36 @@ export default function PricingPage() {
           <p style={{ color: '#8888aa', fontSize: 16, maxWidth: 520, margin: '0 auto', lineHeight: 1.7 }}>
             Escolha o plano ideal e desbloqueie recursos exclusivos de personalização, upload e destaque no VORTEX.
           </p>
+
+          {/* Banner plano atual */}
+          {currentPlan !== 'free' && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              marginTop: 24, background: 'rgba(200,242,60,0.06)',
+              border: '1px solid rgba(200,242,60,0.2)',
+              borderRadius: 50, padding: '8px 20px',
+            }}>
+              <span style={{ fontSize: 16 }}>
+                {plans.find(p => p.id === currentPlan)?.badge}
+              </span>
+              <span style={{ color: '#c8f23c', fontSize: 13, fontWeight: 700 }}>
+                Você está no plano {plans.find(p => p.id === currentPlan)?.name}
+              </span>
+            </div>
+          )}
+
+          {pendingRequest && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 10,
+              marginTop: 12, background: 'rgba(255,200,0,0.06)',
+              border: '1px solid rgba(255,200,0,0.2)',
+              borderRadius: 50, padding: '8px 20px',
+            }}>
+              <span style={{ color: '#ffc800', fontSize: 13, fontWeight: 700 }}>
+                ⏳ Comprovante enviado para {plans.find(p => p.id === pendingRequest)?.name} — aguardando aprovação
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Cards */}
@@ -142,6 +277,10 @@ export default function PricingPage() {
             const isHovered = hoveredPlan === plan.id
             const isFeatured = plan.id === 'boost'
             const isUltimate = plan.id === 'mega'
+            const isCurrent = plan.id === currentPlan
+            const disabled = isCtaDisabled(plan)
+            const ctaLabel = getCtaLabel(plan)
+            const upgrade = isUpgrade(plan.id as PlanId)
 
             return (
               <div
@@ -149,22 +288,40 @@ export default function PricingPage() {
                 onMouseEnter={() => setHoveredPlan(plan.id)}
                 onMouseLeave={() => setHoveredPlan(null)}
                 style={{
-                  background: isFeatured
+                  background: isCurrent
+                    ? `linear-gradient(180deg, ${plan.glowColor} 0%, #111118 100%)`
+                    : isFeatured
                     ? 'linear-gradient(180deg, rgba(200,242,60,0.06) 0%, #111118 100%)'
                     : isUltimate
                     ? 'linear-gradient(180deg, rgba(167,139,250,0.06) 0%, #111118 100%)'
                     : '#111118',
-                  border: `1.5px solid ${isHovered ? plan.borderColor : plan.id === 'free' ? 'rgba(255,255,255,0.06)' : plan.borderColor}`,
+                  border: `1.5px solid ${isCurrent ? plan.color : isHovered ? plan.borderColor : plan.id === 'free' ? 'rgba(255,255,255,0.06)' : plan.borderColor}`,
                   borderRadius: 20, padding: 28, position: 'relative',
                   transition: 'all 0.25s',
-                  boxShadow: isHovered
+                  boxShadow: isCurrent
+                    ? `0 0 32px ${plan.glowColor}`
+                    : isHovered
                     ? `0 0 40px ${plan.glowColor}`
                     : isFeatured ? `0 0 24px rgba(200,242,60,0.1)`
                     : isUltimate ? `0 0 24px rgba(167,139,250,0.1)` : 'none',
-                  transform: isHovered ? 'translateY(-4px)' : 'none',
+                  transform: isHovered && !isCurrent ? 'translateY(-4px)' : 'none',
                 }}
               >
-                {plan.label && (
+                {/* Badge "Plano atual" */}
+                {isCurrent && (
+                  <div style={{
+                    position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
+                    background: plan.color, color: plan.id === 'boost' ? '#000' : '#fff',
+                    fontSize: 11, fontWeight: 800, padding: '4px 16px', borderRadius: 50,
+                    whiteSpace: 'nowrap', letterSpacing: '0.05em',
+                    boxShadow: `0 0 12px ${plan.glowColor}`,
+                  }}>
+                    ✓ Plano atual
+                  </div>
+                )}
+
+                {/* Badge label (Popular/Ultimate) — só mostra se não for o atual */}
+                {plan.label && !isCurrent && (
                   <div style={{
                     position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
                     background: plan.color, color: plan.id === 'boost' ? '#000' : '#fff',
@@ -215,27 +372,37 @@ export default function PricingPage() {
                 </div>
 
                 <button
-                  onClick={() => !plan.ctaDisabled && setPayingPlan(plan)}
-                  disabled={plan.ctaDisabled}
+                  onClick={() => !disabled && plan.id !== 'free' && setPayingPlan(plan)}
+                  disabled={disabled}
                   style={{
                     width: '100%', padding: '13px 0', borderRadius: 50,
-                    border: plan.ctaDisabled ? '1px solid rgba(255,255,255,0.08)'
+                    border: disabled ? '1px solid rgba(255,255,255,0.08)'
                       : plan.id === 'boost' ? 'none'
                       : `1.5px solid ${plan.borderColor}`,
-                    background: plan.ctaDisabled ? 'transparent'
+                    background: disabled
+                      ? isCurrent ? `rgba(${plan.id === 'boost' ? '200,242,60' : plan.id === 'mega' ? '167,139,250' : '136,136,170'},0.08)` : 'transparent'
                       : plan.id === 'boost' ? '#c8f23c'
                       : plan.id === 'mega' ? 'linear-gradient(135deg, #a78bfa, #7c5cbf)'
                       : 'transparent',
-                    color: plan.ctaDisabled ? '#333355' : plan.id === 'boost' ? '#000' : '#f0f0f8',
+                    color: disabled
+                      ? isCurrent ? plan.color : '#333355'
+                      : plan.id === 'boost' ? '#000' : '#f0f0f8',
                     fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14,
-                    cursor: plan.ctaDisabled ? 'default' : 'pointer', transition: 'all 0.2s',
-                    boxShadow: plan.ctaDisabled ? 'none'
+                    cursor: disabled ? 'default' : 'pointer', transition: 'all 0.2s',
+                    boxShadow: disabled ? 'none'
                       : plan.id === 'boost' ? '0 0 20px rgba(200,242,60,0.3)'
                       : plan.id === 'mega' ? '0 0 20px rgba(167,139,250,0.3)' : 'none',
                   }}
                 >
-                  {plan.cta}
+                  {ctaLabel}
                 </button>
+
+                {/* Hint de downgrade */}
+                {!disabled && !upgrade && plan.id !== 'free' && (
+                  <p style={{ color: '#555577', fontSize: 11, textAlign: 'center', marginTop: 8, marginBottom: 0 }}>
+                    Entre em contato com o suporte para downgrade
+                  </p>
+                )}
               </div>
             )
           })}
@@ -253,7 +420,7 @@ export default function PricingPage() {
               Pagamento via Pix
             </p>
             <p style={{ color: '#8888aa', fontSize: 13, margin: 0, lineHeight: 1.6 }}>
-              Após o pagamento, envie o comprovante para nosso suporte. Seu plano será ativado em até 24 horas.
+              Após o pagamento, envie o comprovante direto pelo site. Seu plano será ativado em até 24 horas.
             </p>
           </div>
         </div>
@@ -263,7 +430,7 @@ export default function PricingPage() {
       {payingPlan && (
         <>
           <div
-            onClick={() => setPayingPlan(null)}
+            onClick={() => { setPayingPlan(null); setReceipt(null) }}
             style={{
               position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
               zIndex: 200, backdropFilter: 'blur(6px)', animation: 'fadeIn 0.2s ease',
@@ -275,10 +442,11 @@ export default function PricingPage() {
             background: '#111118',
             border: `1.5px solid ${payingPlan.borderColor}`,
             borderRadius: 24, padding: '32px 28px',
-            width: '90%', maxWidth: 400, zIndex: 201,
+            width: '90%', maxWidth: 420, zIndex: 201,
             fontFamily: "'Syne', sans-serif",
             animation: 'popIn 0.2s cubic-bezier(0.34,1.56,0.64,1)',
             boxShadow: `0 0 60px ${payingPlan.glowColor}`,
+            maxHeight: '90vh', overflowY: 'auto',
           }}>
             {/* Header modal */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -291,7 +459,7 @@ export default function PricingPage() {
                 </h2>
               </div>
               <button
-                onClick={() => setPayingPlan(null)}
+                onClick={() => { setPayingPlan(null); setReceipt(null) }}
                 style={{
                   background: 'rgba(255,255,255,0.06)', border: 'none', color: '#8888aa',
                   width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
@@ -359,16 +527,116 @@ export default function PricingPage() {
               </div>
             </div>
 
-            {/* Instrução */}
+            {/* Divisor */}
             <div style={{
-              background: 'rgba(200,242,60,0.04)',
-              border: '1px solid rgba(200,242,60,0.12)',
-              borderRadius: 12, padding: '12px 16px',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              marginBottom: 20, paddingTop: 20,
             }}>
-              <p style={{ color: '#8888aa', fontSize: 12, lineHeight: 1.7, margin: 0 }}>
-                Após o pagamento, envie o <span style={{ color: '#c8f23c', fontWeight: 700 }}>comprovante</span> via mensagem direta para o admin do VORTEX. Seu plano será ativado em até <span style={{ color: '#c8f23c', fontWeight: 700 }}>24 horas</span>.
+              <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, margin: '0 0 6px' }}>
+                📎 Enviar comprovante
               </p>
+              <p style={{ color: '#8888aa', fontSize: 12, lineHeight: 1.6, margin: '0 0 14px' }}>
+                Após pagar, anexe o comprovante abaixo. Seu plano será ativado em até <span style={{ color: '#c8f23c', fontWeight: 700 }}>24 horas</span>.
+              </p>
+
+              {/* Upload area */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                      toast.error('Arquivo muito grande. Máximo 10MB.')
+                      return
+                    }
+                    setReceipt(file)
+                  }
+                }}
+              />
+
+              {receipt ? (
+                <div style={{
+                  background: 'rgba(200,242,60,0.06)',
+                  border: '1px solid rgba(200,242,60,0.2)',
+                  borderRadius: 12, padding: '12px 16px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>
+                      {receipt.type === 'application/pdf' ? '📄' : '🖼️'}
+                    </span>
+                    <span style={{
+                      color: '#c8f23c', fontSize: 13, fontWeight: 600,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {receipt.name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => { setReceipt(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                    style={{
+                      background: 'none', border: 'none', color: '#8888aa',
+                      cursor: 'pointer', fontSize: 16, flexShrink: 0, padding: 0,
+                    }}
+                  >✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: '100%', padding: '16px',
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1.5px dashed rgba(255,255,255,0.12)',
+                    borderRadius: 12, color: '#8888aa', cursor: 'pointer',
+                    fontFamily: "'Syne', sans-serif", fontSize: 13,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = payingPlan.borderColor
+                    e.currentTarget.style.color = '#f0f0f8'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
+                    e.currentTarget.style.color = '#8888aa'
+                  }}
+                >
+                  <span style={{ fontSize: 24 }}>📎</span>
+                  <span style={{ fontWeight: 600 }}>Clique para anexar</span>
+                  <span style={{ fontSize: 11 }}>PNG, JPG, PDF — até 10MB</span>
+                </button>
+              )}
             </div>
+
+            {/* Botão enviar */}
+            <button
+              onClick={handleSubmitReceipt}
+              disabled={!receipt || uploading}
+              style={{
+                width: '100%', padding: '14px 0', borderRadius: 50,
+                border: 'none',
+                background: !receipt || uploading
+                  ? 'rgba(255,255,255,0.05)'
+                  : payingPlan.id === 'boost'
+                  ? '#c8f23c'
+                  : 'linear-gradient(135deg, #a78bfa, #7c5cbf)',
+                color: !receipt || uploading
+                  ? '#333355'
+                  : payingPlan.id === 'boost' ? '#000' : '#fff',
+                fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15,
+                cursor: !receipt || uploading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: !receipt || uploading ? 'none'
+                  : payingPlan.id === 'boost'
+                  ? '0 0 24px rgba(200,242,60,0.35)'
+                  : '0 0 24px rgba(167,139,250,0.35)',
+              }}
+            >
+              {uploading ? '⏳ Enviando...' : '✓ Enviar comprovante'}
+            </button>
           </div>
         </>
       )}
