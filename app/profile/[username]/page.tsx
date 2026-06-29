@@ -17,6 +17,7 @@ type Profile = {
   banner_url: string | null
   created_at: string
   plan: PlanId
+  accent_color: string | null
 }
 
 type Post = {
@@ -43,6 +44,20 @@ const PLAN_LIMITS: Record<PlanId, { avatar: number; banner: number; label: strin
   boost: { avatar: 10, banner: 10, label: '10MB' },
   mega:  { avatar: 50, banner: 50, label: '50MB' },
 }
+
+// Paleta de cores disponíveis para BOOST/MEGA
+const ACCENT_COLORS = [
+  '#c8f23c', // verde lima (padrão)
+  '#a78bfa', // roxo
+  '#60a5fa', // azul
+  '#f472b6', // rosa
+  '#fb923c', // laranja
+  '#34d399', // verde
+  '#f87171', // vermelho
+  '#facc15', // amarelo
+  '#22d3ee', // ciano
+  '#e879f9', // magenta
+]
 
 function PlanBadge({ plan }: { plan: PlanId }) {
   if (plan === 'boost') return (
@@ -93,6 +108,10 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
 
+  // Cor de destaque
+  const [accentColor, setAccentColor] = useState<string>('#c8f23c')
+  const [showColorPicker, setShowColorPicker] = useState(false)
+
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
 
@@ -114,6 +133,7 @@ export default function ProfilePage() {
       setProfile(profileData)
       setDisplayName(profileData.display_name || '')
       setBio(profileData.bio || '')
+      setAccentColor(profileData.accent_color || '#c8f23c')
       setIsOwner(user?.id === profileData.id)
 
       const [{ count: followers }, { count: following }] = await Promise.all([
@@ -208,6 +228,7 @@ export default function ProfilePage() {
     setSaving(true)
     let avatar_url = profile.avatar_url
     let banner_url = profile.banner_url
+
     if (avatarFile) {
       setUploadingAvatar(true)
       const url = await uploadImage(avatarFile, 'avatars', profile.id)
@@ -220,10 +241,19 @@ export default function ProfilePage() {
       if (url) banner_url = url
       setUploadingBanner(false)
     }
-    await supabase.from('profiles').update({ display_name: displayName, bio, avatar_url, banner_url }).eq('id', profile.id)
-    setProfile(prev => prev ? { ...prev, display_name: displayName, bio, avatar_url, banner_url } : prev)
+
+    const updateData: any = { display_name: displayName, bio, avatar_url, banner_url }
+
+    // Só salva accent_color se o plano permitir
+    if (profile.plan === 'boost' || profile.plan === 'mega') {
+      updateData.accent_color = accentColor
+    }
+
+    await supabase.from('profiles').update(updateData).eq('id', profile.id)
+    setProfile(prev => prev ? { ...prev, display_name: displayName, bio, avatar_url, banner_url, accent_color: accentColor } : prev)
     setAvatarFile(null); setBannerFile(null); setAvatarPreview(null); setBannerPreview(null)
     setEditMode(false); setSaving(false)
+    setShowColorPicker(false)
     toast.success('Perfil atualizado!')
   }
 
@@ -232,6 +262,8 @@ export default function ProfilePage() {
     setAvatarFile(null); setBannerFile(null); setAvatarPreview(null); setBannerPreview(null)
     setDisplayName(profile?.display_name || '')
     setBio(profile?.bio || '')
+    setAccentColor(profile?.accent_color || '#c8f23c')
+    setShowColorPicker(false)
   }
 
   function timeAgo(date: string) {
@@ -246,18 +278,22 @@ export default function ProfilePage() {
   const currentBanner = bannerPreview || profile?.banner_url
   const plan = profile?.plan || 'free'
   const limitLabel = PLAN_LIMITS[plan].label
+  const hasAccent = plan === 'boost' || plan === 'mega'
 
-  // Borda do perfil baseada no plano
-  const planBorderColor = plan === 'mega'
-    ? 'rgba(167,139,250,0.4)'
-    : plan === 'boost'
-    ? 'rgba(200,242,60,0.3)'
+  // Cor ativa: usa accent_color do perfil se tiver plano, senão cor padrão do plano
+  const activeColor = hasAccent && profile?.accent_color
+    ? profile.accent_color
+    : plan === 'mega' ? '#a78bfa' : '#c8f23c'
+
+  // Cor em edição (preview em tempo real)
+  const previewColor = hasAccent ? accentColor : activeColor
+
+  const planBorderColor = hasAccent
+    ? `${previewColor}55`
     : 'rgba(255,255,255,0.08)'
 
-  const planGlow = plan === 'mega'
-    ? '0 0 30px rgba(167,139,250,0.15)'
-    : plan === 'boost'
-    ? '0 0 30px rgba(200,242,60,0.1)'
+  const planGlow = hasAccent
+    ? `0 0 30px ${previewColor}22`
     : 'none'
 
   if (loading) return (
@@ -279,7 +315,7 @@ export default function ProfilePage() {
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(200,242,60,0.2)',
+        borderBottom: `1px solid ${activeColor}33`,
       }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 'max(16px, calc(220px + 32px))' }}>
           <button onClick={() => router.push('/feed')} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>
@@ -296,18 +332,28 @@ export default function ProfilePage() {
           border: `1px solid ${planBorderColor}`,
           borderRadius: 16, overflow: 'hidden',
           boxShadow: planGlow,
-          transition: 'box-shadow 0.3s',
+          transition: 'box-shadow 0.3s, border-color 0.3s',
         }}>
+          {/* Faixa de cor no topo do card — só para boost/mega */}
+          {hasAccent && (
+            <div style={{
+              height: 3,
+              background: `linear-gradient(90deg, transparent, ${previewColor}88, transparent)`,
+              transition: 'background 0.3s',
+            }} />
+          )}
+
           {/* Banner */}
           <div
             onClick={() => editMode && bannerInputRef.current?.click()}
             style={{
               height: 120, position: 'relative', cursor: editMode ? 'pointer' : 'default', overflow: 'hidden',
               background: currentBanner ? 'none'
-                : plan === 'mega' ? 'linear-gradient(135deg, rgba(167,139,250,0.2), rgba(167,139,250,0.05))'
-                : plan === 'boost' ? 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))'
+                : hasAccent
+                ? `linear-gradient(135deg, ${previewColor}22, ${previewColor}08)`
                 : 'linear-gradient(135deg, rgba(200,242,60,0.1), rgba(200,242,60,0.03))',
               borderBottom: `1px solid ${planBorderColor}`,
+              transition: 'background 0.3s',
             }}
           >
             {currentBanner && <img src={currentBanner} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
@@ -328,18 +374,18 @@ export default function ProfilePage() {
                 style={{
                   width: 80, height: 80, borderRadius: '50%',
                   background: currentAvatar ? 'none'
-                    : plan === 'mega' ? 'linear-gradient(135deg, #a78bfa, #7c5cbf)'
+                    : hasAccent
+                    ? `linear-gradient(135deg, ${previewColor}, ${previewColor}99)`
                     : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#000', fontWeight: 800, fontSize: 30,
                   border: `4px solid #111118`,
-                  boxShadow: plan === 'mega'
-                    ? '0 0 20px rgba(167,139,250,0.5)'
-                    : plan === 'boost'
-                    ? '0 0 20px rgba(200,242,60,0.4)'
+                  boxShadow: hasAccent
+                    ? `0 0 20px ${previewColor}66`
                     : '0 0 10px rgba(200,242,60,0.15)',
                   cursor: editMode ? 'pointer' : 'default',
                   position: 'relative', overflow: 'hidden', flexShrink: 0,
+                  transition: 'box-shadow 0.3s',
                 }}
               >
                 {currentAvatar
@@ -356,7 +402,7 @@ export default function ProfilePage() {
 
               {isOwner && !editMode && (
                 <button onClick={() => setEditMode(true)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.4)'; e.currentTarget.style.color = '#c8f23c' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.color = activeColor }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}
                 >
                   Editar perfil
@@ -365,7 +411,7 @@ export default function ProfilePage() {
               {isOwner && editMode && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={handleCancel} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 14px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif" }}>Cancelar</button>
-                  <button onClick={handleSave} disabled={saving} style={{ background: '#c8f23c', color: '#000', fontWeight: 700, padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: '0 0 12px rgba(200,242,60,0.3)', opacity: saving ? 0.7 : 1 }}>
+                  <button onClick={handleSave} disabled={saving} style={{ background: previewColor, color: '#000', fontWeight: 700, padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: `0 0 12px ${previewColor}55`, opacity: saving ? 0.7 : 1, transition: 'background 0.3s' }}>
                     {saving ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
@@ -374,13 +420,13 @@ export default function ProfilePage() {
                 <button
                   onClick={handleFollow} disabled={followLoading}
                   style={{
-                    background: isFollowing ? 'transparent' : '#c8f23c',
+                    background: isFollowing ? 'transparent' : activeColor,
                     border: isFollowing ? '1px solid rgba(255,255,255,0.12)' : 'none',
                     color: isFollowing ? '#8888aa' : '#000',
                     padding: '7px 18px', borderRadius: 50, cursor: followLoading ? 'wait' : 'pointer',
                     fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif",
                     transition: 'all 0.2s', opacity: followLoading ? 0.6 : 1,
-                    boxShadow: isFollowing ? 'none' : '0 0 12px rgba(200,242,60,0.3)',
+                    boxShadow: isFollowing ? 'none' : `0 0 12px ${activeColor}55`,
                   }}
                   onMouseEnter={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,60,60,0.4)'; e.currentTarget.style.color = '#ff6060' } }}
                   onMouseLeave={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' } }}
@@ -400,14 +446,76 @@ export default function ProfilePage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Nome de exibição"
                   style={{ background: '#18181f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14, outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box', width: '100%' }}
-                  onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+                  onFocus={e => (e.target.style.borderColor = `${previewColor}66`)}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
                 <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Bio..." rows={3}
                   style={{ background: '#18181f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14, outline: 'none', fontFamily: "'Syne', sans-serif", resize: 'none', boxSizing: 'border-box', width: '100%' }}
-                  onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+                  onFocus={e => (e.target.style.borderColor = `${previewColor}66`)}
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
+
+                {/* Seletor de cor — só para BOOST/MEGA */}
+                {hasAccent && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <span style={{ color: '#8888aa', fontSize: 12, fontWeight: 600 }}>🎨 Cor de destaque</span>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%',
+                        background: previewColor,
+                        border: '2px solid rgba(255,255,255,0.2)',
+                        boxShadow: `0 0 8px ${previewColor}88`,
+                        transition: 'background 0.2s',
+                      }} />
+                      <span style={{ color: previewColor, fontSize: 11, fontWeight: 700, fontFamily: 'monospace' }}>{previewColor}</span>
+                    </div>
+
+                    {/* Paleta */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                      {ACCENT_COLORS.map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setAccentColor(color)}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            background: color,
+                            border: accentColor === color ? '3px solid #fff' : '2px solid rgba(255,255,255,0.1)',
+                            cursor: 'pointer',
+                            boxShadow: accentColor === color ? `0 0 10px ${color}` : 'none',
+                            transition: 'all 0.15s',
+                            flexShrink: 0,
+                          }}
+                          title={color}
+                        />
+                      ))}
+
+                      {/* Input de cor customizada */}
+                      <label style={{ position: 'relative', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a28', flexShrink: 0 }} title="Cor personalizada">
+                        <span style={{ fontSize: 14 }}>+</span>
+                        <input
+                          type="color"
+                          value={accentColor}
+                          onChange={e => setAccentColor(e.target.value)}
+                          style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Preview ao vivo */}
+                    <div style={{
+                      padding: '10px 14px', borderRadius: 10,
+                      border: `1px solid ${previewColor}44`,
+                      background: `${previewColor}08`,
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      transition: 'all 0.3s',
+                    }}>
+                      <span style={{ fontSize: 13 }}>👁️</span>
+                      <span style={{ color: previewColor, fontSize: 12, fontWeight: 600 }}>
+                        Preview: bordas, avatar e destaques ficarão nessa cor
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -424,7 +532,7 @@ export default function ProfilePage() {
                   <span
                     onClick={() => router.push(`/profile/${profile.username}/follows?tab=followers`)}
                     style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)}
                     onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
                   >
                     <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followersCount}</span> seguidores
@@ -432,7 +540,7 @@ export default function ProfilePage() {
                   <span
                     onClick={() => router.push(`/profile/${profile.username}/follows?tab=following`)}
                     style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
+                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)}
                     onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
                   >
                     <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followingCount}</span> seguindo
@@ -455,8 +563,8 @@ export default function ProfilePage() {
               style={{
                 flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
                 fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-                background: tab === t ? 'rgba(200,242,60,0.12)' : 'transparent',
-                color: tab === t ? '#c8f23c' : '#555577',
+                background: tab === t ? `${activeColor}22` : 'transparent',
+                color: tab === t ? activeColor : '#555577',
               }}
             >
               {t === 'posts' ? `Posts (${posts.length})` : `Comunidades (${communities.length})`}
@@ -475,17 +583,17 @@ export default function ProfilePage() {
                 onClick={() => router.push(`/post/${post.id}`)}
                 style={{
                   background: '#111118',
-                  border: plan !== 'free'
-                    ? `1px solid ${planBorderColor}`
+                  border: hasAccent
+                    ? `1px solid ${activeColor}33`
                     : '1px solid rgba(255,255,255,0.06)',
                   borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = plan === 'mega' ? 'rgba(167,139,250,0.5)' : 'rgba(200,242,60,0.35)'
-                  e.currentTarget.style.boxShadow = planGlow
+                  e.currentTarget.style.borderColor = `${activeColor}66`
+                  e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}11`
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = plan !== 'free' ? planBorderColor : 'rgba(255,255,255,0.06)'
+                  e.currentTarget.style.borderColor = hasAccent ? `${activeColor}33` : 'rgba(255,255,255,0.06)'
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               >
@@ -515,15 +623,17 @@ export default function ProfilePage() {
                 key={c.id}
                 onClick={() => router.push(`/community/${c.slug}`)}
                 style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 14 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}44`; e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}08` }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
               >
                 <div style={{
                   width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                  background: hasAccent
+                    ? `linear-gradient(135deg, ${activeColor}, ${activeColor}88)`
+                    : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#000', fontWeight: 800, fontSize: 18,
-                  boxShadow: '0 0 10px rgba(200,242,60,0.2)'
+                  boxShadow: `0 0 10px ${activeColor}44`,
                 }}>
                   {c.name.charAt(0).toUpperCase()}
                 </div>
@@ -531,7 +641,7 @@ export default function ProfilePage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 15 }}>v/{c.name}</h2>
                     {c.role === 'owner' && (
-                      <span style={{ background: 'rgba(200,242,60,0.15)', color: '#c8f23c', fontSize: 10, padding: '2px 8px', borderRadius: 50, fontWeight: 700 }}>dono</span>
+                      <span style={{ background: `${activeColor}22`, color: activeColor, fontSize: 10, padding: '2px 8px', borderRadius: 50, fontWeight: 700 }}>dono</span>
                     )}
                   </div>
                   {c.description && <p style={{ color: '#8888aa', fontSize: 13, marginTop: 3 }}>{c.description}</p>}
