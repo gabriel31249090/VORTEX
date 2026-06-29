@@ -45,38 +45,33 @@ const PLAN_LIMITS: Record<PlanId, { avatar: number; banner: number; label: strin
   mega:  { avatar: 50, banner: 50, label: '50MB' },
 }
 
-// Paleta de cores disponíveis para BOOST/MEGA
 const ACCENT_COLORS = [
-  '#c8f23c', // verde lima (padrão)
-  '#a78bfa', // roxo
-  '#60a5fa', // azul
-  '#f472b6', // rosa
-  '#fb923c', // laranja
-  '#34d399', // verde
-  '#f87171', // vermelho
-  '#facc15', // amarelo
-  '#22d3ee', // ciano
-  '#e879f9', // magenta
+  '#c8f23c', '#a78bfa', '#60a5fa', '#f472b6', '#fb923c',
+  '#34d399', '#f87171', '#facc15', '#22d3ee', '#e879f9',
 ]
+
+function isVideo(url: string) {
+  return /\.(mp4|webm|mov|ogg)(\?|$)/i.test(url)
+}
+
+function isGif(url: string) {
+  return /\.gif(\?|$)/i.test(url)
+}
 
 function PlanBadge({ plan }: { plan: PlanId }) {
   if (plan === 'boost') return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      background: 'rgba(200,242,60,0.12)',
-      border: '1px solid rgba(200,242,60,0.3)',
-      color: '#c8f23c', fontSize: 11, fontWeight: 800,
-      padding: '2px 8px', borderRadius: 50,
+      background: 'rgba(200,242,60,0.12)', border: '1px solid rgba(200,242,60,0.3)',
+      color: '#c8f23c', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 50,
       boxShadow: '0 0 8px rgba(200,242,60,0.2)',
     }}>⚡ BOOST</span>
   )
   if (plan === 'mega') return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      background: 'rgba(167,139,250,0.12)',
-      border: '1px solid rgba(167,139,250,0.35)',
-      color: '#a78bfa', fontSize: 11, fontWeight: 800,
-      padding: '2px 8px', borderRadius: 50,
+      background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.35)',
+      color: '#a78bfa', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 50,
       boxShadow: '0 0 8px rgba(167,139,250,0.2)',
     }}>👑 MEGA</span>
   )
@@ -105,12 +100,11 @@ export default function ProfilePage() {
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [bannerIsVideo, setBannerIsVideo] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
 
-  // Cor de destaque
   const [accentColor, setAccentColor] = useState<string>('#c8f23c')
-  const [showColorPicker, setShowColorPicker] = useState(false)
 
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
@@ -193,8 +187,15 @@ export default function ProfilePage() {
     if (!file) return
     const plan = profile?.plan || 'free'
     const limitMB = PLAN_LIMITS[plan].avatar
+
+    // GIF só para MEGA
+    if (file.type === 'image/gif' && plan !== 'mega') {
+      toast.error('GIF no avatar é exclusivo do plano 👑 MEGA BOOST!')
+      return
+    }
+
     if (file.size > limitMB * 1024 * 1024) {
-      toast.error(`Imagem deve ter no máximo ${limitMB}MB (seu plano: ${plan.toUpperCase()})`)
+      toast.error(`Avatar deve ter no máximo ${limitMB}MB (plano ${plan.toUpperCase()})`)
       return
     }
     setAvatarFile(file)
@@ -206,17 +207,32 @@ export default function ProfilePage() {
     if (!file) return
     const plan = profile?.plan || 'free'
     const limitMB = PLAN_LIMITS[plan].banner
-    if (file.size > limitMB * 1024 * 1024) {
-      toast.error(`Banner deve ter no máximo ${limitMB}MB (seu plano: ${plan.toUpperCase()})`)
+    const isVid = file.type.startsWith('video/')
+    const isGifFile = file.type === 'image/gif'
+
+    // Vídeo/GIF no banner só para MEGA
+    if ((isVid || isGifFile) && plan !== 'mega') {
+      toast.error('Vídeo e GIF no banner são exclusivos do plano 👑 MEGA BOOST!')
       return
     }
+
+    // Limite de vídeo no banner: usa limite de banner (50MB para MEGA)
+    const videoLimitMB = plan === 'mega' ? 50 : limitMB
+    const effectiveLimit = isVid ? videoLimitMB : limitMB
+
+    if (file.size > effectiveLimit * 1024 * 1024) {
+      toast.error(`Banner deve ter no máximo ${effectiveLimit}MB (plano ${plan.toUpperCase()})`)
+      return
+    }
+
     setBannerFile(file)
     setBannerPreview(URL.createObjectURL(file))
+    setBannerIsVideo(isVid)
   }
 
-  async function uploadImage(file: File, bucket: string, userId: string): Promise<string | null> {
+  async function uploadFile(file: File, bucket: string, userId: string, filename?: string): Promise<string | null> {
     const ext = file.name.split('.').pop()
-    const path = `${userId}/photo.${ext}`
+    const path = `${userId}/${filename || 'photo'}.${ext}`
     const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
     if (error) { console.error(error); return null }
     const { data } = supabase.storage.from(bucket).getPublicUrl(path)
@@ -231,39 +247,46 @@ export default function ProfilePage() {
 
     if (avatarFile) {
       setUploadingAvatar(true)
-      const url = await uploadImage(avatarFile, 'avatars', profile.id)
+      // Nome do arquivo diferente para GIF vs imagem estática
+      const filename = avatarFile.type === 'image/gif' ? 'avatar_gif' : 'photo'
+      const url = await uploadFile(avatarFile, 'avatars', profile.id, filename)
       if (url) avatar_url = url
       setUploadingAvatar(false)
     }
+
     if (bannerFile) {
       setUploadingBanner(true)
-      const url = await uploadImage(bannerFile, 'banners', profile.id)
+      const isVid = bannerFile.type.startsWith('video/')
+      const isGifFile = bannerFile.type === 'image/gif'
+      const bucket = isVid ? 'media' : 'banners'
+      const filename = isVid ? 'banner_video' : isGifFile ? 'banner_gif' : 'photo'
+      const url = await uploadFile(bannerFile, bucket, profile.id, filename)
       if (url) banner_url = url
       setUploadingBanner(false)
     }
 
     const updateData: any = { display_name: displayName, bio, avatar_url, banner_url }
-
-    // Só salva accent_color se o plano permitir
     if (profile.plan === 'boost' || profile.plan === 'mega') {
       updateData.accent_color = accentColor
     }
 
     await supabase.from('profiles').update(updateData).eq('id', profile.id)
     setProfile(prev => prev ? { ...prev, display_name: displayName, bio, avatar_url, banner_url, accent_color: accentColor } : prev)
-    setAvatarFile(null); setBannerFile(null); setAvatarPreview(null); setBannerPreview(null)
+    setAvatarFile(null); setBannerFile(null)
+    setAvatarPreview(null); setBannerPreview(null)
+    setBannerIsVideo(false)
     setEditMode(false); setSaving(false)
-    setShowColorPicker(false)
     toast.success('Perfil atualizado!')
   }
 
   function handleCancel() {
     setEditMode(false)
-    setAvatarFile(null); setBannerFile(null); setAvatarPreview(null); setBannerPreview(null)
+    setAvatarFile(null); setBannerFile(null)
+    setAvatarPreview(null); setBannerPreview(null)
+    setBannerIsVideo(false)
     setDisplayName(profile?.display_name || '')
     setBio(profile?.bio || '')
     setAccentColor(profile?.accent_color || '#c8f23c')
-    setShowColorPicker(false)
   }
 
   function timeAgo(date: string) {
@@ -279,22 +302,26 @@ export default function ProfilePage() {
   const plan = profile?.plan || 'free'
   const limitLabel = PLAN_LIMITS[plan].label
   const hasAccent = plan === 'boost' || plan === 'mega'
+  const isMega = plan === 'mega'
 
-  // Cor ativa: usa accent_color do perfil se tiver plano, senão cor padrão do plano
   const activeColor = hasAccent && profile?.accent_color
     ? profile.accent_color
     : plan === 'mega' ? '#a78bfa' : '#c8f23c'
 
-  // Cor em edição (preview em tempo real)
   const previewColor = hasAccent ? accentColor : activeColor
+  const planBorderColor = hasAccent ? `${previewColor}55` : 'rgba(255,255,255,0.08)'
+  const planGlow = hasAccent ? `0 0 30px ${previewColor}22` : 'none'
 
-  const planBorderColor = hasAccent
-    ? `${previewColor}55`
-    : 'rgba(255,255,255,0.08)'
+  // Determina se o banner atual é vídeo ou GIF animado
+  const currentBannerIsVideo = bannerIsVideo || (currentBanner ? isVideo(currentBanner) : false)
+  const currentBannerIsGif = !bannerIsVideo && (currentBanner ? isGif(currentBanner) : false)
 
-  const planGlow = hasAccent
-    ? `0 0 30px ${previewColor}22`
-    : 'none'
+  // Accept do input de avatar por plano
+  const avatarAccept = isMega ? 'image/*' : 'image/jpeg,image/png,image/webp'
+  // Accept do input de banner por plano
+  const bannerAccept = isMega
+    ? 'image/*,video/mp4,video/webm,video/quicktime'
+    : 'image/jpeg,image/png,image/webp'
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
@@ -334,7 +361,7 @@ export default function ProfilePage() {
           boxShadow: planGlow,
           transition: 'box-shadow 0.3s, border-color 0.3s',
         }}>
-          {/* Faixa de cor no topo do card — só para boost/mega */}
+          {/* Faixa de cor no topo */}
           {hasAccent && (
             <div style={{
               height: 3,
@@ -347,7 +374,9 @@ export default function ProfilePage() {
           <div
             onClick={() => editMode && bannerInputRef.current?.click()}
             style={{
-              height: 120, position: 'relative', cursor: editMode ? 'pointer' : 'default', overflow: 'hidden',
+              height: 120, position: 'relative',
+              cursor: editMode ? 'pointer' : 'default',
+              overflow: 'hidden',
               background: currentBanner ? 'none'
                 : hasAccent
                 ? `linear-gradient(135deg, ${previewColor}22, ${previewColor}08)`
@@ -356,14 +385,35 @@ export default function ProfilePage() {
               transition: 'background 0.3s',
             }}
           >
-            {currentBanner && <img src={currentBanner} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+            {/* Renderiza vídeo, GIF ou imagem no banner */}
+            {currentBanner && currentBannerIsVideo ? (
+              <video
+                src={currentBanner}
+                autoPlay loop muted playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : currentBanner ? (
+              <img src={currentBanner} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ) : null}
+
             {editMode && (
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <span style={{ fontSize: 18 }}>🖼️</span>
-                <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{uploadingBanner ? 'Enviando...' : 'Alterar banner'}</span>
+                <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
+                  {uploadingBanner ? 'Enviando...' : isMega ? 'Alterar banner (imagem, GIF ou vídeo)' : 'Alterar banner'}
+                </span>
+                {isMega && !uploadingBanner && (
+                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>👑 GIF e vídeo disponíveis no seu plano</span>
+                )}
               </div>
             )}
-            <input ref={bannerInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBannerChange} />
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept={bannerAccept}
+              style={{ display: 'none' }}
+              onChange={handleBannerChange}
+            />
           </div>
 
           <div style={{ padding: 20 }}>
@@ -380,28 +430,35 @@ export default function ProfilePage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#000', fontWeight: 800, fontSize: 30,
                   border: `4px solid #111118`,
-                  boxShadow: hasAccent
-                    ? `0 0 20px ${previewColor}66`
-                    : '0 0 10px rgba(200,242,60,0.15)',
+                  boxShadow: hasAccent ? `0 0 20px ${previewColor}66` : '0 0 10px rgba(200,242,60,0.15)',
                   cursor: editMode ? 'pointer' : 'default',
                   position: 'relative', overflow: 'hidden', flexShrink: 0,
                   transition: 'box-shadow 0.3s',
                 }}
               >
+                {/* GIF no avatar usa img tag (anima normalmente) */}
                 {currentAvatar
                   ? <img src={currentAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   : profile.username.charAt(0).toUpperCase()
                 }
                 {editMode && (
-                  <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                     <span style={{ fontSize: 16 }}>📷</span>
+                    {isMega && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>GIF OK</span>}
                   </div>
                 )}
-                <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept={avatarAccept}
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarChange}
+                />
               </div>
 
               {isOwner && !editMode && (
-                <button onClick={() => setEditMode(true)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
+                <button onClick={() => setEditMode(true)}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.color = activeColor }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}
                 >
@@ -411,7 +468,8 @@ export default function ProfilePage() {
               {isOwner && editMode && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={handleCancel} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 14px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif" }}>Cancelar</button>
-                  <button onClick={handleSave} disabled={saving} style={{ background: previewColor, color: '#000', fontWeight: 700, padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: `0 0 12px ${previewColor}55`, opacity: saving ? 0.7 : 1, transition: 'background 0.3s' }}>
+                  <button onClick={handleSave} disabled={saving}
+                    style={{ background: previewColor, color: '#000', fontWeight: 700, padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: `0 0 12px ${previewColor}55`, opacity: saving ? 0.7 : 1, transition: 'background 0.3s' }}>
                     {saving ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
@@ -437,9 +495,16 @@ export default function ProfilePage() {
             </div>
 
             {editMode && (
-              <p style={{ color: '#555577', fontSize: 12, marginBottom: 12 }}>
-                Clique no avatar ou banner para alterar • Máx. {limitLabel} (plano {plan.toUpperCase()})
-              </p>
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ color: '#555577', fontSize: 12, margin: 0 }}>
+                  Clique no avatar ou banner para alterar • Máx. {limitLabel} (plano {plan.toUpperCase()})
+                </p>
+                {isMega && (
+                  <p style={{ color: '#a78bfa', fontSize: 11, margin: '4px 0 0', fontWeight: 600 }}>
+                    👑 MEGA: avatar aceita GIF • banner aceita GIF e vídeo (MP4/WebM)
+                  </p>
+                )}
+              </div>
             )}
 
             {editMode ? (
@@ -455,64 +520,30 @@ export default function ProfilePage() {
                   onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
                 />
 
-                {/* Seletor de cor — só para BOOST/MEGA */}
+                {/* Seletor de cor — só BOOST/MEGA */}
                 {hasAccent && (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                       <span style={{ color: '#8888aa', fontSize: 12, fontWeight: 600 }}>🎨 Cor de destaque</span>
-                      <div style={{
-                        width: 20, height: 20, borderRadius: '50%',
-                        background: previewColor,
-                        border: '2px solid rgba(255,255,255,0.2)',
-                        boxShadow: `0 0 8px ${previewColor}88`,
-                        transition: 'background 0.2s',
-                      }} />
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: previewColor, border: '2px solid rgba(255,255,255,0.2)', boxShadow: `0 0 8px ${previewColor}88`, transition: 'background 0.2s' }} />
                       <span style={{ color: previewColor, fontSize: 11, fontWeight: 700, fontFamily: 'monospace' }}>{previewColor}</span>
                     </div>
-
-                    {/* Paleta */}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                       {ACCENT_COLORS.map(color => (
-                        <button
-                          key={color}
-                          onClick={() => setAccentColor(color)}
-                          style={{
-                            width: 28, height: 28, borderRadius: '50%',
-                            background: color,
-                            border: accentColor === color ? '3px solid #fff' : '2px solid rgba(255,255,255,0.1)',
-                            cursor: 'pointer',
-                            boxShadow: accentColor === color ? `0 0 10px ${color}` : 'none',
-                            transition: 'all 0.15s',
-                            flexShrink: 0,
-                          }}
-                          title={color}
-                        />
+                        <button key={color} onClick={() => setAccentColor(color)} style={{
+                          width: 28, height: 28, borderRadius: '50%', background: color, cursor: 'pointer', flexShrink: 0,
+                          border: accentColor === color ? '3px solid #fff' : '2px solid rgba(255,255,255,0.1)',
+                          boxShadow: accentColor === color ? `0 0 10px ${color}` : 'none', transition: 'all 0.15s',
+                        }} title={color} />
                       ))}
-
-                      {/* Input de cor customizada */}
                       <label style={{ position: 'relative', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a28', flexShrink: 0 }} title="Cor personalizada">
                         <span style={{ fontSize: 14 }}>+</span>
-                        <input
-                          type="color"
-                          value={accentColor}
-                          onChange={e => setAccentColor(e.target.value)}
-                          style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
-                        />
+                        <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
                       </label>
                     </div>
-
-                    {/* Preview ao vivo */}
-                    <div style={{
-                      padding: '10px 14px', borderRadius: 10,
-                      border: `1px solid ${previewColor}44`,
-                      background: `${previewColor}08`,
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      transition: 'all 0.3s',
-                    }}>
+                    <div style={{ padding: '10px 14px', borderRadius: 10, border: `1px solid ${previewColor}44`, background: `${previewColor}08`, display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.3s' }}>
                       <span style={{ fontSize: 13 }}>👁️</span>
-                      <span style={{ color: previewColor, fontSize: 12, fontWeight: 600 }}>
-                        Preview: bordas, avatar e destaques ficarão nessa cor
-                      </span>
+                      <span style={{ color: previewColor, fontSize: 12, fontWeight: 600 }}>Preview: bordas, avatar e destaques ficarão nessa cor</span>
                     </div>
                   </div>
                 )}
@@ -527,22 +558,13 @@ export default function ProfilePage() {
                 </div>
                 <p style={{ color: '#555577', fontSize: 14, marginBottom: 8 }}>@{profile.username}</p>
                 {profile.bio && <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{profile.bio}</p>}
-
                 <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
-                  <span
-                    onClick={() => router.push(`/profile/${profile.username}/follows?tab=followers`)}
-                    style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                  >
+                  <span onClick={() => router.push(`/profile/${profile.username}/follows?tab=followers`)} style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)} onMouseLeave={e => (e.currentTarget.style.color = '#555577')}>
                     <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followersCount}</span> seguidores
                   </span>
-                  <span
-                    onClick={() => router.push(`/profile/${profile.username}/follows?tab=following`)}
-                    style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                  >
+                  <span onClick={() => router.push(`/profile/${profile.username}/follows?tab=following`)} style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)} onMouseLeave={e => (e.currentTarget.style.color = '#555577')}>
                     <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followingCount}</span> seguindo
                   </span>
                   <span style={{ color: '#555577', fontSize: 13 }}>
@@ -557,16 +579,12 @@ export default function ProfilePage() {
         {/* Tabs */}
         <div style={{ display: 'flex', background: '#111118', borderRadius: 12, padding: 3, border: '1px solid rgba(255,255,255,0.05)' }}>
           {(['posts', 'communities'] as Tab[]).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
-                fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-                background: tab === t ? `${activeColor}22` : 'transparent',
-                color: tab === t ? activeColor : '#555577',
-              }}
-            >
+            <button key={t} onClick={() => setTab(t)} style={{
+              flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+              fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
+              background: tab === t ? `${activeColor}22` : 'transparent',
+              color: tab === t ? activeColor : '#555577',
+            }}>
               {t === 'posts' ? `Posts (${posts.length})` : `Comunidades (${communities.length})`}
             </button>
           ))}
@@ -574,28 +592,12 @@ export default function ProfilePage() {
 
         {tab === 'posts' && (
           <>
-            {posts.length === 0 && (
-              <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '40px 0' }}>Nenhuma publicação ainda.</p>
-            )}
+            {posts.length === 0 && <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '40px 0' }}>Nenhuma publicação ainda.</p>}
             {posts.map(post => (
-              <article
-                key={post.id}
-                onClick={() => router.push(`/post/${post.id}`)}
-                style={{
-                  background: '#111118',
-                  border: hasAccent
-                    ? `1px solid ${activeColor}33`
-                    : '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = `${activeColor}66`
-                  e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}11`
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = hasAccent ? `${activeColor}33` : 'rgba(255,255,255,0.06)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
+              <article key={post.id} onClick={() => router.push(`/post/${post.id}`)}
+                style={{ background: '#111118', border: hasAccent ? `1px solid ${activeColor}33` : '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}11` }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = hasAccent ? `${activeColor}33` : 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
               >
                 <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{post.title}</h2>
                 {post.content && (
@@ -615,34 +617,20 @@ export default function ProfilePage() {
 
         {tab === 'communities' && (
           <>
-            {communities.length === 0 && (
-              <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '40px 0' }}>Nenhuma comunidade ainda.</p>
-            )}
+            {communities.length === 0 && <p style={{ textAlign: 'center', color: '#333355', fontSize: 14, padding: '40px 0' }}>Nenhuma comunidade ainda.</p>}
             {communities.map(c => (
-              <div
-                key={c.id}
-                onClick={() => router.push(`/community/${c.slug}`)}
+              <div key={c.id} onClick={() => router.push(`/community/${c.slug}`)}
                 style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 14 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}44`; e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}08` }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
               >
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: hasAccent
-                    ? `linear-gradient(135deg, ${activeColor}, ${activeColor}88)`
-                    : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#000', fontWeight: 800, fontSize: 18,
-                  boxShadow: `0 0 10px ${activeColor}44`,
-                }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: hasAccent ? `linear-gradient(135deg, ${activeColor}, ${activeColor}88)` : 'linear-gradient(135deg, #c8f23c, #8ab82a)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 18, boxShadow: `0 0 10px ${activeColor}44` }}>
                   {c.name.charAt(0).toUpperCase()}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 15 }}>v/{c.name}</h2>
-                    {c.role === 'owner' && (
-                      <span style={{ background: `${activeColor}22`, color: activeColor, fontSize: 10, padding: '2px 8px', borderRadius: 50, fontWeight: 700 }}>dono</span>
-                    )}
+                    {c.role === 'owner' && <span style={{ background: `${activeColor}22`, color: activeColor, fontSize: 10, padding: '2px 8px', borderRadius: 50, fontWeight: 700 }}>dono</span>}
                   </div>
                   {c.description && <p style={{ color: '#8888aa', fontSize: 13, marginTop: 3 }}>{c.description}</p>}
                 </div>
