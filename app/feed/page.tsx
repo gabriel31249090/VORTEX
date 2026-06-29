@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import toast from 'react-hot-toast'
+
+type PlanId = 'free' | 'boost' | 'mega'
 
 type Post = {
   id: string
@@ -16,7 +18,7 @@ type Post = {
   comments_count: number
   created_at: string
   author_id: string
-  profiles: { username: string; avatar_url: string | null } | null
+  profiles: { username: string; avatar_url: string | null; plan: PlanId } | null
   communities: { name: string; slug: string } | null
 }
 
@@ -49,6 +51,27 @@ function SkeletonCard() {
       </div>
     </div>
   )
+}
+
+function getPlanStyle(plan: PlanId): { border: string; shadow: string; avatarShadow: string; badgeEl: React.ReactNode } {
+  if (plan === 'mega') return {
+    border: '1px solid rgba(167,139,250,0.3)',
+    shadow: '0 0 20px rgba(167,139,250,0.08)',
+    avatarShadow: '0 0 10px rgba(167,139,250,0.5)',
+    badgeEl: <span style={{ fontSize: 12, lineHeight: 1 }}>👑</span>,
+  }
+  if (plan === 'boost') return {
+    border: '1px solid rgba(200,242,60,0.25)',
+    shadow: '0 0 16px rgba(200,242,60,0.06)',
+    avatarShadow: '0 0 10px rgba(200,242,60,0.4)',
+    badgeEl: <span style={{ fontSize: 12, lineHeight: 1 }}>⚡</span>,
+  }
+  return {
+    border: '1px solid rgba(255,255,255,0.06)',
+    shadow: 'none',
+    avatarShadow: '0 0 8px rgba(200,242,60,0.2)',
+    badgeEl: null,
+  }
 }
 
 export default function FeedPage() {
@@ -86,16 +109,14 @@ export default function FeedPage() {
     init()
   }, [])
 
-  // Realtime — novos posts aparecem no topo
+  // Realtime
   useEffect(() => {
     const channel = supabase
       .channel('feed-realtime')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'posts'
-      }, async (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
         const { data: newPost } = await supabase
           .from('posts')
-          .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url), communities(name, slug)')
+          .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url, plan), communities(name, slug)')
           .eq('id', payload.new.id)
           .single()
         if (newPost) setPosts(prev => [newPost as any, ...prev])
@@ -111,7 +132,7 @@ export default function FeedPage() {
 
     let query = supabase
       .from('posts')
-      .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url), communities(name, slug)')
+      .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url, plan), communities(name, slug)')
       .order('created_at', { ascending: false })
       .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1)
 
@@ -223,14 +244,12 @@ export default function FeedPage() {
           ))}
         </div>
 
-        {/* Skeletons */}
         {loading && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
           </div>
         )}
 
-        {/* Empty state seguindo */}
         {!loading && tab === 'seguindo' && posts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>👥</div>
@@ -239,7 +258,6 @@ export default function FeedPage() {
           </div>
         )}
 
-        {/* Empty state geral */}
         {!loading && tab === 'geral' && posts.length === 0 && (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🌀</div>
@@ -247,24 +265,47 @@ export default function FeedPage() {
           </div>
         )}
 
-        {/* Posts */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {posts.map((post, i) => {
             const isLiked = likedPosts.has(post.id)
             const isLiking = likingPost === post.id
+            const authorPlan: PlanId = post.profiles?.plan || 'free'
+            const planStyle = getPlanStyle(authorPlan)
 
             return (
               <article
                 key={post.id}
                 style={{
-                  background: '#111118', border: '1px solid rgba(255,255,255,0.06)',
+                  background: '#111118',
+                  border: planStyle.border,
                   borderRadius: 16, overflow: 'hidden',
+                  boxShadow: planStyle.shadow,
                   animation: `fadeUp 0.4s ease ${Math.min(i, 5) * 0.05}s both`,
                   transition: 'border-color 0.2s, box-shadow 0.2s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = authorPlan === 'mega'
+                    ? 'rgba(167,139,250,0.5)'
+                    : 'rgba(200,242,60,0.35)'
+                  e.currentTarget.style.boxShadow = authorPlan === 'mega'
+                    ? '0 0 24px rgba(167,139,250,0.12)'
+                    : '0 0 20px rgba(200,242,60,0.08)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = planStyle.border.replace('1px solid ', '')
+                  e.currentTarget.style.boxShadow = planStyle.shadow
+                }}
               >
+                {/* Faixa de destaque para boost/mega */}
+                {authorPlan !== 'free' && (
+                  <div style={{
+                    height: 2,
+                    background: authorPlan === 'mega'
+                      ? 'linear-gradient(90deg, transparent, rgba(167,139,250,0.6), transparent)'
+                      : 'linear-gradient(90deg, transparent, rgba(200,242,60,0.5), transparent)',
+                  }} />
+                )}
+
                 {/* Mídia */}
                 {post.media_url && (
                   isVideo(post.media_url) ? (
@@ -281,17 +322,20 @@ export default function FeedPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                     <div style={{
                       width: 32, height: 32, borderRadius: '50%',
-                      background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                      background: post.profiles?.avatar_url ? 'none'
+                        : authorPlan === 'mega' ? 'linear-gradient(135deg, #a78bfa, #7c5cbf)'
+                        : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-                      boxShadow: '0 0 8px rgba(200,242,60,0.3)', overflow: 'hidden',
+                      boxShadow: planStyle.avatarShadow, overflow: 'hidden',
+                      position: 'relative',
                     }}>
                       {post.profiles?.avatar_url
                         ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         : getInitial(post.profiles?.username || '?')
                       }
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span
                         style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
                         onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
@@ -300,15 +344,17 @@ export default function FeedPage() {
                       >
                         @{post.profiles?.username || 'usuário'}
                       </span>
+                      {/* Badge inline no feed */}
+                      {planStyle.badgeEl}
                       {post.communities && (
                         <span
                           style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
                           onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
                         >
-                          {' '}em v/{post.communities.name}
+                          em v/{post.communities.name}
                         </span>
                       )}
-                      <span style={{ color: '#444466', fontSize: 13 }}> · {timeAgo(post.created_at)}</span>
+                      <span style={{ color: '#444466', fontSize: 13 }}>· {timeAgo(post.created_at)}</span>
                     </div>
                   </div>
 

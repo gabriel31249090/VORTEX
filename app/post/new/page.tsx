@@ -5,8 +5,16 @@ import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 
+type PlanId = 'free' | 'boost' | 'mega'
 type FormatType = 'bold' | 'italic' | 'strikeThrough' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock'
 type MediaType = 'image' | 'video' | 'audio' | 'gif' | null
+
+// Limites de upload por plano (MB)
+const UPLOAD_LIMITS: Record<PlanId, { image: number; video: number; audio: number; gif: number }> = {
+  free:  { image: 2,   video: 10,  audio: 5,   gif: 2 },
+  boost: { image: 10,  video: 100, audio: 50,  gif: 10 },
+  mega:  { image: 50,  video: 500, audio: 200, gif: 50 },
+}
 
 function NewPostInner() {
   const [title, setTitle] = useState('')
@@ -18,6 +26,8 @@ function NewPostInner() {
   const [uploading, setUploading] = useState(false)
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set())
   const [charCount, setCharCount] = useState(0)
+  const [userPlan, setUserPlan] = useState<PlanId>('free')
+  const [userId, setUserId] = useState<string | null>(null)
 
   const imageRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLInputElement>(null)
@@ -29,7 +39,19 @@ function NewPostInner() {
   const communityId = searchParams.get('community')
   const supabase = createClient()
 
-  useEffect(() => { editorRef.current?.focus() }, [])
+  useEffect(() => {
+    editorRef.current?.focus()
+    // Buscar plano do usuário
+    async function fetchPlan() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setUserId(user.id)
+      const { data: profile } = await supabase
+        .from('profiles').select('plan').eq('id', user.id).single()
+      if (profile?.plan) setUserPlan(profile.plan as PlanId)
+    }
+    fetchPlan()
+  }, [])
 
   function updateActiveFormats() {
     const formats = new Set<string>()
@@ -60,12 +82,20 @@ function NewPostInner() {
 
   function handleMediaSelect(e: React.ChangeEvent<HTMLInputElement>, type: MediaType) {
     const file = e.target.files?.[0]
-    if (!file) return
-    const maxSize = type === 'video' ? 50 : 5
-    if (file.size > maxSize * 1024 * 1024) {
-      setError(`Arquivo deve ter no máximo ${maxSize}MB.`)
+    if (!file || !type) return
+
+    const limits = UPLOAD_LIMITS[userPlan]
+    const limitMB = limits[type as keyof typeof limits]
+
+    if (file.size > limitMB * 1024 * 1024) {
+      const planNames: Record<PlanId, string> = { free: 'Free', boost: 'BOOST ⚡', mega: 'MEGA BOOST 👑' }
+      setError(
+        `Arquivo muito grande! Limite para ${type} no plano ${planNames[userPlan]}: ${limitMB}MB.` +
+        (userPlan === 'free' ? ' Faça upgrade para enviar arquivos maiores.' : '')
+      )
       return
     }
+
     setMediaFile(file)
     setMediaPreview(URL.createObjectURL(file))
     setMediaType(type)
@@ -134,6 +164,10 @@ function NewPostInner() {
     router.push(communityId ? `/community/${communityId}` : '/feed')
   }
 
+  const limits = UPLOAD_LIMITS[userPlan]
+  const planColor = userPlan === 'mega' ? '#a78bfa' : userPlan === 'boost' ? '#c8f23c' : '#555577'
+  const planLabel = userPlan === 'mega' ? '👑 MEGA BOOST' : userPlan === 'boost' ? '⚡ BOOST' : 'Free'
+
   const btn = (active: boolean, onClick: () => void, title: string, children: React.ReactNode) => (
     <button
       onMouseDown={e => { e.preventDefault(); onClick() }}
@@ -152,9 +186,10 @@ function NewPostInner() {
     >{children}</button>
   )
 
-  const mediaBtn = (label: string, emoji: string, onClick: () => void, active: boolean) => (
+  const mediaBtn = (label: string, emoji: string, onClick: () => void, active: boolean, limitMB: number) => (
     <button
       onClick={onClick}
+      title={`Máx. ${limitMB}MB (${planLabel})`}
       style={{
         background: active ? 'rgba(200,242,60,0.12)' : 'rgba(255,255,255,0.04)',
         border: `1px solid ${active ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
@@ -165,7 +200,10 @@ function NewPostInner() {
       }}
       onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.3)'; e.currentTarget.style.color = '#c8f23c' } }}
       onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8888aa' } }}
-    >{emoji} {label}</button>
+    >
+      {emoji} {label}
+      <span style={{ color: '#444466', fontSize: 10, marginLeft: 2 }}>{limitMB}MB</span>
+    </button>
   )
 
   return (
@@ -174,7 +212,18 @@ function NewPostInner() {
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(10,10,15,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(200,242,60,0.2)' }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
           <button onClick={() => router.push('/feed')} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>← Voltar</button>
-          <span style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16 }}>Nova publicação</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16 }}>Nova publicação</span>
+            {/* Badge do plano no header */}
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 50,
+              background: userPlan !== 'free' ? `rgba(${userPlan === 'mega' ? '167,139,250' : '200,242,60'},0.12)` : 'transparent',
+              border: userPlan !== 'free' ? `1px solid ${planColor}40` : 'none',
+              color: planColor,
+            }}>
+              {planLabel}
+            </span>
+          </div>
           <button onClick={handleSubmit} disabled={loading} style={{ background: '#c8f23c', color: '#000', fontWeight: 700, padding: '8px 18px', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: '0 0 12px rgba(200,242,60,0.4)', opacity: loading ? 0.6 : 1 }}>
             {uploading ? 'Enviando...' : loading ? 'Publicando...' : 'Publicar'}
           </button>
@@ -234,12 +283,12 @@ function NewPostInner() {
             </div>
           )}
 
-          {/* Botões de mídia */}
+          {/* Botões de mídia com limites visíveis */}
           <div style={{ display: 'flex', gap: 8, padding: '12px 20px 16px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {mediaBtn('Imagem', '🖼', () => imageRef.current?.click(), mediaType === 'image')}
-            {mediaBtn('Vídeo', '🎬', () => videoRef.current?.click(), mediaType === 'video')}
-            {mediaBtn('Áudio', '🎵', () => audioRef.current?.click(), mediaType === 'audio')}
-            {mediaBtn('GIF', '🎭', () => gifRef.current?.click(), mediaType === 'gif')}
+            {mediaBtn('Imagem', '🖼', () => imageRef.current?.click(), mediaType === 'image', limits.image)}
+            {mediaBtn('Vídeo', '🎬', () => videoRef.current?.click(), mediaType === 'video', limits.video)}
+            {mediaBtn('Áudio', '🎵', () => audioRef.current?.click(), mediaType === 'audio', limits.audio)}
+            {mediaBtn('GIF', '🎭', () => gifRef.current?.click(), mediaType === 'gif', limits.gif)}
           </div>
 
           {/* Inputs hidden */}
@@ -249,8 +298,28 @@ function NewPostInner() {
           <input ref={gifRef} type="file" accept="image/gif" onChange={e => handleMediaSelect(e, 'gif')} style={{ display: 'none' }} />
         </div>
 
-        {error && <p style={{ color: '#ff4466', fontSize: 13, marginTop: 12 }}>{error}</p>}
-        <p style={{ color: '#333355', fontSize: 12, marginTop: 10, textAlign: 'right' }}>Ctrl+B negrito · Ctrl+I itálico · Tab indentar</p>
+        {error && (
+          <div style={{
+            color: '#ff4466', fontSize: 13, marginTop: 12,
+            background: 'rgba(255,68,102,0.08)', border: '1px solid rgba(255,68,102,0.2)',
+            borderRadius: 10, padding: '10px 14px', display: 'flex', gap: 8, alignItems: 'flex-start',
+          }}>
+            <span>⚠️</span>
+            <span>{error}</span>
+            {error.includes('upgrade') && (
+              <button
+                onClick={() => router.push('/pricing')}
+                style={{ marginLeft: 'auto', background: '#c8f23c', color: '#000', border: 'none', borderRadius: 50, padding: '3px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Syne', sans-serif", whiteSpace: 'nowrap' }}
+              >
+                Ver planos
+              </button>
+            )}
+          </div>
+        )}
+
+        <p style={{ color: '#333355', fontSize: 12, marginTop: 10, textAlign: 'right' }}>
+          Ctrl+B negrito · Ctrl+I itálico · Tab indentar
+        </p>
       </main>
 
       <style>{`

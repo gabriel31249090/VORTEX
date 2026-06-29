@@ -6,6 +6,8 @@ import { useRouter, useParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import Nav from '../../components/Nav'
 
+type PlanId = 'free' | 'boost' | 'mega'
+
 type Profile = {
   id: string
   username: string
@@ -14,6 +16,7 @@ type Profile = {
   avatar_url: string | null
   banner_url: string | null
   created_at: string
+  plan: PlanId
 }
 
 type Post = {
@@ -34,6 +37,36 @@ type Community = {
 }
 
 type Tab = 'posts' | 'communities'
+
+const PLAN_LIMITS: Record<PlanId, { avatar: number; banner: number; label: string }> = {
+  free:  { avatar: 2,  banner: 2,  label: '2MB' },
+  boost: { avatar: 10, banner: 10, label: '10MB' },
+  mega:  { avatar: 50, banner: 50, label: '50MB' },
+}
+
+function PlanBadge({ plan }: { plan: PlanId }) {
+  if (plan === 'boost') return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      background: 'rgba(200,242,60,0.12)',
+      border: '1px solid rgba(200,242,60,0.3)',
+      color: '#c8f23c', fontSize: 11, fontWeight: 800,
+      padding: '2px 8px', borderRadius: 50,
+      boxShadow: '0 0 8px rgba(200,242,60,0.2)',
+    }}>⚡ BOOST</span>
+  )
+  if (plan === 'mega') return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      background: 'rgba(167,139,250,0.12)',
+      border: '1px solid rgba(167,139,250,0.35)',
+      color: '#a78bfa', fontSize: 11, fontWeight: 800,
+      padding: '2px 8px', borderRadius: 50,
+      boxShadow: '0 0 8px rgba(167,139,250,0.2)',
+    }}>👑 MEGA</span>
+  )
+  return null
+}
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -138,7 +171,12 @@ export default function ProfilePage() {
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return }
+    const plan = profile?.plan || 'free'
+    const limitMB = PLAN_LIMITS[plan].avatar
+    if (file.size > limitMB * 1024 * 1024) {
+      toast.error(`Imagem deve ter no máximo ${limitMB}MB (seu plano: ${plan.toUpperCase()})`)
+      return
+    }
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
   }
@@ -146,7 +184,12 @@ export default function ProfilePage() {
   function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return }
+    const plan = profile?.plan || 'free'
+    const limitMB = PLAN_LIMITS[plan].banner
+    if (file.size > limitMB * 1024 * 1024) {
+      toast.error(`Banner deve ter no máximo ${limitMB}MB (seu plano: ${plan.toUpperCase()})`)
+      return
+    }
     setBannerFile(file)
     setBannerPreview(URL.createObjectURL(file))
   }
@@ -201,6 +244,21 @@ export default function ProfilePage() {
 
   const currentAvatar = avatarPreview || profile?.avatar_url
   const currentBanner = bannerPreview || profile?.banner_url
+  const plan = profile?.plan || 'free'
+  const limitLabel = PLAN_LIMITS[plan].label
+
+  // Borda do perfil baseada no plano
+  const planBorderColor = plan === 'mega'
+    ? 'rgba(167,139,250,0.4)'
+    : plan === 'boost'
+    ? 'rgba(200,242,60,0.3)'
+    : 'rgba(255,255,255,0.08)'
+
+  const planGlow = plan === 'mega'
+    ? '0 0 30px rgba(167,139,250,0.15)'
+    : plan === 'boost'
+    ? '0 0 30px rgba(200,242,60,0.1)'
+    : 'none'
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
@@ -228,17 +286,28 @@ export default function ProfilePage() {
             ← Voltar
           </button>
           <span style={{ color: '#f0f0f8', fontWeight: 700 }}>@{profile.username}</span>
+          {plan !== 'free' && <PlanBadge plan={plan} />}
         </div>
       </header>
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px', paddingLeft: 'max(16px, calc(220px + 32px))', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{
+          background: '#111118',
+          border: `1px solid ${planBorderColor}`,
+          borderRadius: 16, overflow: 'hidden',
+          boxShadow: planGlow,
+          transition: 'box-shadow 0.3s',
+        }}>
+          {/* Banner */}
           <div
             onClick={() => editMode && bannerInputRef.current?.click()}
             style={{
               height: 120, position: 'relative', cursor: editMode ? 'pointer' : 'default', overflow: 'hidden',
-              background: currentBanner ? 'none' : 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))',
-              borderBottom: '1px solid rgba(200,242,60,0.1)',
+              background: currentBanner ? 'none'
+                : plan === 'mega' ? 'linear-gradient(135deg, rgba(167,139,250,0.2), rgba(167,139,250,0.05))'
+                : plan === 'boost' ? 'linear-gradient(135deg, rgba(200,242,60,0.15), rgba(200,242,60,0.05))'
+                : 'linear-gradient(135deg, rgba(200,242,60,0.1), rgba(200,242,60,0.03))',
+              borderBottom: `1px solid ${planBorderColor}`,
             }}
           >
             {currentBanner && <img src={currentBanner} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
@@ -253,14 +322,22 @@ export default function ProfilePage() {
 
           <div style={{ padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -52, marginBottom: 16 }}>
+              {/* Avatar */}
               <div
                 onClick={() => editMode && avatarInputRef.current?.click()}
                 style={{
                   width: 80, height: 80, borderRadius: '50%',
-                  background: currentAvatar ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                  background: currentAvatar ? 'none'
+                    : plan === 'mega' ? 'linear-gradient(135deg, #a78bfa, #7c5cbf)'
+                    : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#000', fontWeight: 800, fontSize: 30,
-                  border: '4px solid #111118', boxShadow: '0 0 20px rgba(200,242,60,0.3)',
+                  border: `4px solid #111118`,
+                  boxShadow: plan === 'mega'
+                    ? '0 0 20px rgba(167,139,250,0.5)'
+                    : plan === 'boost'
+                    ? '0 0 20px rgba(200,242,60,0.4)'
+                    : '0 0 10px rgba(200,242,60,0.15)',
                   cursor: editMode ? 'pointer' : 'default',
                   position: 'relative', overflow: 'hidden', flexShrink: 0,
                 }}
@@ -313,7 +390,11 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {editMode && <p style={{ color: '#555577', fontSize: 12, marginBottom: 12 }}>Clique no avatar ou banner para alterar • Máx. 5MB</p>}
+            {editMode && (
+              <p style={{ color: '#555577', fontSize: 12, marginBottom: 12 }}>
+                Clique no avatar ou banner para alterar • Máx. {limitLabel} (plano {plan.toUpperCase()})
+              </p>
+            )}
 
             {editMode ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -330,10 +411,15 @@ export default function ProfilePage() {
               </div>
             ) : (
               <>
-                <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 20, marginBottom: 4 }}>{profile.display_name || profile.username}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 20, margin: 0 }}>
+                    {profile.display_name || profile.username}
+                  </h1>
+                  <PlanBadge plan={plan} />
+                </div>
                 <p style={{ color: '#555577', fontSize: 14, marginBottom: 8 }}>@{profile.username}</p>
                 {profile.bio && <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{profile.bio}</p>}
-                
+
                 <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
                   <span
                     onClick={() => router.push(`/profile/${profile.username}/follows?tab=followers`)}
@@ -360,6 +446,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Tabs */}
         <div style={{ display: 'flex', background: '#111118', borderRadius: 12, padding: 3, border: '1px solid rgba(255,255,255,0.05)' }}>
           {(['posts', 'communities'] as Tab[]).map(t => (
             <button
@@ -386,9 +473,21 @@ export default function ProfilePage() {
               <article
                 key={post.id}
                 onClick={() => router.push(`/post/${post.id}`)}
-                style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.05)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
+                style={{
+                  background: '#111118',
+                  border: plan !== 'free'
+                    ? `1px solid ${planBorderColor}`
+                    : '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = plan === 'mega' ? 'rgba(167,139,250,0.5)' : 'rgba(200,242,60,0.35)'
+                  e.currentTarget.style.boxShadow = planGlow
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = plan !== 'free' ? planBorderColor : 'rgba(255,255,255,0.06)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
               >
                 <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{post.title}</h2>
                 {post.content && (
