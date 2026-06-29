@@ -34,6 +34,7 @@ export default function Nav() {
   const pathname = usePathname()
   const supabase = createClient()
   const [username, setUsername] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -43,8 +44,15 @@ export default function Nav() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle()
-      if (data) setUsername(data.username)
+      const { data } = await supabase
+        .from('profiles')
+        .select('username, is_admin')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (data) {
+        setUsername(data.username)
+        setIsAdmin(data.is_admin === true)
+      }
 
       const { count } = await supabase
         .from('notifications')
@@ -106,6 +114,7 @@ export default function Nav() {
     { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
     { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
     { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
+    ...(isAdmin ? [{ icon: '🛡️', label: 'Admin', path: '/admin', admin: true, onClick: () => router.push('/admin') }] : []),
   ]
 
   return (
@@ -125,29 +134,42 @@ export default function Nav() {
           {items.map(item => {
             const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
             const isNotif = item.path === '__notif__'
+            const isAdminItem = (item as any).admin === true
             return (
               <button
                 key={item.label}
                 onClick={item.onClick}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, position: 'relative',
-                  padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                  background: item.accent ? '#c8f23c' : isActive ? 'rgba(200,242,60,0.1)' : 'transparent',
-                  color: item.accent ? '#000' : isActive ? '#c8f23c' : '#8888aa',
-                  fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: item.accent || isActive ? 700 : 500,
+                  padding: '10px 12px', borderRadius: 12, border: isAdminItem ? '1px solid rgba(200,242,60,0.15)' : 'none',
+                  cursor: 'pointer',
+                  background: item.accent ? '#c8f23c'
+                    : isActive && isAdminItem ? 'rgba(200,242,60,0.12)'
+                    : isActive ? 'rgba(200,242,60,0.1)'
+                    : isAdminItem ? 'rgba(200,242,60,0.04)'
+                    : 'transparent',
+                  color: item.accent ? '#000' : isActive ? '#c8f23c' : isAdminItem ? '#c8f23c' : '#8888aa',
+                  fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: item.accent || isActive || isAdminItem ? 700 : 500,
                   transition: 'all 0.2s', textAlign: 'left',
+                  marginTop: isAdminItem ? 8 : 0,
                   boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.3)' : isActive ? '0 0 8px rgba(200,242,60,0.1)' : 'none'
                 }}
                 onMouseEnter={e => {
-                  if (!item.accent && !isActive) {
+                  if (!item.accent && !isActive && !isAdminItem) {
                     e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
                     e.currentTarget.style.color = '#f0f0f8'
                   }
+                  if (isAdminItem && !isActive) {
+                    e.currentTarget.style.background = 'rgba(200,242,60,0.1)'
+                  }
                 }}
                 onMouseLeave={e => {
-                  if (!item.accent && !isActive) {
+                  if (!item.accent && !isActive && !isAdminItem) {
                     e.currentTarget.style.background = 'transparent'
                     e.currentTarget.style.color = '#8888aa'
+                  }
+                  if (isAdminItem && !isActive) {
+                    e.currentTarget.style.background = 'rgba(200,242,60,0.04)'
                   }
                 }}
               >
@@ -196,7 +218,7 @@ export default function Nav() {
         display: 'flex', justifyContent: 'space-around', alignItems: 'center',
         padding: '8px 0 12px', zIndex: 100, fontFamily: "'Syne', sans-serif"
       }} className="nav-bottom">
-        {items.map(item => {
+        {items.filter(i => !(i as any).admin).map(item => {
           const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
           const isNotif = item.path === '__notif__'
           return (
