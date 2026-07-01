@@ -106,6 +106,7 @@ export default function FeedPage() {
   const [tab, setTab] = useState<FeedTab>('geral')
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [page, setPage] = useState(0)
+  const [feedAds, setFeedAds] = useState<{ id: string; title: string; description: string | null; image_url: string | null; link_url: string }[]>([])
   const loaderRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -118,7 +119,18 @@ export default function FeedPage() {
 
       const { data: profile } = await supabase
         .from('profiles').select('plan').eq('id', user.id).single()
-      if (profile?.plan) setUserPlan(profile.plan as PlanId)
+      const plan = (profile?.plan as PlanId) || 'free'
+      setUserPlan(plan)
+
+      // Busca anúncios de feed ativos só se o usuário for Free
+      if (plan === 'free') {
+        const { data: ads } = await supabase
+          .from('ads')
+          .select('id, title, description, image_url, link_url')
+          .eq('type', 'feed')
+          .eq('active', true)
+        if (ads) setFeedAds(ads)
+      }
 
       const { data: likes } = await supabase
         .from('likes').select('post_id').eq('user_id', user.id)
@@ -298,7 +310,8 @@ export default function FeedPage() {
 
             // Posição real no feed (1-indexed) — insere anúncio a cada 40 posts, só pra Free
             const position = i + 1
-            const showAd = userPlan === 'free' && position % AD_INTERVAL === 0
+            const showAd = userPlan === 'free' && position % AD_INTERVAL === 0 && feedAds.length > 0
+            const adToShow = showAd ? feedAds[Math.floor(position / AD_INTERVAL - 1) % feedAds.length] : null
 
             return (
               <div key={post.id} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -437,16 +450,7 @@ export default function FeedPage() {
                 </article>
 
                 {/* Anúncio a cada 40 posts — só pra usuários Free */}
-                {showAd && <FeedAd
-                  key={`ad-${position}`}
-                  ad={{
-                    id: `ad-${position}`,
-                    title: 'Apoie quem cria conteúdo',
-                    description: 'Descubra recursos exclusivos e vantagens disponíveis para membros premium.',
-                    image_url: null,
-                    link_url: 'https://vortex.app',
-                  }}
-                />}
+                {showAd && adToShow && <FeedAd key={`ad-${position}`} ad={adToShow} />}
               </div>
             )
           })}
