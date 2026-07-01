@@ -1,502 +1,57 @@
-================================================================================
-                     VORTEX - CÓDIGO FONTE COMPLETO
-================================================================================
+📋 RESUMO DO DIA — VORTEX
+🔁 Contexto inicial
+Você mandou o relatório completo do projeto (Next.js 16, React 19, TypeScript, Supabase, Tailwind v4) e o código-fonte pra eu ficar por dentro do estado atual. Também resolvemos um problema de conexão do git (push falhou por internet instável, resolvido tentando de novo).
 
-ÍNDICE:
-1. Arquivos de Configuração
-2. Arquivo de Ambiente
-3. Bibliotecas
-4. Componentes
-5. Páginas
+🅰️ BLOCO A — Melhorias implementadas (concluído e commitado)
+1. Cor customizada na página do post individual (app/post/[id]/page.tsx)
 
-================================================================================
-1. ARQUIVOS DE CONFIGURAÇÃO
-================================================================================
+O post individual agora aplica a accent_color do autor (já existia no feed, faltava aqui)
+Título, avatar, borda do card e faixa superior decorativa usam a cor escolhida por usuários BOOST/MEGA
+Badge ⚡/👑 aparece ao lado do @username
 
-──────────────────────────────────────────────────────────────────────────────
-package.json
-──────────────────────────────────────────────────────────────────────────────
-{
-  "name": "vortex",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.107.0",
-    "clsx": "^2.1.1",
-    "lucide-react": "^1.17.0",
-    "next": "16.2.7",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-hot-toast": "^2.6.0",
-    "tailwind-merge": "^3.6.0",
-    "zustand": "^5.0.14"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.7",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
-}
+2. Notificação de plano aprovado (app/admin/page.tsx + app/notifications/page.tsx)
 
-──────────────────────────────────────────────────────────────────────────────
-tsconfig.json
-──────────────────────────────────────────────────────────────────────────────
-{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./*"]
-    }
-  },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
-  ],
-  "exclude": ["node_modules"]
-}
+Nova coluna plan na tabela notifications (rodamos ALTER TABLE notifications ADD COLUMN plan text;)
+Quando o admin aprova um pedido em /admin (ou seta o plano manualmente na aba Usuários), o sistema insere uma notificação tipo plan_approved
+Na tela de notificações, aparece: "Seu plano ⚡ BOOST foi ativado! 🎉" com ícone especial, e ao clicar leva para /pricing
 
-──────────────────────────────────────────────────────────────────────────────
-next.config.ts
-──────────────────────────────────────────────────────────────────────────────
-import type { NextConfig } from "next";
+3. Loading states (app/settings/page.tsx)
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+Trocamos o texto simples "Carregando..." por um skeleton visual (blocos pulsando) igual ao padrão usado em outras páginas do site
+saved/page.tsx já tinha skeleton, não precisou mexer
 
-export default nextConfig;
+4. Meta tags / SEO básico (app/post/[id]/page.tsx)
 
-──────────────────────────────────────────────────────────────────────────────
-eslint.config.mjs
-──────────────────────────────────────────────────────────────────────────────
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+Ao abrir um post, o título da aba do navegador muda dinamicamente pra [Título do post] — VORTEX
+Meta tags description, og:title, og:description e og:image são inseridas via JavaScript
+⚠️ Limitação importante que expliquei: como o middleware do site exige login em quase todas as rotas, bots de redes sociais (que não fazem login) são redirecionados antes de ler essas tags — então prévias de link no WhatsApp/Discord/Twitter não vão funcionar de verdade ainda. Isso ajuda no título da aba do navegador, mas não em compartilhamentos externos. Se quiser resolver isso direito, precisaríamos tornar /post/[id] uma rota pública no middleware — ainda não fizemos essa parte.
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
+5. Rate limiting (cooldown entre posts) (app/post/new/page.tsx)
 
-export default eslintConfig;
+Cooldown definido por plano: 60s (Free), 20s (BOOST), 5s (MEGA BOOST)
+Verifica o último post do usuário ao carregar a página E revalida no momento do clique em "Publicar" (pra evitar burlar deixando a aba aberta)
+Botão de publicar mostra contador regressivo (⏳ 45s) enquanto bloqueado
+Aviso visual explicando o cooldown, com nudge pra upgrade se for Free
 
-──────────────────────────────────────────────────────────────────────────────
-postcss.config.mjs
-──────────────────────────────────────────────────────────────────────────────
-const config = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
-};
+Arquivos entregues e já commitados:
 
-export default config;
+app/post/[id]/page.tsx
+app/admin/page.tsx
+app/notifications/page.tsx
+app/settings/page.tsx
+app/post/new/page.tsx
 
-──────────────────────────────────────────────────────────────────────────────
-middleware.ts
-──────────────────────────────────────────────────────────────────────────────
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+Commit: "cor no post, notificacao de plano, loading states, seo basico e rate limit" — subiu com sucesso pro GitHub (9e8738b).
 
-const PUBLIC_ROUTES = ['/login', '/register']
+🅱️ BLOCO B — Sistema de anúncios (ainda não iniciado)
+Decidido: só usuários Free vão ver anúncios (BOOST/MEGA não veem). Ainda faltam definir:
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+Tabela no banco pra armazenar anúncios
+Tipos: pop-up, anúncio lateral, posts patrocinados com link externo
+Interface no /admin pra criar/editar/pausar anúncios
 
-  // Rotas públicas — deixa passar
-  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-    return NextResponse.next()
-  }
+🅲 BLOCO C — Sistema de DMs (ainda não iniciado)
+Você mencionou que já tentou implementar mensagens diretas antes e não deu certo. Precisamos conversar sobre o que travou da última vez antes de tentar de novo, pra não repetir o mesmo erro.
 
-  const response = NextResponse.next()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  return response
-}
-
-export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).+)',
-  ],
-}
-
-================================================================================
-2. ARQUIVO DE AMBIENTE
-================================================================================
-
-──────────────────────────────────────────────────────────────────────────────
-.env.local (TEMPLATE - Configure com seus valores)
-──────────────────────────────────────────────────────────────────────────────
-NEXT_PUBLIC_SUPABASE_URL=sua_url_supabase_aqui
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_anon_aqui
-
-================================================================================
-3. BIBLIOTECAS
-================================================================================
-
-──────────────────────────────────────────────────────────────────────────────
-lib/supabase.ts
-──────────────────────────────────────────────────────────────────────────────
-import { createBrowserClient } from '@supabase/ssr'
-
-export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
-
-================================================================================
-4. COMPONENTES
-================================================================================
-
-──────────────────────────────────────────────────────────────────────────────
-app/components/Nav.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo muito grande)
-Nota: Contém:
-- Navegação sidebar desktop
-- Bottom nav mobile
-- Sistema de notificações em tempo real
-- Dropdown de conta
-- Contador de notificações não-lidas
-- ~550 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/components/BottomNav.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo pequeno)
-Nota: Contém:
-- Menu de navegação mobile
-- 5 itens principais (Feed, Busca, Postar, Avisos, Perfil)
-- Indicador de notificações
-- ~100 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-================================================================================
-5. PÁGINAS (ARQUIVOS PRINCIPAIS)
-================================================================================
-
-──────────────────────────────────────────────────────────────────────────────
-app/layout.tsx
-──────────────────────────────────────────────────────────────────────────────
-import type { Metadata } from "next";
-import { Toaster } from "react-hot-toast";
-
-export const metadata: Metadata = {
-  title: "VORTEX",
-  description: "A rede social sem limites",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="pt">
-      <body style={{ margin: 0, padding: 0, background: '#0a0a0f' }}>
-        {children}
-        <Toaster
-          position="bottom-center"
-          toastOptions={{
-            style: {
-              background: '#111118',
-              color: '#f0f0f8',
-              border: '1px solid rgba(200,242,60,0.2)',
-              fontFamily: "'Syne', sans-serif",
-              fontSize: '14px',
-              borderRadius: '12px',
-            },
-            success: {
-              iconTheme: {
-                primary: '#c8f23c',
-                secondary: '#000',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ff4444',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
-      </body>
-    </html>
-  );
-}
-
-──────────────────────────────────────────────────────────────────────────────
-app/page.tsx
-──────────────────────────────────────────────────────────────────────────────
-import { redirect } from 'next/navigation'
-
-export default function Home() {
-  redirect('/login')
-}
-
-──────────────────────────────────────────────────────────────────────────────
-app/not-found.tsx (CÓDIGO COMPLETO OMITIDO)
-Nota: Contém:
-- Página 404 customizada
-- Botões de navegação
-- Animação de spinner
-- ~100 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/login/page.tsx (CÓDIGO COMPLETO OMITIDO)
-Nota: Contém:
-- Formulário de login
-- Integração Supabase Auth
-- Validações de email/senha
-- Redirecionamento pós-login
-- ~120 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/register/page.tsx (CÓDIGO COMPLETO OMITIDO)
-Nota: Contém:
-- Formulário de registro
-- Validação de username disponível
-- Criação de perfil
-- Confirmação de email
-- ~140 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/feed/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo grande)
-Nota: Contém:
-- Feed principal com posts
-- Dois abas: "Geral" e "Seguindo"
-- Paginação infinita
-- Sistema de curtidas
-- Real-time updates
-- Skeleton loading
-- ~500 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/search/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo grande)
-Nota: Contém:
-- Busca com debounce
-- 3 abas: Posts, Pessoas, Comunidades
-- Highlight de termos encontrados
-- ~350 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/post/new/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo grande)
-Nota: Contém:
-- Editor WYSIWYG para posts
-- Toolbar de formatação (negrito, itálico, listas, etc)
-- Upload de imagem, vídeo, áudio, GIF
-- Preview de mídia
-- ~450 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/post/[id]/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo grande)
-Nota: Contém:
-- Visualização completa de post
-- Sistema de comentários com threads
-- Auto-complete de menções (@)
-- Replies aninhadas
-- Renderização de HTML rico
-- ~550 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/notifications/page.tsx (CÓDIGO COMPLETO OMITIDO)
-Nota: Contém:
-- Lista de notificações
-- Filtro: Todas / Não-lidas
-- 3 tipos: like, comment, follow
-- Botão para limpar todas
-- ~200 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/profile/[username]/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo grande)
-Nota: Contém:
-- Perfil do usuário
-- Avatar e banner editáveis
-- Bio e nome de exibição
-- Dois abas: Posts e Comunidades
-- Botão de seguir
-- Contadores de posts, seguidores, seguindo
-- ~600 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/profile/[username]/follows/page.tsx (CÓDIGO COMPLETO OMITIDO)
-Nota: Contém:
-- Lista de seguidores e seguindo
-- Dois abas
-- Cards de usuários
-- Botão para seguir/deixar de seguir
-- ~250 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/communities/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo grande)
-Nota: Contém:
-- Lista de comunidades
-- Busca com filtro
-- Modal para criar comunidade
-- Botões de entrar/sair
-- Seções: Participando e Descobrir
-- ~500 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/community/[slug]/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo muito grande)
-Nota: Contém:
-- Página da comunidade com hero banner
-- Sidebar com informações e membros
-- Feed de posts da comunidade
-- Botão para postar
-- Lista de moderadores
-- ~800 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/saved/page.tsx (CÓDIGO COMPLETO OMITIDO)
-Nota: Contém:
-- Posts salvos do usuário
-- Botão para remover dos salvos
-- ~120 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/pricing/page.tsx (CÓDIGO COMPLETO OMITIDO - Arquivo grande)
-Nota: Contém:
-- 3 planos: Free, BOOST ($10), MEGA BOOST ($15)
-- Modal de pagamento Pix
-- QR code e chave Pix
-- Lista de features por plano
-- ~600 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-──────────────────────────────────────────────────────────────────────────────
-app/settings/page.tsx (CÓDIGO COMPLETO OMITIDO)
-Nota: Contém:
-- Edição de perfil (nome, bio)
-- Upload de avatar e banner
-- Informações de conta
-- Botão de sair
-- ~300 linhas
-──────────────────────────────────────────────────────────────────────────────
-
-================================================================================
-RESUMO TÉCNICO
-================================================================================
-
-TOTAL DE ARQUIVOS: 27 arquivos
-
-ESTRUTURA:
-✓ 5 arquivos de configuração (tsconfig, package.json, etc)
-✓ 1 arquivo middleware (autenticação)
-✓ 1 biblioteca (Supabase client)
-✓ 2 componentes reutilizáveis
-✓ 18 páginas/rotas
-✓ 2 páginas especiais (not-found, layout)
-✓ 1 página raiz (home - redirect)
-
-LINHAS DE CÓDIGO ESTIMADAS: ~6.000 linhas
-
-PRINCIPAIS FEATURES:
-- Sistema de autenticação com Supabase
-- Feed social com posts, curtidas e comentários
-- Comunidades (criar, entrar, gerenciar)
-- Sistema de notificações real-time
-- Busca avançada (posts, usuários, comunidades)
-- Perfil de usuário com seguindo/seguidores
-- Posts salvos
-- Sistema de planos (Free, BOOST, MEGA BOOST)
-- Upload de mídia (imagem, vídeo, áudio, GIF)
-- Editor WYSIWYG com formatação
-- Dark mode completo
-- Responsivo (mobile-first)
-
-TECNOLOGIAS:
-- Next.js 16.2.7 com App Router
-- React 19.2.4
-- TypeScript 5
-- Supabase (Auth + Database)
-- Tailwind CSS 4
-- React Hot Toast (notificações)
-- Zustand (state management, opcional)
-
-CORES:
-- Fundo principal: #0a0a0f
-- Primária/Destaque: #c8f23c
-- Erro: #ff4466
-- Sucesso: #c8f23c
-
-================================================================================
-                          FIM DO CÓDIGO COMPLETO
-================================================================================
-
-Nota: Alguns arquivos foram omitidos por serem muito grandes (>300 linhas).
-Para ver o código completo de um arquivo, consulte o arquivo correspondente
-na pasta do projeto.
+📌 Para retomar amanhã
+Você vai escolher entre atacar o Bloco B (anúncios) ou Bloco C (DMs) primeiro. Também ficou pendente perguntar mais detalhes sobre os anúncios (formato, frequência de exibição, se tem limite de cliques, etc.) quando formos começar.
