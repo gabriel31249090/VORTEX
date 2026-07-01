@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
+import FeedAd from '../components/FeedAd'
 import toast from 'react-hot-toast'
 
 type PlanId = 'free' | 'boost' | 'mega'
@@ -25,6 +26,7 @@ type Post = {
 type FeedTab = 'geral' | 'seguindo'
 
 const PAGE_SIZE = 15
+const AD_INTERVAL = 40
 
 function isVideo(url: string) {
   return /\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(url)
@@ -52,7 +54,6 @@ function SkeletonCard() {
   )
 }
 
-// Retorna a cor efetiva do autor considerando plano e accent_color
 function getAuthorColor(plan: PlanId, accentColor: string | null): string {
   if (plan === 'mega' && accentColor) return accentColor
   if (plan === 'mega') return '#a78bfa'
@@ -101,6 +102,7 @@ export default function FeedPage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
   const [likingPost, setLikingPost] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [userPlan, setUserPlan] = useState<PlanId>('free')
   const [tab, setTab] = useState<FeedTab>('geral')
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [page, setPage] = useState(0)
@@ -113,6 +115,10 @@ export default function FeedPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
+
+      const { data: profile } = await supabase
+        .from('profiles').select('plan').eq('id', user.id).single()
+      if (profile?.plan) setUserPlan(profile.plan as PlanId)
 
       const { data: likes } = await supabase
         .from('likes').select('post_id').eq('user_id', user.id)
@@ -289,148 +295,159 @@ export default function FeedPage() {
             const planStyle = getPlanStyle(authorPlan, authorAccent)
             const authorColor = getAuthorColor(authorPlan, authorAccent)
             const isMega = authorPlan === 'mega'
-            const isBoost = authorPlan === 'boost'
+
+            // Posição real no feed (1-indexed) — insere anúncio a cada 40 posts, só pra Free
+            const position = i + 1
+            const showAd = userPlan === 'free' && position % AD_INTERVAL === 0
 
             return (
-              <article
-                key={post.id}
-                style={{
-                  background: '#111118',
-                  border: planStyle.border,
-                  borderRadius: 16, overflow: 'hidden',
-                  boxShadow: planStyle.shadow,
-                  animation: `fadeUp 0.4s ease ${Math.min(i, 5) * 0.05}s both`,
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = planStyle.hoverBorder
-                  e.currentTarget.style.boxShadow = planStyle.hoverShadow
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = planStyle.border.replace('1px solid ', '')
-                  e.currentTarget.style.boxShadow = planStyle.shadow
-                }}
-              >
-                {/* Faixa de destaque — usa accent_color do autor */}
-                {authorPlan !== 'free' && planStyle.stripColor && (
-                  <div style={{
-                    height: 2,
-                    background: `linear-gradient(90deg, transparent, ${planStyle.stripColor}99, transparent)`,
-                  }} />
-                )}
-
-                {/* Mídia */}
-                {post.media_url && (
-                  isVideo(post.media_url) ? (
-                    <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
-                  ) : (
-                    <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                      <img src={post.media_url} alt={post.title} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} />
-                    </div>
-                  )
-                )}
-
-                <div style={{ padding: 20 }}>
-                  {/* Meta */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div key={post.id} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <article
+                  style={{
+                    background: '#111118',
+                    border: planStyle.border,
+                    borderRadius: 16, overflow: 'hidden',
+                    boxShadow: planStyle.shadow,
+                    animation: `fadeUp 0.4s ease ${Math.min(i, 5) * 0.05}s both`,
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = planStyle.hoverBorder
+                    e.currentTarget.style.boxShadow = planStyle.hoverShadow
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = planStyle.border.replace('1px solid ', '')
+                    e.currentTarget.style.boxShadow = planStyle.shadow
+                  }}
+                >
+                  {authorPlan !== 'free' && planStyle.stripColor && (
                     <div style={{
-                      width: 32, height: 32, borderRadius: '50%',
-                      background: post.profiles?.avatar_url ? 'none'
-                        : `linear-gradient(135deg, ${authorColor}, ${authorColor}99)`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-                      boxShadow: planStyle.avatarShadow, overflow: 'hidden',
-                    }}>
-                      {post.profiles?.avatar_url
-                        ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : getInitial(post.profiles?.username || '?')
-                      }
-                    </div>
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span
-                        style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                        onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
-                        onMouseEnter={e => (e.currentTarget.style.color = authorColor)}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-                      >
-                        @{post.profiles?.username || 'usuário'}
-                      </span>
-                      {planStyle.badgeEl}
-                      {post.communities && (
+                      height: 2,
+                      background: `linear-gradient(90deg, transparent, ${planStyle.stripColor}99, transparent)`,
+                    }} />
+                  )}
+
+                  {post.media_url && (
+                    isVideo(post.media_url) ? (
+                      <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
+                    ) : (
+                      <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                        <img src={post.media_url} alt={post.title} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} />
+                      </div>
+                    )
+                  )}
+
+                  <div style={{ padding: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: post.profiles?.avatar_url ? 'none'
+                          : `linear-gradient(135deg, ${authorColor}, ${authorColor}99)`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
+                        boxShadow: planStyle.avatarShadow, overflow: 'hidden',
+                      }}>
+                        {post.profiles?.avatar_url
+                          ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : getInitial(post.profiles?.username || '?')
+                        }
+                      </div>
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <span
-                          style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
-                          onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
+                          style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                          onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
+                          onMouseEnter={e => (e.currentTarget.style.color = authorColor)}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
                         >
-                          em v/{post.communities.name}
+                          @{post.profiles?.username || 'usuário'}
                         </span>
+                        {planStyle.badgeEl}
+                        {post.communities && (
+                          <span
+                            style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
+                            onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
+                          >
+                            em v/{post.communities.name}
+                          </span>
+                        )}
+                        <span style={{ color: '#444466', fontSize: 13 }}>· {timeAgo(post.created_at)}</span>
+                      </div>
+                    </div>
+
+                    <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                      <h2 style={{
+                        color: isMega ? authorColor : '#f0f0f8',
+                        fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3,
+                        textShadow: isMega ? `0 0 20px ${authorColor}44` : 'none',
+                        transition: 'color 0.2s',
+                      }}>
+                        {post.title}
+                      </h2>
+                      {post.content && (
+                        <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                          {post.content}
+                        </p>
                       )}
-                      <span style={{ color: '#444466', fontSize: 13 }}>· {timeAgo(post.created_at)}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                      <button
+                        onClick={() => handleLike(post.id)}
+                        style={{
+                          background: isLiked ? `${authorColor}1a` : 'transparent',
+                          border: `1px solid ${isLiked ? `${authorColor}66` : 'rgba(255,255,255,0.08)'}`,
+                          color: isLiked ? authorColor : '#555577',
+                          padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                          fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                          display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                          boxShadow: isLiked ? `0 0 10px ${authorColor}33` : 'none',
+                          transform: isLiking ? 'scale(1.2)' : 'scale(1)',
+                        }}
+                      >
+                        ▲ {post.likes_count}
+                      </button>
+                      <button
+                        onClick={() => router.push(`/post/${post.id}`)}
+                        style={{
+                          background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                          color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                          fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                          display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                      >
+                        💬 {post.comments_count}
+                      </button>
+                      <button
+                        onClick={() => handleShare(post.id)}
+                        style={{
+                          background: 'transparent', border: 'none',
+                          color: '#555577', cursor: 'pointer',
+                          fontSize: 13, fontFamily: "'Syne', sans-serif",
+                          marginLeft: 'auto', transition: 'color 0.2s'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                      >
+                        ↗ Compartilhar
+                      </button>
                     </div>
                   </div>
+                </article>
 
-                  {/* Conteúdo — título colorido para MEGA */}
-                  <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                    <h2 style={{
-                      color: isMega ? authorColor : '#f0f0f8',
-                      fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3,
-                      textShadow: isMega ? `0 0 20px ${authorColor}44` : 'none',
-                      transition: 'color 0.2s',
-                    }}>
-                      {post.title}
-                    </h2>
-                    {post.content && (
-                      <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
-                        {post.content}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Ações */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <button
-                      onClick={() => handleLike(post.id)}
-                      style={{
-                        background: isLiked ? `${authorColor}1a` : 'transparent',
-                        border: `1px solid ${isLiked ? `${authorColor}66` : 'rgba(255,255,255,0.08)'}`,
-                        color: isLiked ? authorColor : '#555577',
-                        padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                        fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-                        boxShadow: isLiked ? `0 0 10px ${authorColor}33` : 'none',
-                        transform: isLiking ? 'scale(1.2)' : 'scale(1)',
-                      }}
-                    >
-                      ▲ {post.likes_count}
-                    </button>
-                    <button
-                      onClick={() => router.push(`/post/${post.id}`)}
-                      style={{
-                        background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                        fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                      onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                    >
-                      💬 {post.comments_count}
-                    </button>
-                    <button
-                      onClick={() => handleShare(post.id)}
-                      style={{
-                        background: 'transparent', border: 'none',
-                        color: '#555577', cursor: 'pointer',
-                        fontSize: 13, fontFamily: "'Syne', sans-serif",
-                        marginLeft: 'auto', transition: 'color 0.2s'
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                      onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                    >
-                      ↗ Compartilhar
-                    </button>
-                  </div>
-                </div>
-              </article>
+                {/* Anúncio a cada 40 posts — só pra usuários Free */}
+                {showAd && <FeedAd
+                  key={`ad-${position}`}
+                  ad={{
+                    id: `ad-${position}`,
+                    title: 'Apoie quem cria conteúdo',
+                    description: 'Descubra recursos exclusivos e vantagens disponíveis para membros premium.',
+                    image_url: null,
+                    link_url: 'https://vortex.app',
+                  }}
+                />}
+              </div>
             )
           })}
         </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
+import AdPopup from "./components/AdPopup";
 
 export const metadata: Metadata = {
   title: "VORTEX",
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="pt">
       <body style={{ margin: 0, padding: 0, background: '#0a0a0f' }}>
         {children}
+        <AdPopup />
         <Toaster
           position="bottom-center"
           toastOptions={{
