@@ -33,17 +33,21 @@ export default function Nav() {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
+  const [userId, setUserId] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifLoading, setNotifLoading] = useState(false)
+  const [dmUnreadCount, setDmUnreadCount] = useState(0)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      setUserId(user.id)
+
       const { data } = await supabase
         .from('profiles')
         .select('username, is_admin')
@@ -60,9 +64,47 @@ export default function Nav() {
         .eq('user_id', user.id)
         .eq('read', false)
       setUnreadCount(count || 0)
+
+      await checkDmUnread(user.id)
     }
     load()
   }, [pathname])
+
+  async function checkDmUnread(uid: string) {
+    const { data: myParts } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id, last_read_at')
+      .eq('user_id', uid)
+
+    if (!myParts || myParts.length === 0) { setDmUnreadCount(0); return }
+
+    let unreadConvs = 0
+    for (const part of myParts) {
+      const { data: lastMsg } = await supabase
+        .from('messages')
+        .select('created_at, sender_id')
+        .eq('conversation_id', part.conversation_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (lastMsg && lastMsg.sender_id !== uid && new Date(lastMsg.created_at) > new Date(part.last_read_at)) {
+        unreadConvs++
+      }
+    }
+    setDmUnreadCount(unreadConvs)
+  }
+
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase
+      .channel('nav-dm-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        checkDmUnread(userId)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [userId])
 
   async function openNotifications() {
     setNotifOpen(true)
@@ -111,6 +153,7 @@ export default function Nav() {
     { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
     { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
     { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
+    { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
     { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
     { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
     { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
@@ -134,6 +177,7 @@ export default function Nav() {
           {items.map(item => {
             const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
             const isNotif = item.path === '__notif__'
+            const isMessages = item.path === '/messages'
             const isAdminItem = (item as any).admin === true
             return (
               <button
@@ -185,6 +229,16 @@ export default function Nav() {
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
+                  {isMessages && dmUnreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -6, right: -8,
+                      background: '#c8f23c', color: '#000',
+                      fontSize: 9, fontWeight: 800, borderRadius: 999,
+                      padding: '1px 4px', minWidth: 14, textAlign: 'center', lineHeight: 1.5,
+                    }}>
+                      {dmUnreadCount > 9 ? '9+' : dmUnreadCount}
+                    </span>
+                  )}
                 </span>
                 <span>{item.label}</span>
               </button>
@@ -221,6 +275,7 @@ export default function Nav() {
         {items.filter(i => !(i as any).admin).map(item => {
           const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
           const isNotif = item.path === '__notif__'
+          const isMessages = item.path === '/messages'
           return (
             <button
               key={item.label}
@@ -245,6 +300,16 @@ export default function Nav() {
                     padding: '1px 4px', minWidth: 14, textAlign: 'center', lineHeight: 1.5,
                   }}>
                     {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+                {isMessages && dmUnreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -8,
+                    background: '#c8f23c', color: '#000',
+                    fontSize: 9, fontWeight: 800, borderRadius: 999,
+                    padding: '1px 4px', minWidth: 14, textAlign: 'center', lineHeight: 1.5,
+                  }}>
+                    {dmUnreadCount > 9 ? '9+' : dmUnreadCount}
                   </span>
                 )}
               </span>
