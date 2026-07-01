@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -77,7 +76,6 @@ function CropModal({
   onCancel: () => void
 }) {
   const isAvatar = target === 'avatar'
-  // Dimensões de output
   const OUT_W = isAvatar ? 400 : 1200
   const OUT_H = isAvatar ? 400 : 400
 
@@ -90,7 +88,6 @@ function CropModal({
   const [imgDisplaySize, setImgDisplaySize] = useState({ w: 1, h: 1 })
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
 
-  // Tamanho da janela de crop na tela
   const CROP_W = isAvatar ? 220 : 460
   const CROP_H = isAvatar ? 220 : 154
 
@@ -98,7 +95,6 @@ function CropModal({
     const img = new Image()
     img.onload = () => {
       setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight })
-      // Calcula zoom inicial para cobrir a janela
       const scaleX = CROP_W / img.naturalWidth
       const scaleY = CROP_H / img.naturalHeight
       const initZoom = Math.max(scaleX, scaleY)
@@ -109,12 +105,10 @@ function CropModal({
     img.src = src
   }, [src])
 
-  // Atualiza tamanho exibido ao mudar zoom
   useEffect(() => {
     setImgDisplaySize({ w: imgNaturalSize.w * zoom, h: imgNaturalSize.h * zoom })
   }, [zoom, imgNaturalSize])
 
-  // Clamp position para não deixar borda branca
   function clamp(p: { x: number; y: number }, dw: number, dh: number) {
     const maxX = 0
     const minX = CROP_W - dw
@@ -145,7 +139,6 @@ function CropModal({
 
   function onMouseUp() { setDragging(false) }
 
-  // Touch support
   const lastTouch = useRef({ x: 0, y: 0 })
   function onTouchStart(e: React.TouchEvent) {
     const t = e.touches[0]
@@ -182,7 +175,6 @@ function CropModal({
     const ctx = canvas.getContext('2d')!
     const img = new Image()
     img.onload = () => {
-      // pos e imgDisplaySize são em pixels de tela; converte para pixels da imagem natural
       const scaleToNatural = imgNaturalSize.w / imgDisplaySize.w
       const srcX = (-pos.x) * scaleToNatural
       const srcY = (-pos.y) * scaleToNatural
@@ -221,7 +213,6 @@ function CropModal({
           Arraste para reposicionar • Use o slider para dar zoom
         </p>
 
-        {/* Área de crop */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <div
             ref={containerRef}
@@ -260,7 +251,6 @@ function CropModal({
           </div>
         </div>
 
-        {/* Zoom slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <span style={{ color: '#555577', fontSize: 16 }}>🔍</span>
           <input
@@ -275,7 +265,6 @@ function CropModal({
           <span style={{ color: '#555577', fontSize: 12, minWidth: 36 }}>{Math.round(zoom * 100)}%</span>
         </div>
 
-        {/* Botões */}
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onCancel} style={{ flex: 1, padding: '10px 0', borderRadius: 50, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#8888aa', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
             Cancelar
@@ -306,6 +295,7 @@ export default function ProfilePage() {
   const [followingCount, setFollowingCount] = useState(0)
   const [followLoading, setFollowLoading] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [messageLoading, setMessageLoading] = useState(false)
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
@@ -316,7 +306,6 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
 
-  // Crop state
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropTarget, setCropTarget] = useState<CropTarget>(null)
   const [pendingAvatarSrc, setPendingAvatarSrc] = useState<string | null>(null)
@@ -394,6 +383,53 @@ export default function ProfilePage() {
     setFollowLoading(false)
   }
 
+  // Busca conversa 1:1 existente com esse usuário, ou cria uma nova, e navega até ela
+  async function handleMessage() {
+    if (!currentUserId) { router.push('/login'); return }
+    if (!profile) return
+    setMessageLoading(true)
+
+    try {
+      const { data: myConvs } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', currentUserId)
+
+      const myConvIds = (myConvs || []).map((c: any) => c.conversation_id)
+
+      if (myConvIds.length > 0) {
+        const { data: sharedConvs } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id, conversations!inner(is_group)')
+          .eq('user_id', profile.id)
+          .in('conversation_id', myConvIds)
+
+        const existing = (sharedConvs || []).find((c: any) => c.conversations?.is_group === false)
+        if (existing) {
+          router.push(`/messages/${existing.conversation_id}`)
+          return
+        }
+      }
+
+      const { data: newConv, error } = await supabase
+        .from('conversations')
+        .insert({ is_group: false, created_by: currentUserId })
+        .select('id')
+        .single()
+
+      if (error || !newConv) { toast.error('Erro ao iniciar conversa.'); return }
+
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: newConv.id, user_id: currentUserId },
+        { conversation_id: newConv.id, user_id: profile.id },
+      ])
+
+      router.push(`/messages/${newConv.id}`)
+    } finally {
+      setMessageLoading(false)
+    }
+  }
+
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -407,14 +443,12 @@ export default function ProfilePage() {
       toast.error(`Avatar deve ter no máximo ${limitMB}MB (plano ${plan.toUpperCase()})`); return
     }
 
-    // GIF não precisa de crop (já é animado, não faz sentido rasterizar)
     if (file.type === 'image/gif') {
       setAvatarBlob(file)
       setAvatarPreview(URL.createObjectURL(file))
       return
     }
 
-    // Abre o modal de crop
     const url = URL.createObjectURL(file)
     setPendingAvatarSrc(url)
     setCropSrc(url)
@@ -439,7 +473,6 @@ export default function ProfilePage() {
       toast.error(`Banner deve ter no máximo ${effectiveLimit}MB (plano ${plan.toUpperCase()})`); return
     }
 
-    // Vídeo e GIF não passam por crop
     if (isVid || isGifFile) {
       setBannerFile(file)
       setBannerPreview(URL.createObjectURL(file))
@@ -448,7 +481,6 @@ export default function ProfilePage() {
       return
     }
 
-    // Imagem: abre crop
     const url = URL.createObjectURL(file)
     setPendingBannerSrc(url)
     setCropSrc(url)
@@ -584,7 +616,6 @@ export default function ProfilePage() {
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
 
-      {/* Modal de Crop */}
       {cropSrc && cropTarget && (
         <CropModal
           src={cropSrc}
@@ -666,12 +697,28 @@ export default function ProfilePage() {
                 </div>
               )}
               {!isOwner && (
-                <button onClick={handleFollow} disabled={followLoading}
-                  style={{ background: isFollowing ? 'transparent' : activeColor, border: isFollowing ? '1px solid rgba(255,255,255,0.12)' : 'none', color: isFollowing ? '#8888aa' : '#000', padding: '7px 18px', borderRadius: 50, cursor: followLoading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s', opacity: followLoading ? 0.6 : 1, boxShadow: isFollowing ? 'none' : `0 0 12px ${activeColor}55` }}
-                  onMouseEnter={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,60,60,0.4)'; e.currentTarget.style.color = '#ff6060' } }}
-                  onMouseLeave={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' } }}>
-                  {followLoading ? '...' : isFollowing ? 'Seguindo ✓' : 'Seguir'}
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleMessage}
+                    disabled={messageLoading}
+                    style={{
+                      background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+                      color: '#8888aa', padding: '7px 16px', borderRadius: 50,
+                      cursor: messageLoading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Syne', sans-serif", transition: 'all 0.2s', opacity: messageLoading ? 0.6 : 1,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.color = activeColor }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}
+                  >
+                    {messageLoading ? '...' : '✉ Mensagem'}
+                  </button>
+                  <button onClick={handleFollow} disabled={followLoading}
+                    style={{ background: isFollowing ? 'transparent' : activeColor, border: isFollowing ? '1px solid rgba(255,255,255,0.12)' : 'none', color: isFollowing ? '#8888aa' : '#000', padding: '7px 18px', borderRadius: 50, cursor: followLoading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s', opacity: followLoading ? 0.6 : 1, boxShadow: isFollowing ? 'none' : `0 0 12px ${activeColor}55` }}
+                    onMouseEnter={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,60,60,0.4)'; e.currentTarget.style.color = '#ff6060' } }}
+                    onMouseLeave={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' } }}>
+                    {followLoading ? '...' : isFollowing ? 'Seguindo ✓' : 'Seguir'}
+                  </button>
+                </div>
               )}
             </div>
 
