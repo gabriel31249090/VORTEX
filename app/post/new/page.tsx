@@ -9,11 +9,17 @@ type PlanId = 'free' | 'boost' | 'mega'
 type FormatType = 'bold' | 'italic' | 'strikeThrough' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock'
 type MediaType = 'image' | 'video' | 'audio' | 'gif' | null
 
-// Limites de upload por plano (MB)
 const UPLOAD_LIMITS: Record<PlanId, { image: number; video: number; audio: number; gif: number }> = {
   free:  { image: 2,   video: 10,  audio: 5,   gif: 2 },
   boost: { image: 10,  video: 100, audio: 50,  gif: 10 },
   mega:  { image: 50,  video: 500, audio: 200, gif: 50 },
+}
+
+// Cooldown entre posts, em segundos, por plano
+const POST_COOLDOWN: Record<PlanId, number> = {
+  free: 60,
+  boost: 20,
+  mega: 5,
 }
 
 function NewPostInner() {
@@ -28,6 +34,7 @@ function NewPostInner() {
   const [charCount, setCharCount] = useState(0)
   const [userPlan, setUserPlan] = useState<PlanId>('free')
   const [userId, setUserId] = useState<string | null>(null)
+  const [cooldownLeft, setCooldownLeft] = useState(0)
 
   const imageRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLInputElement>(null)
@@ -41,17 +48,40 @@ function NewPostInner() {
 
   useEffect(() => {
     editorRef.current?.focus()
-    // Buscar plano do usuário
-    async function fetchPlan() {
+    async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
+
       const { data: profile } = await supabase
         .from('profiles').select('plan').eq('id', user.id).single()
-      if (profile?.plan) setUserPlan(profile.plan as PlanId)
+      const plan = (profile?.plan as PlanId) || 'free'
+      setUserPlan(plan)
+
+      // Checa último post pra calcular cooldown
+      const { data: lastPost } = await supabase
+        .from('posts')
+        .select('created_at')
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (lastPost) {
+        const secondsSince = (Date.now() - new Date(lastPost.created_at).getTime()) / 1000
+        const remaining = Math.ceil(POST_COOLDOWN[plan] - secondsSince)
+        if (remaining > 0) setCooldownLeft(remaining)
+      }
     }
-    fetchPlan()
+    init()
   }, [])
+
+  // Contador regressivo do cooldown
+  useEffect(() => {
+    if (cooldownLeft <= 0) return
+    const t = setInterval(() => setCooldownLeft(c => Math.max(0, c - 1)), 1000)
+    return () => clearInterval(t)
+  }, [cooldownLeft])
 
   function updateActiveFormats() {
     const formats = new Set<string>()
@@ -109,6 +139,7 @@ function NewPostInner() {
   }
 
   async function handleSubmit() {
+    if (cooldownLeft > 0) return
     if (!title.trim()) { setError('O título é obrigatório.'); return }
     const htmlContent = editorRef.current?.innerHTML || ''
     const textContent = editorRef.current?.innerText?.trim() || ''
@@ -117,6 +148,26 @@ function NewPostInner() {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
+
+    // Revalida cooldown no momento do envio (evita burlar esperando a página aberta)
+    const { data: lastPost } = await supabase
+      .from('posts')
+      .select('created_at')
+      .eq('author_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (lastPost) {
+      const secondsSince = (Date.now() - new Date(lastPost.created_at).getTime()) / 1000
+      const remaining = Math.ceil(POST_COOLDOWN[userPlan] - secondsSince)
+      if (remaining > 0) {
+        setCooldownLeft(remaining)
+        setError(`Aguarde ${remaining}s antes de publicar novamente.`)
+        setLoading(false)
+        return
+      }
+    }
 
     let mediaUrl = null
     let postType = 'text'
@@ -206,6 +257,8 @@ function NewPostInner() {
     </button>
   )
 
+  const isBlocked = cooldownLeft > 0
+
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
@@ -214,7 +267,6 @@ function NewPostInner() {
           <button onClick={() => router.push('/feed')} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>← Voltar</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16 }}>Nova publicação</span>
-            {/* Badge do plano no header */}
             <span style={{
               fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 50,
               background: userPlan !== 'free' ? `rgba(${userPlan === 'mega' ? '167,139,250' : '200,242,60'},0.12)` : 'transparent',
@@ -224,16 +276,40 @@ function NewPostInner() {
               {planLabel}
             </span>
           </div>
-          <button onClick={handleSubmit} disabled={loading} style={{ background: '#c8f23c', color: '#000', fontWeight: 700, padding: '8px 18px', borderRadius: 50, border: 'none', cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: '0 0 12px rgba(200,242,60,0.4)', opacity: loading ? 0.6 : 1 }}>
-            {uploading ? 'Enviando...' : loading ? 'Publicando...' : 'Publicar'}
+          <button
+            onClick={handleSubmit}
+            disabled={loading || isBlocked}
+            style={{
+              background: isBlocked ? 'rgba(255,255,255,0.06)' : '#c8f23c',
+              color: isBlocked ? '#555577' : '#000', fontWeight: 700,
+              padding: '8px 18px', borderRadius: 50, border: 'none',
+              cursor: isBlocked ? 'not-allowed' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif",
+              boxShadow: isBlocked ? 'none' : '0 0 12px rgba(200,242,60,0.4)',
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            {isBlocked ? `⏳ ${cooldownLeft}s` : uploading ? 'Enviando...' : loading ? 'Publicando...' : 'Publicar'}
           </button>
         </div>
       </header>
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
+        {isBlocked && (
+          <div style={{
+            marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+            background: 'rgba(255,200,0,0.06)', border: '1px solid rgba(255,200,0,0.2)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ fontSize: 16 }}>⏳</span>
+            <span style={{ color: '#ffc800', fontSize: 13 }}>
+              Aguarde <strong>{cooldownLeft}s</strong> antes de publicar de novo.
+              {userPlan === 'free' && ' Usuários BOOST e MEGA BOOST têm intervalos menores entre posts.'}
+            </span>
+          </div>
+        )}
+
         <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }}>
 
-          {/* Título */}
           <div style={{ padding: '20px 20px 0' }}>
             <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Título da publicação" maxLength={200}
               style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#f0f0f8', fontSize: 20, fontWeight: 700, fontFamily: "'Syne', sans-serif", padding: '0 0 16px 0', outline: 'none', boxSizing: 'border-box' }}
@@ -242,7 +318,6 @@ function NewPostInner() {
             />
           </div>
 
-          {/* Toolbar formatação */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             {btn(activeFormats.has('bold'), () => execFormat('bold'), 'Negrito (Ctrl+B)', <strong style={{ fontFamily: 'serif' }}>B</strong>)}
             {btn(activeFormats.has('italic'), () => execFormat('italic'), 'Itálico (Ctrl+I)', <em style={{ fontFamily: 'serif' }}>I</em>)}
@@ -260,7 +335,6 @@ function NewPostInner() {
             <span style={{ marginLeft: 'auto', color: '#444466', fontSize: 12 }}>{charCount} chars</span>
           </div>
 
-          {/* Editor */}
           <div ref={editorRef} contentEditable suppressContentEditableWarning
             onInput={handleEditorInput} onKeyDown={handleKeyDown} onKeyUp={updateActiveFormats}
             onMouseUp={updateActiveFormats} onFocus={updateActiveFormats}
@@ -268,7 +342,6 @@ function NewPostInner() {
             style={{ minHeight: 180, padding: '16px 20px', color: '#c8c8dd', fontSize: 15, lineHeight: 1.75, outline: 'none', fontFamily: "'Syne', sans-serif", wordBreak: 'break-word' }}
           />
 
-          {/* Preview de mídia */}
           {mediaPreview && (
             <div style={{ position: 'relative', margin: '0 20px 16px' }}>
               {mediaType === 'video' && <video src={mediaPreview} controls style={{ width: '100%', borderRadius: 12, maxHeight: 300, background: '#000' }} />}
@@ -283,7 +356,6 @@ function NewPostInner() {
             </div>
           )}
 
-          {/* Botões de mídia com limites visíveis */}
           <div style={{ display: 'flex', gap: 8, padding: '12px 20px 16px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             {mediaBtn('Imagem', '🖼', () => imageRef.current?.click(), mediaType === 'image', limits.image)}
             {mediaBtn('Vídeo', '🎬', () => videoRef.current?.click(), mediaType === 'video', limits.video)}
@@ -291,7 +363,6 @@ function NewPostInner() {
             {mediaBtn('GIF', '🎭', () => gifRef.current?.click(), mediaType === 'gif', limits.gif)}
           </div>
 
-          {/* Inputs hidden */}
           <input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handleMediaSelect(e, 'image')} style={{ display: 'none' }} />
           <input ref={videoRef} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e => handleMediaSelect(e, 'video')} style={{ display: 'none' }} />
           <input ref={audioRef} type="file" accept="audio/mpeg,audio/ogg,audio/wav,audio/mp4" onChange={e => handleMediaSelect(e, 'audio')} style={{ display: 'none' }} />

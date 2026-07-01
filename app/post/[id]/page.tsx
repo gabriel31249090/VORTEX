@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 
+type PlanId = 'free' | 'boost' | 'mega'
+
 type Post = {
   id: string
   title: string
@@ -15,7 +17,7 @@ type Post = {
   comments_count: number
   created_at: string
   author_id: string
-  profiles: { username: string; avatar_url: string | null } | null
+  profiles: { username: string; avatar_url: string | null; plan: PlanId; accent_color: string | null } | null
 }
 
 type Comment = {
@@ -57,7 +59,7 @@ export default function PostPage() {
 
       const { data: postData } = await supabase
         .from('posts')
-        .select('id, title, content, html_content, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url)')
+        .select('id, title, content, html_content, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url, plan, accent_color)')
         .eq('id', postId)
         .single()
       setPost(postData as any)
@@ -68,7 +70,6 @@ export default function PostPage() {
         .eq('post_id', postId)
         .order('created_at', { ascending: true })
 
-      // Build thread tree
       const flat = (commentsData as any) || []
       const map: Record<string, Comment> = {}
       const roots: Comment[] = []
@@ -86,7 +87,46 @@ export default function PostPage() {
     load()
   }, [postId])
 
-  // Mention search
+  // Meta / título dinâmico (SEO básico do lado do cliente)
+  useEffect(() => {
+    if (!post) return
+    document.title = `${post.title} — VORTEX`
+    const desc = post.content?.slice(0, 150) || 'Confira essa publicação no VORTEX.'
+    let metaDesc = document.querySelector('meta[name="description"]')
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta')
+      metaDesc.setAttribute('name', 'description')
+      document.head.appendChild(metaDesc)
+    }
+    metaDesc.setAttribute('content', desc)
+
+    let ogTitle = document.querySelector('meta[property="og:title"]')
+    if (!ogTitle) {
+      ogTitle = document.createElement('meta')
+      ogTitle.setAttribute('property', 'og:title')
+      document.head.appendChild(ogTitle)
+    }
+    ogTitle.setAttribute('content', post.title)
+
+    let ogDesc = document.querySelector('meta[property="og:description"]')
+    if (!ogDesc) {
+      ogDesc = document.createElement('meta')
+      ogDesc.setAttribute('property', 'og:description')
+      document.head.appendChild(ogDesc)
+    }
+    ogDesc.setAttribute('content', desc)
+
+    if (post.media_url && !isVideo(post.media_url)) {
+      let ogImage = document.querySelector('meta[property="og:image"]')
+      if (!ogImage) {
+        ogImage = document.createElement('meta')
+        ogImage.setAttribute('property', 'og:image')
+        document.head.appendChild(ogImage)
+      }
+      ogImage.setAttribute('content', post.media_url)
+    }
+  }, [post])
+
   useEffect(() => {
     if (mentionQuery === null) { setMentionResults([]); return }
     if (mentionQuery === '') { setMentionResults([]); return }
@@ -108,11 +148,8 @@ export default function PostPage() {
     const cursor = e.target.selectionStart
     const textBefore = val.slice(0, cursor)
     const match = textBefore.match(/@(\w*)$/)
-    if (match) {
-      setMentionQuery(match[1])
-    } else {
-      setMentionQuery(null)
-    }
+    if (match) setMentionQuery(match[1])
+    else setMentionQuery(null)
   }
 
   function insertMention(username: string) {
@@ -172,7 +209,6 @@ export default function PostPage() {
       await supabase.from('posts').update({ comments_count: (post?.comments_count || 0) + 1 }).eq('id', postId)
       setPost(prev => prev ? { ...prev, comments_count: prev.comments_count + 1 } : prev)
 
-      // Notificações de menção
       const mentions = [...newComment.matchAll(/@(\w+)/g)].map(m => m[1])
       for (const mention of mentions) {
         const { data: mentioned } = await supabase.from('profiles').select('id').eq('username', mention).single()
@@ -217,7 +253,6 @@ export default function PostPage() {
     return username?.charAt(0).toUpperCase() || '?'
   }
 
-  // Highlight @mentions in comment text
   function renderContent(text: string) {
     const parts = text.split(/(@\w+)/g)
     return parts.map((part, i) =>
@@ -272,7 +307,7 @@ export default function PostPage() {
                     setNewComment(`@${comment.profiles?.username} `)
                     textareaRef.current?.focus()
                   }}
-                  style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif', transition: 'color 0.2s'" }}
+                  style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'color 0.2s' }}
                   onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#444466')}
                 >
@@ -295,7 +330,6 @@ export default function PostPage() {
             {renderContent(comment.content)}
           </p>
         </div>
-        {/* Replies */}
         {(comment.replies || []).map(reply => (
           <CommentItem key={reply.id} comment={reply} depth={depth + 1} />
         ))}
@@ -315,6 +349,10 @@ export default function PostPage() {
     </div>
   )
 
+  const authorPlan: PlanId = post.profiles?.plan || 'free'
+  const hasAccent = authorPlan === 'boost' || authorPlan === 'mega'
+  const accentColor = post.profiles?.accent_color || (authorPlan === 'mega' ? '#a78bfa' : '#c8f23c')
+
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
@@ -322,7 +360,7 @@ export default function PostPage() {
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(200,242,60,0.2)',
+        borderBottom: `1px solid ${hasAccent ? `${accentColor}33` : 'rgba(200,242,60,0.2)'}`,
       }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 'max(16px, calc(220px + 32px))' }}>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>
@@ -339,7 +377,16 @@ export default function PostPage() {
         display: 'flex', flexDirection: 'column', gap: 16
       }}>
         {/* Post */}
-        <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{
+          background: '#111118',
+          border: hasAccent ? `1px solid ${accentColor}44` : '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 16, overflow: 'hidden',
+          boxShadow: hasAccent ? `0 0 30px ${accentColor}14` : 'none',
+        }}>
+          {hasAccent && (
+            <div style={{ height: 3, background: `linear-gradient(90deg, transparent, ${accentColor}88, transparent)` }} />
+          )}
+
           {post.media_url && (
             isVideo(post.media_url) ? (
               <video src={post.media_url} controls style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
@@ -352,10 +399,10 @@ export default function PostPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-                  background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                  background: post.profiles?.avatar_url ? 'none' : hasAccent ? `linear-gradient(135deg, ${accentColor}, ${accentColor}99)` : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#000', fontWeight: 800, fontSize: 14,
-                  boxShadow: '0 0 10px rgba(200,242,60,0.2)'
+                  boxShadow: hasAccent ? `0 0 12px ${accentColor}66` : '0 0 10px rgba(200,242,60,0.2)'
                 }}>
                   {post.profiles?.avatar_url
                     ? <img src={post.profiles.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -363,11 +410,15 @@ export default function PostPage() {
                   }
                 </div>
                 <div>
-                  <p onClick={() => router.push(`/profile/${post.profiles?.username}`)} style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-                  >@{post.profiles?.username}</p>
-                  <p style={{ color: '#555577', fontSize: 12 }}>{timeAgo(post.created_at)}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <p onClick={() => router.push(`/profile/${post.profiles?.username}`)} style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, cursor: 'pointer', margin: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = hasAccent ? accentColor : '#c8f23c')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
+                    >@{post.profiles?.username}</p>
+                    {authorPlan === 'boost' && <span style={{ fontSize: 12 }}>⚡</span>}
+                    {authorPlan === 'mega' && <span style={{ fontSize: 12 }}>👑</span>}
+                  </div>
+                  <p style={{ color: '#555577', fontSize: 12, margin: 0 }}>{timeAgo(post.created_at)}</p>
                 </div>
               </div>
               {userId === post.author_id && (
@@ -378,9 +429,11 @@ export default function PostPage() {
               )}
             </div>
 
-            <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 22, marginBottom: 12, lineHeight: 1.3 }}>{post.title}</h1>
+            <h1 style={{
+              color: hasAccent ? accentColor : '#f0f0f8', fontWeight: 800, fontSize: 22, marginBottom: 12, lineHeight: 1.3,
+              textShadow: hasAccent ? `0 0 20px ${accentColor}33` : 'none',
+            }}>{post.title}</h1>
 
-            {/* Renderiza HTML rico se disponível, senão texto puro */}
             {post.html_content ? (
               <div
                 dangerouslySetInnerHTML={{ __html: post.html_content }}
@@ -424,7 +477,6 @@ export default function PostPage() {
               onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; setTimeout(() => setMentionResults([]), 150) }}
             />
 
-            {/* Mention dropdown */}
             {mentionResults.length > 0 && (
               <div style={{
                 position: 'absolute', bottom: '100%', left: 0, right: 0,

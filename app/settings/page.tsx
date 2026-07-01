@@ -5,6 +5,46 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 
+function SettingsSkeleton() {
+  const block = (w: string, h: number) => (
+    <div style={{ height: h, width: w, background: '#1a1a28', borderRadius: 8 }} />
+  )
+  return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
+      <Nav />
+      <main style={{ maxWidth: 600, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
+        <div style={{ marginBottom: 4 }}>{block('180px', 26)}</div>
+        <div style={{ marginTop: 8, marginBottom: 32 }}>{block('240px', 14)}</div>
+
+        <div style={{ marginBottom: 12 }}>{block('140px', 12)}</div>
+        <div style={{
+          background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16,
+          overflow: 'hidden', animation: 'pulse 1.5s ease infinite',
+        }}>
+          <div style={{ height: 100, background: '#161620' }} />
+          <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#1a1a28', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>{block('60%', 14)}</div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 32, marginBottom: 12 }}>{block('80px', 12)}</div>
+        <div style={{
+          background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16,
+          padding: 20, display: 'flex', flexDirection: 'column', gap: 14,
+          animation: 'pulse 1.5s ease infinite',
+        }}>
+          {block('100%', 40)}
+          {block('100%', 40)}
+          {block('100%', 70)}
+          {block('100%', 40)}
+        </div>
+      </main>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } @media (max-width: 767px) { main { padding-left: 16px !important; } }`}</style>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -16,7 +56,6 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
-  // Upload states
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
@@ -119,11 +158,7 @@ export default function SettingsPage() {
     setSaving(false)
   }
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
-      <p style={{ color: '#555577' }}>Carregando...</p>
-    </div>
-  )
+  if (loading) return <SettingsSkeleton />
 
   const currentAvatar = avatarPreview || profile?.avatar_url
   const currentBanner = bannerPreview || profile?.banner_url
@@ -148,11 +183,9 @@ export default function SettingsPage() {
         <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 24, marginBottom: 4 }}>Configurações</h1>
         <p style={{ color: '#555577', fontSize: 14 }}>Gerencie sua conta e preferências</p>
 
-        {/* Imagens do Perfil */}
         {section('Imagens do perfil')}
         <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 4 }}>
 
-          {/* Banner preview clicável */}
           <div
             onClick={() => bannerInputRef.current?.click()}
             style={{
@@ -178,7 +211,6 @@ export default function SettingsPage() {
           </div>
 
           <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-            {/* Avatar preview clicável */}
             <div
               onClick={() => avatarInputRef.current?.click()}
               style={{
@@ -215,7 +247,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Perfil */}
         {section('Perfil')}
         <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
@@ -264,7 +295,6 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* Conta */}
         {section('Conta')}
         <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -275,7 +305,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Zona de perigo */}
         {section('Zona de perigo')}
         <div style={{ background: 'rgba(255,50,50,0.05)', border: '1px solid rgba(255,50,50,0.2)', borderRadius: 16, padding: 20 }}>
           <p style={{ color: '#f0f0f8', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Sair da conta</p>

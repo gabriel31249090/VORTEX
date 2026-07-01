@@ -49,14 +49,13 @@ export default function AdminPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [adminId, setAdminId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'requests' | 'users'>('requests')
 
-  // Plan requests
   const [requests, setRequests] = useState<PlanRequest[]>([])
   const [requestsFilter, setRequestsFilter] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [processingId, setProcessingId] = useState<string | null>(null)
 
-  // Users
   const [users, setUsers] = useState<Profile[]>([])
   const [userSearch, setUserSearch] = useState('')
   const [updatingUser, setUpdatingUser] = useState<string | null>(null)
@@ -87,6 +86,7 @@ export default function AdminPage() {
       return
     }
 
+    setAdminId(user.id)
     setIsAdmin(true)
     setLoading(false)
   }
@@ -122,7 +122,6 @@ export default function AdminPage() {
     const supabase = createClient()
 
     try {
-      // Atualiza o status do pedido
       const { error: reqError } = await supabase
         .from('plan_requests')
         .update({ status: action })
@@ -130,7 +129,6 @@ export default function AdminPage() {
 
       if (reqError) throw reqError
 
-      // Se aprovado, atualiza o plano do usuário
       if (action === 'approved') {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -138,6 +136,14 @@ export default function AdminPage() {
           .eq('id', userId)
 
         if (profileError) throw profileError
+
+        // Notifica o usuário que o plano foi aprovado
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          actor_id: adminId,
+          type: 'plan_approved',
+          plan: plan,
+        })
       }
 
       toast.success(action === 'approved' ? '✓ Plano aprovado!' : 'Pedido rejeitado.')
@@ -161,6 +167,16 @@ export default function AdminPage() {
         .eq('id', userId)
 
       if (error) throw error
+
+      // Notifica também quando o admin seta o plano manualmente
+      if (plan !== 'free') {
+        await supabase.from('notifications').insert({
+          user_id: userId,
+          actor_id: adminId,
+          type: 'plan_approved',
+          plan: plan,
+        })
+      }
 
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u))
       toast.success(`Plano atualizado para ${plan.toUpperCase()}!`)
@@ -196,7 +212,6 @@ export default function AdminPage() {
         paddingLeft: 'max(24px, calc(220px + 32px))',
       }} className="admin-main">
 
-        {/* Header */}
         <div style={{ marginBottom: 40 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -213,7 +228,6 @@ export default function AdminPage() {
           </h1>
         </div>
 
-        {/* Tabs */}
         <div style={{
           display: 'flex', gap: 4,
           background: '#111118',
@@ -238,10 +252,8 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* ── ABA: PEDIDOS ── */}
         {activeTab === 'requests' && (
           <div>
-            {/* Filtro de status */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
               {(['pending', 'approved', 'rejected'] as const).map(s => (
                 <button
@@ -273,7 +285,6 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {/* Lista de pedidos */}
             {requests.length === 0 ? (
               <div style={{
                 textAlign: 'center', padding: '60px 0',
@@ -291,7 +302,6 @@ export default function AdminPage() {
                     display: 'flex', alignItems: 'center', gap: 16,
                     flexWrap: 'wrap',
                   }}>
-                    {/* Avatar */}
                     <div style={{
                       width: 44, height: 44, borderRadius: '50%',
                       background: '#1a1a28',
@@ -307,7 +317,6 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <span style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 15 }}>
@@ -335,7 +344,6 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Comprovante */}
                     <a
                       href={req.receipt_url}
                       target="_blank"
@@ -352,7 +360,6 @@ export default function AdminPage() {
                       📎 Ver comprovante
                     </a>
 
-                    {/* Ações (só pra pendentes) */}
                     {requestsFilter === 'pending' && (
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
@@ -393,10 +400,8 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── ABA: USUÁRIOS ── */}
         {activeTab === 'users' && (
           <div>
-            {/* Busca */}
             <div style={{ marginBottom: 24, position: 'relative' }}>
               <span style={{
                 position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
@@ -418,7 +423,6 @@ export default function AdminPage() {
               />
             </div>
 
-            {/* Lista de usuários */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {filteredUsers.map(user => (
                 <div key={user.id} style={{
@@ -428,7 +432,6 @@ export default function AdminPage() {
                   display: 'flex', alignItems: 'center', gap: 14,
                   flexWrap: 'wrap',
                 }}>
-                  {/* Avatar */}
                   <div style={{
                     width: 40, height: 40, borderRadius: '50%',
                     background: '#1a1a28',
@@ -444,7 +447,6 @@ export default function AdminPage() {
                     )}
                   </div>
 
-                  {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14 }}>
@@ -468,7 +470,6 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Seletor de plano */}
                   <div style={{ display: 'flex', gap: 6 }}>
                     {(['free', 'boost', 'mega'] as PlanId[]).map(p => (
                       <button
