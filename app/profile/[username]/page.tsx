@@ -1,6 +1,7 @@
+
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -38,6 +39,7 @@ type Community = {
 }
 
 type Tab = 'posts' | 'communities'
+type CropTarget = 'avatar' | 'banner' | null
 
 const PLAN_LIMITS: Record<PlanId, { avatar: number; banner: number; label: string }> = {
   free:  { avatar: 2,  banner: 2,  label: '2MB' },
@@ -54,28 +56,237 @@ function isVideo(url: string) {
   return /\.(mp4|webm|mov|ogg)(\?|$)/i.test(url)
 }
 
-function isGif(url: string) {
-  return /\.gif(\?|$)/i.test(url)
-}
-
 function PlanBadge({ plan }: { plan: PlanId }) {
   if (plan === 'boost') return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      background: 'rgba(200,242,60,0.12)', border: '1px solid rgba(200,242,60,0.3)',
-      color: '#c8f23c', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 50,
-      boxShadow: '0 0 8px rgba(200,242,60,0.2)',
-    }}>⚡ BOOST</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(200,242,60,0.12)', border: '1px solid rgba(200,242,60,0.3)', color: '#c8f23c', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 50, boxShadow: '0 0 8px rgba(200,242,60,0.2)' }}>⚡ BOOST</span>
   )
   if (plan === 'mega') return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.35)',
-      color: '#a78bfa', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 50,
-      boxShadow: '0 0 8px rgba(167,139,250,0.2)',
-    }}>👑 MEGA</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 50, boxShadow: '0 0 8px rgba(167,139,250,0.2)' }}>👑 MEGA</span>
   )
   return null
+}
+
+// ── CROP MODAL ──────────────────────────────────────────────────────────────
+function CropModal({
+  src, target, accentColor, onConfirm, onCancel,
+}: {
+  src: string
+  target: CropTarget
+  accentColor: string
+  onConfirm: (blob: Blob) => void
+  onCancel: () => void
+}) {
+  const isAvatar = target === 'avatar'
+  // Dimensões de output
+  const OUT_W = isAvatar ? 400 : 1200
+  const OUT_H = isAvatar ? 400 : 400
+
+  const containerRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [dragging, setDragging] = useState(false)
+  const [imgNaturalSize, setImgNaturalSize] = useState({ w: 1, h: 1 })
+  const [imgDisplaySize, setImgDisplaySize] = useState({ w: 1, h: 1 })
+  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
+
+  // Tamanho da janela de crop na tela
+  const CROP_W = isAvatar ? 220 : 460
+  const CROP_H = isAvatar ? 220 : 154
+
+  useEffect(() => {
+    const img = new Image()
+    img.onload = () => {
+      setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight })
+      // Calcula zoom inicial para cobrir a janela
+      const scaleX = CROP_W / img.naturalWidth
+      const scaleY = CROP_H / img.naturalHeight
+      const initZoom = Math.max(scaleX, scaleY)
+      setZoom(initZoom)
+      setImgDisplaySize({ w: img.naturalWidth * initZoom, h: img.naturalHeight * initZoom })
+      setPos({ x: 0, y: 0 })
+    }
+    img.src = src
+  }, [src])
+
+  // Atualiza tamanho exibido ao mudar zoom
+  useEffect(() => {
+    setImgDisplaySize({ w: imgNaturalSize.w * zoom, h: imgNaturalSize.h * zoom })
+  }, [zoom, imgNaturalSize])
+
+  // Clamp position para não deixar borda branca
+  function clamp(p: { x: number; y: number }, dw: number, dh: number) {
+    const maxX = 0
+    const minX = CROP_W - dw
+    const maxY = 0
+    const minY = CROP_H - dh
+    return {
+      x: Math.min(maxX, Math.max(minX, p.x)),
+      y: Math.min(maxY, Math.max(minY, p.y)),
+    }
+  }
+
+  function onMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    setDragging(true)
+    dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y }
+  }
+
+  function onMouseMove(e: React.MouseEvent) {
+    if (!dragging) return
+    const dx = e.clientX - dragStart.current.mx
+    const dy = e.clientY - dragStart.current.my
+    const newPos = clamp(
+      { x: dragStart.current.px + dx, y: dragStart.current.py + dy },
+      imgDisplaySize.w, imgDisplaySize.h
+    )
+    setPos(newPos)
+  }
+
+  function onMouseUp() { setDragging(false) }
+
+  // Touch support
+  const lastTouch = useRef({ x: 0, y: 0 })
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0]
+    lastTouch.current = { x: t.clientX, y: t.clientY }
+    dragStart.current = { mx: t.clientX, my: t.clientY, px: pos.x, py: pos.y }
+    setDragging(true)
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    e.preventDefault()
+    const t = e.touches[0]
+    const dx = t.clientX - dragStart.current.mx
+    const dy = t.clientY - dragStart.current.my
+    const newPos = clamp(
+      { x: dragStart.current.px + dx, y: dragStart.current.py + dy },
+      imgDisplaySize.w, imgDisplaySize.h
+    )
+    setPos(newPos)
+  }
+  function onTouchEnd() { setDragging(false) }
+
+  function handleZoom(val: number) {
+    const minZoom = Math.max(CROP_W / imgNaturalSize.w, CROP_H / imgNaturalSize.h)
+    const newZoom = Math.max(minZoom, Math.min(4, val))
+    const newDW = imgNaturalSize.w * newZoom
+    const newDH = imgNaturalSize.h * newZoom
+    setZoom(newZoom)
+    setPos(p => clamp(p, newDW, newDH))
+  }
+
+  function handleConfirm() {
+    const canvas = document.createElement('canvas')
+    canvas.width = OUT_W
+    canvas.height = OUT_H
+    const ctx = canvas.getContext('2d')!
+    const img = new Image()
+    img.onload = () => {
+      // pos e imgDisplaySize são em pixels de tela; converte para pixels da imagem natural
+      const scaleToNatural = imgNaturalSize.w / imgDisplaySize.w
+      const srcX = (-pos.x) * scaleToNatural
+      const srcY = (-pos.y) * scaleToNatural
+      const srcW = CROP_W * scaleToNatural
+      const srcH = CROP_H * scaleToNatural
+
+      if (isAvatar) {
+        ctx.beginPath()
+        ctx.arc(OUT_W / 2, OUT_H / 2, OUT_W / 2, 0, Math.PI * 2)
+        ctx.clip()
+      }
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, OUT_W, OUT_H)
+      canvas.toBlob(blob => { if (blob) onConfirm(blob) }, 'image/jpeg', 0.92)
+    }
+    img.src = src
+  }
+
+  return (
+    <>
+      <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, backdropFilter: 'blur(8px)' }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        background: '#111118', border: `1px solid ${accentColor}44`,
+        borderRadius: 20, padding: 24, zIndex: 301,
+        width: Math.max(CROP_W + 48, 340), fontFamily: "'Syne', sans-serif",
+        boxShadow: `0 0 40px ${accentColor}22`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h3 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 15, margin: 0 }}>
+            {isAvatar ? '📷 Ajustar foto de perfil' : '🖼️ Ajustar banner'}
+          </h3>
+          <button onClick={onCancel} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#8888aa', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        </div>
+
+        <p style={{ color: '#555577', fontSize: 12, marginBottom: 14 }}>
+          Arraste para reposicionar • Use o slider para dar zoom
+        </p>
+
+        {/* Área de crop */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <div
+            ref={containerRef}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            style={{
+              width: CROP_W, height: CROP_H,
+              borderRadius: isAvatar ? '50%' : 12,
+              overflow: 'hidden',
+              cursor: dragging ? 'grabbing' : 'grab',
+              position: 'relative',
+              border: `2px solid ${accentColor}66`,
+              boxShadow: `0 0 20px ${accentColor}33`,
+              userSelect: 'none',
+              touchAction: 'none',
+            }}
+          >
+            <img
+              ref={imgRef}
+              src={src}
+              draggable={false}
+              style={{
+                position: 'absolute',
+                left: pos.x, top: pos.y,
+                width: imgDisplaySize.w,
+                height: imgDisplaySize.h,
+                pointerEvents: 'none',
+                userSelect: 'none',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Zoom slider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <span style={{ color: '#555577', fontSize: 16 }}>🔍</span>
+          <input
+            type="range"
+            min={0.5}
+            max={4}
+            step={0.01}
+            value={zoom}
+            onChange={e => handleZoom(Number(e.target.value))}
+            style={{ flex: 1, accentColor }}
+          />
+          <span style={{ color: '#555577', fontSize: 12, minWidth: 36 }}>{Math.round(zoom * 100)}%</span>
+        </div>
+
+        {/* Botões */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: '10px 0', borderRadius: 50, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#8888aa', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            Cancelar
+          </button>
+          <button onClick={handleConfirm} style={{ flex: 1, padding: '10px 0', borderRadius: 50, border: 'none', background: accentColor, color: '#000', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, cursor: 'pointer', boxShadow: `0 0 16px ${accentColor}44` }}>
+            ✓ Confirmar
+          </button>
+        </div>
+      </div>
+    </>
+  )
 }
 
 export default function ProfilePage() {
@@ -98,11 +309,18 @@ export default function ProfilePage() {
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null)
+  const [bannerBlob, setBannerBlob] = useState<Blob | null>(null)
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [bannerIsVideo, setBannerIsVideo] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
+
+  // Crop state
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropTarget, setCropTarget] = useState<CropTarget>(null)
+  const [pendingAvatarSrc, setPendingAvatarSrc] = useState<string | null>(null)
+  const [pendingBannerSrc, setPendingBannerSrc] = useState<string | null>(null)
 
   const [accentColor, setAccentColor] = useState<string>('#c8f23c')
 
@@ -145,20 +363,16 @@ export default function ProfilePage() {
       }
 
       const { data: postsData } = await supabase
-        .from('posts')
-        .select('id, title, content, likes_count, comments_count, created_at')
-        .eq('author_id', profileData.id)
-        .order('created_at', { ascending: false })
+        .from('posts').select('id, title, content, likes_count, comments_count, created_at')
+        .eq('author_id', profileData.id).order('created_at', { ascending: false })
       setPosts(postsData || [])
 
       const { data: memberData } = await supabase
-        .from('community_members')
-        .select('role, community:community_id(id, name, slug, description)')
+        .from('community_members').select('role, community:community_id(id, name, slug, description)')
         .eq('user_id', profileData.id)
       if (memberData) {
         setCommunities(memberData.map((m: any) => ({ ...m.community, role: m.role })))
       }
-
       setLoading(false)
     }
     load()
@@ -170,13 +384,11 @@ export default function ProfilePage() {
     setFollowLoading(true)
     if (isFollowing) {
       await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
-      setIsFollowing(false)
-      setFollowersCount(c => c - 1)
+      setIsFollowing(false); setFollowersCount(c => c - 1)
       toast('Você deixou de seguir @' + profile.username)
     } else {
       await supabase.from('follows').insert({ follower_id: currentUserId, following_id: profile.id })
-      setIsFollowing(true)
-      setFollowersCount(c => c + 1)
+      setIsFollowing(true); setFollowersCount(c => c + 1)
       toast.success('Seguindo @' + profile.username)
     }
     setFollowLoading(false)
@@ -188,18 +400,26 @@ export default function ProfilePage() {
     const plan = profile?.plan || 'free'
     const limitMB = PLAN_LIMITS[plan].avatar
 
-    // GIF só para MEGA
     if (file.type === 'image/gif' && plan !== 'mega') {
-      toast.error('GIF no avatar é exclusivo do plano 👑 MEGA BOOST!')
+      toast.error('GIF no avatar é exclusivo do plano 👑 MEGA BOOST!'); return
+    }
+    if (file.size > limitMB * 1024 * 1024) {
+      toast.error(`Avatar deve ter no máximo ${limitMB}MB (plano ${plan.toUpperCase()})`); return
+    }
+
+    // GIF não precisa de crop (já é animado, não faz sentido rasterizar)
+    if (file.type === 'image/gif') {
+      setAvatarBlob(file)
+      setAvatarPreview(URL.createObjectURL(file))
       return
     }
 
-    if (file.size > limitMB * 1024 * 1024) {
-      toast.error(`Avatar deve ter no máximo ${limitMB}MB (plano ${plan.toUpperCase()})`)
-      return
-    }
-    setAvatarFile(file)
-    setAvatarPreview(URL.createObjectURL(file))
+    // Abre o modal de crop
+    const url = URL.createObjectURL(file)
+    setPendingAvatarSrc(url)
+    setCropSrc(url)
+    setCropTarget('avatar')
+    e.target.value = ''
   }
 
   function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -210,29 +430,63 @@ export default function ProfilePage() {
     const isVid = file.type.startsWith('video/')
     const isGifFile = file.type === 'image/gif'
 
-    // Vídeo/GIF no banner só para MEGA
     if ((isVid || isGifFile) && plan !== 'mega') {
-      toast.error('Vídeo e GIF no banner são exclusivos do plano 👑 MEGA BOOST!')
-      return
+      toast.error('Vídeo e GIF no banner são exclusivos do plano 👑 MEGA BOOST!'); return
     }
 
-    // Limite de vídeo no banner: usa limite de banner (50MB para MEGA)
-    const videoLimitMB = plan === 'mega' ? 50 : limitMB
-    const effectiveLimit = isVid ? videoLimitMB : limitMB
-
+    const effectiveLimit = isVid ? (plan === 'mega' ? 50 : limitMB) : limitMB
     if (file.size > effectiveLimit * 1024 * 1024) {
-      toast.error(`Banner deve ter no máximo ${effectiveLimit}MB (plano ${plan.toUpperCase()})`)
+      toast.error(`Banner deve ter no máximo ${effectiveLimit}MB (plano ${plan.toUpperCase()})`); return
+    }
+
+    // Vídeo e GIF não passam por crop
+    if (isVid || isGifFile) {
+      setBannerFile(file)
+      setBannerPreview(URL.createObjectURL(file))
+      setBannerIsVideo(isVid)
+      e.target.value = ''
       return
     }
 
-    setBannerFile(file)
-    setBannerPreview(URL.createObjectURL(file))
-    setBannerIsVideo(isVid)
+    // Imagem: abre crop
+    const url = URL.createObjectURL(file)
+    setPendingBannerSrc(url)
+    setCropSrc(url)
+    setCropTarget('banner')
+    e.target.value = ''
   }
 
-  async function uploadFile(file: File, bucket: string, userId: string, filename?: string): Promise<string | null> {
+  function handleCropConfirm(blob: Blob) {
+    if (cropTarget === 'avatar') {
+      setAvatarBlob(blob)
+      setAvatarPreview(URL.createObjectURL(blob))
+    } else {
+      setBannerBlob(blob)
+      setBannerFile(null)
+      setBannerPreview(URL.createObjectURL(blob))
+      setBannerIsVideo(false)
+    }
+    setCropSrc(null)
+    setCropTarget(null)
+  }
+
+  function handleCropCancel() {
+    setCropSrc(null)
+    setCropTarget(null)
+  }
+
+  async function uploadBlob(blob: Blob, bucket: string, userId: string, filename: string): Promise<string | null> {
+    const ext = blob.type === 'image/gif' ? 'gif' : 'jpg'
+    const path = `${userId}/${filename}.${ext}`
+    const { error } = await supabase.storage.from(bucket).upload(path, blob, { upsert: true, contentType: blob.type })
+    if (error) { console.error(error); return null }
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+    return `${data.publicUrl}?t=${Date.now()}`
+  }
+
+  async function uploadFile(file: File, bucket: string, userId: string, filename: string): Promise<string | null> {
     const ext = file.name.split('.').pop()
-    const path = `${userId}/${filename || 'photo'}.${ext}`
+    const path = `${userId}/${filename}.${ext}`
     const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
     if (error) { console.error(error); return null }
     const { data } = supabase.storage.from(bucket).getPublicUrl(path)
@@ -245,21 +499,25 @@ export default function ProfilePage() {
     let avatar_url = profile.avatar_url
     let banner_url = profile.banner_url
 
-    if (avatarFile) {
+    if (avatarBlob) {
       setUploadingAvatar(true)
-      // Nome do arquivo diferente para GIF vs imagem estática
-      const filename = avatarFile.type === 'image/gif' ? 'avatar_gif' : 'photo'
-      const url = await uploadFile(avatarFile, 'avatars', profile.id, filename)
+      const filename = avatarBlob.type === 'image/gif' ? 'avatar_gif' : 'avatar'
+      const url = await uploadBlob(avatarBlob, 'avatars', profile.id, filename)
       if (url) avatar_url = url
       setUploadingAvatar(false)
     }
 
-    if (bannerFile) {
+    if (bannerBlob) {
+      setUploadingBanner(true)
+      const url = await uploadBlob(bannerBlob, 'banners', profile.id, 'banner')
+      if (url) banner_url = url
+      setUploadingBanner(false)
+    } else if (bannerFile) {
       setUploadingBanner(true)
       const isVid = bannerFile.type.startsWith('video/')
       const isGifFile = bannerFile.type === 'image/gif'
       const bucket = isVid ? 'media' : 'banners'
-      const filename = isVid ? 'banner_video' : isGifFile ? 'banner_gif' : 'photo'
+      const filename = isVid ? 'banner_video' : isGifFile ? 'banner_gif' : 'banner'
       const url = await uploadFile(bannerFile, bucket, profile.id, filename)
       if (url) banner_url = url
       setUploadingBanner(false)
@@ -272,21 +530,20 @@ export default function ProfilePage() {
 
     await supabase.from('profiles').update(updateData).eq('id', profile.id)
     setProfile(prev => prev ? { ...prev, display_name: displayName, bio, avatar_url, banner_url, accent_color: accentColor } : prev)
-    setAvatarFile(null); setBannerFile(null)
-    setAvatarPreview(null); setBannerPreview(null)
-    setBannerIsVideo(false)
+    setAvatarBlob(null); setBannerBlob(null); setBannerFile(null)
+    setAvatarPreview(null); setBannerPreview(null); setBannerIsVideo(false)
     setEditMode(false); setSaving(false)
     toast.success('Perfil atualizado!')
   }
 
   function handleCancel() {
     setEditMode(false)
-    setAvatarFile(null); setBannerFile(null)
-    setAvatarPreview(null); setBannerPreview(null)
-    setBannerIsVideo(false)
+    setAvatarBlob(null); setBannerBlob(null); setBannerFile(null)
+    setAvatarPreview(null); setBannerPreview(null); setBannerIsVideo(false)
     setDisplayName(profile?.display_name || '')
     setBio(profile?.bio || '')
     setAccentColor(profile?.accent_color || '#c8f23c')
+    setCropSrc(null); setCropTarget(null)
   }
 
   function timeAgo(date: string) {
@@ -304,31 +561,19 @@ export default function ProfilePage() {
   const hasAccent = plan === 'boost' || plan === 'mega'
   const isMega = plan === 'mega'
 
-  const activeColor = hasAccent && profile?.accent_color
-    ? profile.accent_color
-    : plan === 'mega' ? '#a78bfa' : '#c8f23c'
-
+  const activeColor = hasAccent && profile?.accent_color ? profile.accent_color : plan === 'mega' ? '#a78bfa' : '#c8f23c'
   const previewColor = hasAccent ? accentColor : activeColor
   const planBorderColor = hasAccent ? `${previewColor}55` : 'rgba(255,255,255,0.08)'
   const planGlow = hasAccent ? `0 0 30px ${previewColor}22` : 'none'
-
-  // Determina se o banner atual é vídeo ou GIF animado
   const currentBannerIsVideo = bannerIsVideo || (currentBanner ? isVideo(currentBanner) : false)
-  const currentBannerIsGif = !bannerIsVideo && (currentBanner ? isGif(currentBanner) : false)
-
-  // Accept do input de avatar por plano
   const avatarAccept = isMega ? 'image/*' : 'image/jpeg,image/png,image/webp'
-  // Accept do input de banner por plano
-  const bannerAccept = isMega
-    ? 'image/*,video/mp4,video/webm,video/quicktime'
-    : 'image/jpeg,image/png,image/webp'
+  const bannerAccept = isMega ? 'image/*,video/mp4,video/webm,video/quicktime' : 'image/jpeg,image/png,image/webp'
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
       <p style={{ color: '#555577' }}>Carregando...</p>
     </div>
   )
-
   if (!profile) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
       <p style={{ color: '#555577' }}>Usuário não encontrado.</p>
@@ -339,81 +584,50 @@ export default function ProfilePage() {
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
 
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)',
-        borderBottom: `1px solid ${activeColor}33`,
-      }}>
+      {/* Modal de Crop */}
+      {cropSrc && cropTarget && (
+        <CropModal
+          src={cropSrc}
+          target={cropTarget}
+          accentColor={previewColor}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
+
+      <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(20px)', borderBottom: `1px solid ${activeColor}33` }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 'max(16px, calc(220px + 32px))' }}>
-          <button onClick={() => router.push('/feed')} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>
-            ← Voltar
-          </button>
+          <button onClick={() => router.push('/feed')} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>← Voltar</button>
           <span style={{ color: '#f0f0f8', fontWeight: 700 }}>@{profile.username}</span>
           {plan !== 'free' && <PlanBadge plan={plan} />}
         </div>
       </header>
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px', paddingLeft: 'max(16px, calc(220px + 32px))', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{
-          background: '#111118',
-          border: `1px solid ${planBorderColor}`,
-          borderRadius: 16, overflow: 'hidden',
-          boxShadow: planGlow,
-          transition: 'box-shadow 0.3s, border-color 0.3s',
-        }}>
-          {/* Faixa de cor no topo */}
+        <div style={{ background: '#111118', border: `1px solid ${planBorderColor}`, borderRadius: 16, overflow: 'hidden', boxShadow: planGlow, transition: 'box-shadow 0.3s, border-color 0.3s' }}>
+
           {hasAccent && (
-            <div style={{
-              height: 3,
-              background: `linear-gradient(90deg, transparent, ${previewColor}88, transparent)`,
-              transition: 'background 0.3s',
-            }} />
+            <div style={{ height: 3, background: `linear-gradient(90deg, transparent, ${previewColor}88, transparent)`, transition: 'background 0.3s' }} />
           )}
 
           {/* Banner */}
           <div
             onClick={() => editMode && bannerInputRef.current?.click()}
-            style={{
-              height: 120, position: 'relative',
-              cursor: editMode ? 'pointer' : 'default',
-              overflow: 'hidden',
-              background: currentBanner ? 'none'
-                : hasAccent
-                ? `linear-gradient(135deg, ${previewColor}22, ${previewColor}08)`
-                : 'linear-gradient(135deg, rgba(200,242,60,0.1), rgba(200,242,60,0.03))',
-              borderBottom: `1px solid ${planBorderColor}`,
-              transition: 'background 0.3s',
-            }}
+            style={{ height: 120, position: 'relative', cursor: editMode ? 'pointer' : 'default', overflow: 'hidden', background: currentBanner ? 'none' : hasAccent ? `linear-gradient(135deg, ${previewColor}22, ${previewColor}08)` : 'linear-gradient(135deg, rgba(200,242,60,0.1), rgba(200,242,60,0.03))', borderBottom: `1px solid ${planBorderColor}`, transition: 'background 0.3s' }}
           >
-            {/* Renderiza vídeo, GIF ou imagem no banner */}
             {currentBanner && currentBannerIsVideo ? (
-              <video
-                src={currentBanner}
-                autoPlay loop muted playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
+              <video src={currentBanner} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             ) : currentBanner ? (
               <img src={currentBanner} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             ) : null}
-
             {editMode && (
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                 <span style={{ fontSize: 18 }}>🖼️</span>
-                <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
-                  {uploadingBanner ? 'Enviando...' : isMega ? 'Alterar banner (imagem, GIF ou vídeo)' : 'Alterar banner'}
-                </span>
-                {isMega && !uploadingBanner && (
-                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>👑 GIF e vídeo disponíveis no seu plano</span>
-                )}
+                <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{uploadingBanner ? 'Enviando...' : isMega ? 'Alterar banner (imagem, GIF ou vídeo)' : 'Alterar banner'}</span>
+                {isMega && !uploadingBanner && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>👑 GIF e vídeo disponíveis no seu plano</span>}
               </div>
             )}
-            <input
-              ref={bannerInputRef}
-              type="file"
-              accept={bannerAccept}
-              style={{ display: 'none' }}
-              onChange={handleBannerChange}
-            />
+            <input ref={bannerInputRef} type="file" accept={bannerAccept} style={{ display: 'none' }} onChange={handleBannerChange} />
           </div>
 
           <div style={{ padding: 20 }}>
@@ -421,22 +635,8 @@ export default function ProfilePage() {
               {/* Avatar */}
               <div
                 onClick={() => editMode && avatarInputRef.current?.click()}
-                style={{
-                  width: 80, height: 80, borderRadius: '50%',
-                  background: currentAvatar ? 'none'
-                    : hasAccent
-                    ? `linear-gradient(135deg, ${previewColor}, ${previewColor}99)`
-                    : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#000', fontWeight: 800, fontSize: 30,
-                  border: `4px solid #111118`,
-                  boxShadow: hasAccent ? `0 0 20px ${previewColor}66` : '0 0 10px rgba(200,242,60,0.15)',
-                  cursor: editMode ? 'pointer' : 'default',
-                  position: 'relative', overflow: 'hidden', flexShrink: 0,
-                  transition: 'box-shadow 0.3s',
-                }}
+                style={{ width: 80, height: 80, borderRadius: '50%', background: currentAvatar ? 'none' : hasAccent ? `linear-gradient(135deg, ${previewColor}, ${previewColor}99)` : 'linear-gradient(135deg, #c8f23c, #8ab82a)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 30, border: `4px solid #111118`, boxShadow: hasAccent ? `0 0 20px ${previewColor}66` : '0 0 10px rgba(200,242,60,0.15)', cursor: editMode ? 'pointer' : 'default', position: 'relative', overflow: 'hidden', flexShrink: 0, transition: 'box-shadow 0.3s' }}
               >
-                {/* GIF no avatar usa img tag (anima normalmente) */}
                 {currentAvatar
                   ? <img src={currentAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   : profile.username.charAt(0).toUpperCase()
@@ -447,48 +647,29 @@ export default function ProfilePage() {
                     {isMega && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>GIF OK</span>}
                   </div>
                 )}
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept={avatarAccept}
-                  style={{ display: 'none' }}
-                  onChange={handleAvatarChange}
-                />
+                <input ref={avatarInputRef} type="file" accept={avatarAccept} style={{ display: 'none' }} onChange={handleAvatarChange} />
               </div>
 
               {isOwner && !editMode && (
-                <button onClick={() => setEditMode(true)}
-                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
+                <button onClick={() => setEditMode(true)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 16px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.color = activeColor }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}
-                >
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}>
                   Editar perfil
                 </button>
               )}
               {isOwner && editMode && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={handleCancel} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', padding: '7px 14px', borderRadius: 50, cursor: 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif" }}>Cancelar</button>
-                  <button onClick={handleSave} disabled={saving}
-                    style={{ background: previewColor, color: '#000', fontWeight: 700, padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: `0 0 12px ${previewColor}55`, opacity: saving ? 0.7 : 1, transition: 'background 0.3s' }}>
+                  <button onClick={handleSave} disabled={saving} style={{ background: previewColor, color: '#000', fontWeight: 700, padding: '7px 16px', borderRadius: 50, border: 'none', cursor: saving ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif", boxShadow: `0 0 12px ${previewColor}55`, opacity: saving ? 0.7 : 1, transition: 'background 0.3s' }}>
                     {saving ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
               )}
               {!isOwner && (
-                <button
-                  onClick={handleFollow} disabled={followLoading}
-                  style={{
-                    background: isFollowing ? 'transparent' : activeColor,
-                    border: isFollowing ? '1px solid rgba(255,255,255,0.12)' : 'none',
-                    color: isFollowing ? '#8888aa' : '#000',
-                    padding: '7px 18px', borderRadius: 50, cursor: followLoading ? 'wait' : 'pointer',
-                    fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif",
-                    transition: 'all 0.2s', opacity: followLoading ? 0.6 : 1,
-                    boxShadow: isFollowing ? 'none' : `0 0 12px ${activeColor}55`,
-                  }}
+                <button onClick={handleFollow} disabled={followLoading}
+                  style={{ background: isFollowing ? 'transparent' : activeColor, border: isFollowing ? '1px solid rgba(255,255,255,0.12)' : 'none', color: isFollowing ? '#8888aa' : '#000', padding: '7px 18px', borderRadius: 50, cursor: followLoading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s', opacity: followLoading ? 0.6 : 1, boxShadow: isFollowing ? 'none' : `0 0 12px ${activeColor}55` }}
                   onMouseEnter={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,60,60,0.4)'; e.currentTarget.style.color = '#ff6060' } }}
-                  onMouseLeave={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' } }}
-                >
+                  onMouseLeave={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' } }}>
                   {followLoading ? '...' : isFollowing ? 'Seguindo ✓' : 'Seguir'}
                 </button>
               )}
@@ -499,11 +680,7 @@ export default function ProfilePage() {
                 <p style={{ color: '#555577', fontSize: 12, margin: 0 }}>
                   Clique no avatar ou banner para alterar • Máx. {limitLabel} (plano {plan.toUpperCase()})
                 </p>
-                {isMega && (
-                  <p style={{ color: '#a78bfa', fontSize: 11, margin: '4px 0 0', fontWeight: 600 }}>
-                    👑 MEGA: avatar aceita GIF • banner aceita GIF e vídeo (MP4/WebM)
-                  </p>
-                )}
+                {isMega && <p style={{ color: '#a78bfa', fontSize: 11, margin: '4px 0 0', fontWeight: 600 }}>👑 MEGA: avatar aceita GIF • banner aceita GIF e vídeo (MP4/WebM)</p>}
               </div>
             )}
 
@@ -512,15 +689,12 @@ export default function ProfilePage() {
                 <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Nome de exibição"
                   style={{ background: '#18181f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14, outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box', width: '100%' }}
                   onFocus={e => (e.target.style.borderColor = `${previewColor}66`)}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
-                />
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
                 <textarea value={bio} onChange={e => setBio(e.target.value)} placeholder="Bio..." rows={3}
                   style={{ background: '#18181f', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14, outline: 'none', fontFamily: "'Syne', sans-serif", resize: 'none', boxSizing: 'border-box', width: '100%' }}
                   onFocus={e => (e.target.style.borderColor = `${previewColor}66`)}
-                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
-                />
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
 
-                {/* Seletor de cor — só BOOST/MEGA */}
                 {hasAccent && (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -530,13 +704,9 @@ export default function ProfilePage() {
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                       {ACCENT_COLORS.map(color => (
-                        <button key={color} onClick={() => setAccentColor(color)} style={{
-                          width: 28, height: 28, borderRadius: '50%', background: color, cursor: 'pointer', flexShrink: 0,
-                          border: accentColor === color ? '3px solid #fff' : '2px solid rgba(255,255,255,0.1)',
-                          boxShadow: accentColor === color ? `0 0 10px ${color}` : 'none', transition: 'all 0.15s',
-                        }} title={color} />
+                        <button key={color} onClick={() => setAccentColor(color)} style={{ width: 28, height: 28, borderRadius: '50%', background: color, cursor: 'pointer', flexShrink: 0, border: accentColor === color ? '3px solid #fff' : '2px solid rgba(255,255,255,0.1)', boxShadow: accentColor === color ? `0 0 10px ${color}` : 'none', transition: 'all 0.15s' }} title={color} />
                       ))}
-                      <label style={{ position: 'relative', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a28', flexShrink: 0 }} title="Cor personalizada">
+                      <label style={{ position: 'relative', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a28', flexShrink: 0 }}>
                         <span style={{ fontSize: 14 }}>+</span>
                         <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
                       </label>
@@ -551,25 +721,19 @@ export default function ProfilePage() {
             ) : (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                  <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 20, margin: 0 }}>
-                    {profile.display_name || profile.username}
-                  </h1>
+                  <h1 style={{ color: '#f0f0f8', fontWeight: 800, fontSize: 20, margin: 0 }}>{profile.display_name || profile.username}</h1>
                   <PlanBadge plan={plan} />
                 </div>
                 <p style={{ color: '#555577', fontSize: 14, marginBottom: 8 }}>@{profile.username}</p>
                 {profile.bio && <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6 }}>{profile.bio}</p>}
                 <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
-                  <span onClick={() => router.push(`/profile/${profile.username}/follows?tab=followers`)} style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)} onMouseLeave={e => (e.currentTarget.style.color = '#555577')}>
+                  <span onClick={() => router.push(`/profile/${profile.username}/follows?tab=followers`)} style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.color = activeColor)} onMouseLeave={e => (e.currentTarget.style.color = '#555577')}>
                     <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followersCount}</span> seguidores
                   </span>
-                  <span onClick={() => router.push(`/profile/${profile.username}/follows?tab=following`)} style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = activeColor)} onMouseLeave={e => (e.currentTarget.style.color = '#555577')}>
+                  <span onClick={() => router.push(`/profile/${profile.username}/follows?tab=following`)} style={{ color: '#555577', fontSize: 13, cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.color = activeColor)} onMouseLeave={e => (e.currentTarget.style.color = '#555577')}>
                     <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{followingCount}</span> seguindo
                   </span>
-                  <span style={{ color: '#555577', fontSize: 13 }}>
-                    <span style={{ color: '#f0f0f8', fontWeight: 700 }}>{posts.length}</span> posts
-                  </span>
+                  <span style={{ color: '#555577', fontSize: 13 }}><span style={{ color: '#f0f0f8', fontWeight: 700 }}>{posts.length}</span> posts</span>
                 </div>
               </>
             )}
@@ -579,12 +743,7 @@ export default function ProfilePage() {
         {/* Tabs */}
         <div style={{ display: 'flex', background: '#111118', borderRadius: 12, padding: 3, border: '1px solid rgba(255,255,255,0.05)' }}>
           {(['posts', 'communities'] as Tab[]).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
-              fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-              background: tab === t ? `${activeColor}22` : 'transparent',
-              color: tab === t ? activeColor : '#555577',
-            }}>
+            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s', background: tab === t ? `${activeColor}22` : 'transparent', color: tab === t ? activeColor : '#555577' }}>
               {t === 'posts' ? `Posts (${posts.length})` : `Comunidades (${communities.length})`}
             </button>
           ))}
@@ -597,14 +756,9 @@ export default function ProfilePage() {
               <article key={post.id} onClick={() => router.push(`/post/${post.id}`)}
                 style={{ background: '#111118', border: hasAccent ? `1px solid ${activeColor}33` : '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}11` }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = hasAccent ? `${activeColor}33` : 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
-              >
+                onMouseLeave={e => { e.currentTarget.style.borderColor = hasAccent ? `${activeColor}33` : 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}>
                 <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{post.title}</h2>
-                {post.content && (
-                  <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
-                    {post.content}
-                  </p>
-                )}
+                {post.content && <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>{post.content}</p>}
                 <div style={{ display: 'flex', gap: 16 }}>
                   <span style={{ color: '#333355', fontSize: 12 }}>▲ {post.likes_count}</span>
                   <span style={{ color: '#333355', fontSize: 12 }}>💬 {post.comments_count}</span>
@@ -622,8 +776,7 @@ export default function ProfilePage() {
               <div key={c.id} onClick={() => router.push(`/community/${c.slug}`)}
                 style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 14 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}44`; e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}08` }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
-              >
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}>
                 <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: hasAccent ? `linear-gradient(135deg, ${activeColor}, ${activeColor}88)` : 'linear-gradient(135deg, #c8f23c, #8ab82a)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 18, boxShadow: `0 0 10px ${activeColor}44` }}>
                   {c.name.charAt(0).toUpperCase()}
                 </div>
