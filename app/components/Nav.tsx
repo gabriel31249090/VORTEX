@@ -152,6 +152,7 @@ export default function Nav() {
     { icon: '◆', label: 'Planos', path: '/pricing', onClick: () => router.push('/pricing') },
     { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
     { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
+    { icon: '🎮', label: 'Jogos', path: '/games', onClick: () => router.push('/games') },
     { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
     { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
     { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
@@ -175,7 +176,7 @@ export default function Nav() {
 
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px' }}>
           {items.map(item => {
-            const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
+            const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && item.path !== '/games' && pathname.startsWith(item.path)) || (item.path === '/games' && pathname.startsWith('/games')))
             const isNotif = item.path === '__notif__'
             const isMessages = item.path === '/messages'
             const isAdminItem = (item as any).admin === true
@@ -273,7 +274,7 @@ export default function Nav() {
         padding: '8px 0 12px', zIndex: 100, fontFamily: "'Syne', sans-serif"
       }} className="nav-bottom">
         {items.filter(i => !(i as any).admin).map(item => {
-          const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && pathname.startsWith(item.path)))
+          const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && item.path !== '/games' && pathname.startsWith(item.path)) || (item.path === '/games' && pathname.startsWith('/games')))
           const isNotif = item.path === '__notif__'
           const isMessages = item.path === '/messages'
           return (
