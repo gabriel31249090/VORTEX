@@ -160,8 +160,6 @@ export default function AbismoGamePage() {
     if (!name.trim()) { toast.error('Dá um nome pro personagem!'); return }
     if (!classId) { toast.error('Escolhe uma classe!'); return }
     if (pointsLeft !== 0) { toast.error(`Ainda faltam distribuir ${pointsLeft} pontos de atributo`); return }
-    console.log('[DEBUG] userId no momento do save:', userId)
-    console.log('[DEBUG] sessão atual:', await supabase.auth.getSession())
     setSaving(true)
     try {
       let avatarUrl = editingId ? avatarPreview : null
