@@ -1,5 +1,14 @@
 // lib/abismo/mapGenerator.ts
-import type { MapNode, MapNodeType } from './type'
+export type MapNodeType = 'combat' | 'shop' | 'event' | 'boss'
+
+export type MapNode = {
+  id: string
+  floor: number
+  n: number
+  type: MapNodeType
+  visited: boolean
+  connections: string[]
+}
 
 export type FloorMap = MapNode[][] // mapData[floorIndex] = lista de nós daquele andar
 
