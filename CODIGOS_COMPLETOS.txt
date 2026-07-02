@@ -1,57 +1,133 @@
-📋 RESUMO DO DIA — VORTEX
-🔁 Contexto inicial
-Você mandou o relatório completo do projeto (Next.js 16, React 19, TypeScript, Supabase, Tailwind v4) e o código-fonte pra eu ficar por dentro do estado atual. Também resolvemos um problema de conexão do git (push falhou por internet instável, resolvido tentando de novo).
+# 📊 RELATÓRIO DE PROGRESSO — VORTEX
 
-🅰️ BLOCO A — Melhorias implementadas (concluído e commitado)
-1. Cor customizada na página do post individual (app/post/[id]/page.tsx)
+**Data:** 01/07/2026
+**Stack:** Next.js 16 + React 19 + TypeScript + Supabase + Tailwind 4
+**Repositório:** github.com/gabriel31249090/VORTEX (branch `main`, deploy via Vercel)
 
-O post individual agora aplica a accent_color do autor (já existia no feed, faltava aqui)
-Título, avatar, borda do card e faixa superior decorativa usam a cor escolhida por usuários BOOST/MEGA
-Badge ⚡/👑 aparece ao lado do @username
+---
 
-2. Notificação de plano aprovado (app/admin/page.tsx + app/notifications/page.tsx)
+## 1. Infraestrutura Base (já existente)
 
-Nova coluna plan na tabela notifications (rodamos ALTER TABLE notifications ADD COLUMN plan text;)
-Quando o admin aprova um pedido em /admin (ou seta o plano manualmente na aba Usuários), o sistema insere uma notificação tipo plan_approved
-Na tela de notificações, aparece: "Seu plano ⚡ BOOST foi ativado! 🎉" com ícone especial, e ao clicar leva para /pricing
+- App Router do Next.js 16, com middleware de autenticação (redireciona pra `/login` se não logado)
+- ~18 rotas prontas: login/register, feed (geral/seguindo), busca, criação de post, visualização de post, notificações, perfil, comunidades, salvos, settings, pricing
+- Nav responsiva: sidebar no desktop, bottom bar no mobile
+- Editor de posts com upload de imagem, vídeo, áudio e GIF
 
-3. Loading states (app/settings/page.tsx)
+---
 
-Trocamos o texto simples "Carregando..." por um skeleton visual (blocos pulsando) igual ao padrão usado em outras páginas do site
-saved/page.tsx já tinha skeleton, não precisou mexer
+## 2. Painel Administrativo
 
-4. Meta tags / SEO básico (app/post/[id]/page.tsx)
+**Status: ✅ Concluído e funcionando**
 
-Ao abrir um post, o título da aba do navegador muda dinamicamente pra [Título do post] — VORTEX
-Meta tags description, og:title, og:description e og:image são inseridas via JavaScript
-⚠️ Limitação importante que expliquei: como o middleware do site exige login em quase todas as rotas, bots de redes sociais (que não fazem login) são redirecionados antes de ler essas tags — então prévias de link no WhatsApp/Discord/Twitter não vão funcionar de verdade ainda. Isso ajuda no título da aba do navegador, mas não em compartilhamentos externos. Se quiser resolver isso direito, precisaríamos tornar /post/[id] uma rota pública no middleware — ainda não fizemos essa parte.
+- Coluna `is_admin` (boolean) adicionada à tabela `profiles`
+- Conta admin criada: `ADM_VORTEX`
+- Página `/admin` com dois blocos:
+  - **Pedidos de Plano** — lista pendentes/aprovados/rejeitados, visualização do comprovante, botões aprovar/rejeitar (atualiza o plano do usuário automaticamente)
+  - **Usuários** — busca por nome/username, botões para setar plano manualmente (FREE/BOOST/MEGA) sem precisar de Pix, útil para testes
+- Redirecionamento automático pro feed caso `is_admin` seja falso
+- Item **🛡️ Admin** na sidebar, visível apenas para a conta admin (implementado em `Nav.tsx`)
 
-5. Rate limiting (cooldown entre posts) (app/post/new/page.tsx)
+---
 
-Cooldown definido por plano: 60s (Free), 20s (BOOST), 5s (MEGA BOOST)
-Verifica o último post do usuário ao carregar a página E revalida no momento do clique em "Publicar" (pra evitar burlar deixando a aba aberta)
-Botão de publicar mostra contador regressivo (⏳ 45s) enquanto bloqueado
-Aviso visual explicando o cooldown, com nudge pra upgrade se for Free
+## 3. Sistema de Planos e Vantagens
 
-Arquivos entregues e já commitados:
+**Planos:** Free, BOOST, MEGA BOOST — pagamento via Pix com upload de comprovante, aprovação manual ou via painel admin.
 
-app/post/[id]/page.tsx
-app/admin/page.tsx
-app/notifications/page.tsx
-app/settings/page.tsx
-app/post/new/page.tsx
+### ✅ Implementado até agora
 
-Commit: "cor no post, notificacao de plano, loading states, seo basico e rate limit" — subiu com sucesso pro GitHub (9e8738b).
+| Vantagem | Plano | Status |
+|---|---|---|
+| Badges ⚡ (BOOST) e 👑 (MEGA) no perfil/feed | BOOST/MEGA | ✅ |
+| Limites de upload por plano (perfil, vídeo, áudio) | Todos | ✅ |
+| Destaque visual nos cards de post | BOOST/MEGA | ✅ |
+| Cor de destaque personalizada no perfil (paleta + hex custom, preview ao vivo) | BOOST/MEGA | ✅ |
+| GIF na foto de perfil | MEGA | ✅ |
+| Vídeo/GIF no banner (autoplay, loop, muted) | MEGA | ✅ |
+| Cor customizada nos posts do **feed** (título, borda, glow, curtidas) | MEGA (BOOST herda parcialmente) | ✅ |
+| Modal de crop/reposicionamento (arrastar + zoom) para avatar e banner | Todos, prioridade MEGA | ✅ (gerado, **commit pendente de confirmação**) |
 
-🅱️ BLOCO B — Sistema de anúncios (ainda não iniciado)
-Decidido: só usuários Free vão ver anúncios (BOOST/MEGA não veem). Ainda faltam definir:
+### ❌ Ainda pendente
 
-Tabela no banco pra armazenar anúncios
-Tipos: pop-up, anúncio lateral, posts patrocinados com link externo
-Interface no /admin pra criar/editar/pausar anúncios
+- Cor customizada nos posts na página individual `/post/[id]` (já feito no feed, falta lá)
+- Fontes e formatação especial nos posts (MEGA)
+- Indicar na UI que caracteres/emojis especiais no nome já funcionam nativamente (BOOST)
 
-🅲 BLOCO C — Sistema de DMs (ainda não iniciado)
-Você mencionou que já tentou implementar mensagens diretas antes e não deu certo. Precisamos conversar sobre o que travou da última vez antes de tentar de novo, pra não repetir o mesmo erro.
+---
 
-📌 Para retomar amanhã
-Você vai escolher entre atacar o Bloco B (anúncios) ou Bloco C (DMs) primeiro. Também ficou pendente perguntar mais detalhes sobre os anúncios (formato, frequência de exibição, se tem limite de cliques, etc.) quando formos começar.
+## 4. Sistema de Anúncios (Bloco B)
+
+**Status: ✅ Estrutura implementada**
+
+- Tabela `ads` no Supabase (título, descrição, imagem, link, tipo `popup`/`feed`, ativo) com RLS: admins têm controle total, usuários veem apenas anúncios ativos
+- Regras definidas:
+  - Pop-up ao abrir o site, com cooldown (1x por sessão)
+  - Anúncio no feed a cada **40 posts**
+  - Formatos aceitos: texto+link e imagem+link
+- Componentes criados: `AdPopup.tsx` e `FeedAd.tsx`
+- Aba de Anúncios adicionada ao painel `/admin` (criar, editar, ativar/pausar, deletar)
+- **Pendente:** integrar `FeedAd` no `app/feed/page.tsx` (lógica de inserção a cada 40 posts) e `AdPopup` no `app/layout.tsx` (exibição global)
+
+---
+
+## 5. Sistema de DMs (Bloco C)
+
+**Status: ❌ Não iniciado nesta rodada**
+
+- Tentativa anterior travou; precisa de abordagem nova antes de recomeçar
+
+---
+
+## 6. Novo Projeto: Integração de Jogos (Abismo das Fichas + Ficha D&D + VoidOS)
+
+**Status: 🟡 Em planejamento, primeira etapa iniciada**
+
+Ideia geral: trazer os jogos/ferramentas standalone para dentro do próprio Vortex, como uma seção de jogos.
+
+### Decisões já tomadas
+1. Tudo vai viver **dentro do Vortex** (não em site separado)
+2. Abismo das Fichas vai virar **multiplayer em tempo real** entre usuários do Vortex (via Supabase Realtime)
+3. Ficha de D&D será **simplificada** e usada como sistema de criação de personagem no Abismo
+4. Do VoidOS: aproveitar **animações/efeitos visuais** e o **terminal**, traduzido para português e simplificado
+
+### Ordem de ataque definida
+1. Ficha de personagem simplificada (base do sistema)
+2. Jogo Abismo integrado ao Vortex usando a ficha
+3. Multiplayer via Supabase Realtime
+4. Terminal do VoidOS como feature extra
+
+### Progresso técnico
+- Tabela `characters` desenhada (nome, raça, classe, nível, XP, HP, CA, velocidade, os 6 atributos — FOR/DES/CON/INT/SAB/CAR, skills e inventário em JSONB, notas, avatar) com RLS completo (usuário só vê/edita/deleta os próprios personagens)
+- Decidido criar um **bucket próprio no Supabase Storage** chamado `characters` (público) para os avatares dos personagens
+- **Próximo passo:** confirmar criação do bucket → rodar o SQL da tabela `characters` → começar o código da ficha
+
+---
+
+## 7. Outros projetos do Gabriel (contexto, fora do Vortex)
+
+- **CYBERBEAT** — rhythm game single-file com sistema de aim-assist magnético
+- **Abismo de Fichas** (standalone) — roguelike com Phaser 3, avaliação de mãos de poker, animações de inimigos
+- **Shadow Bound** — roguelike HTML single-file, já passou por auditoria técnica
+- **MOSPT v4.0** — IDE browser inspirada em VS Code para linguagem própria (MiniLang PT-BR)
+- **Mini OS Pro v4.0 / VoidOS** — sistema operacional browser com autenticação, IndexedDB, gerenciador de janelas, 20+ módulos
+- **Masmorra do Caos 3D** — dungeon crawler em Python/Pygame com raycasting e geração procedural BSP
+- **Karate Shotokan Scoreboard** — placar de karatê em português (timer, pontuação, penalidades)
+
+---
+
+## 8. Pendências gerais (checklist rápido)
+
+- [ ] Confirmar commit do crop modal (avatar/banner)
+- [ ] Cor customizada nos posts em `/post/[id]`
+- [ ] Fontes/formatação especial nos posts (MEGA)
+- [ ] Integrar `FeedAd` no feed (a cada 40 posts)
+- [ ] Integrar `AdPopup` no layout global
+- [ ] RLS policy para admin ler todos os `plan_requests` (hoje só o próprio usuário vê os seus)
+- [ ] Sistema de DMs (repensar abordagem)
+- [ ] Editar/deletar posts
+- [ ] Criar bucket `characters` no Supabase Storage
+- [ ] Rodar SQL da tabela `characters`
+- [ ] Iniciar ficha de personagem simplificada
+
+---
+
+*Relatório gerado a pedido do Gabriel para acompanhar o progresso do projeto VORTEX.*
