@@ -41,6 +41,7 @@ export default function Nav() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifLoading, setNotifLoading] = useState(false)
   const [dmUnreadCount, setDmUnreadCount] = useState(0)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -107,6 +108,7 @@ export default function Nav() {
   }, [userId])
 
   async function openNotifications() {
+    setMoreOpen(false)
     setNotifOpen(true)
     setNotifLoading(true)
 
@@ -141,6 +143,7 @@ export default function Nav() {
   }
 
   async function handleProfileClick() {
+    setMoreOpen(false)
     if (username) { router.push(`/profile/${username}`); return }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -148,6 +151,7 @@ export default function Nav() {
     if (data?.username) { setUsername(data.username); router.push(`/profile/${data.username}`) }
   }
 
+  // Todos os itens (usados na sidebar desktop, sem cortes)
   const items = [
     { icon: '◆', label: 'Planos', path: '/pricing', onClick: () => router.push('/pricing') },
     { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
@@ -160,6 +164,32 @@ export default function Nav() {
     { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
     ...(isAdmin ? [{ icon: '🛡️', label: 'Admin', path: '/admin', admin: true, onClick: () => router.push('/admin') }] : []),
   ]
+
+  // Itens principais da barra mobile (máx. 6, com Publicar no centro)
+  const mobileCoreItems = [
+    items.find(i => i.path === '/feed')!,
+    items.find(i => i.path === '/games')!,
+    items.find(i => i.path === '/post/new')!,
+    items.find(i => i.path === '__notif__')!,
+    items.find(i => i.path === '/messages')!,
+  ]
+
+  // Resto vai pro menu "Mais"
+  const mobileMoreItems = [
+    items.find(i => i.path === '/pricing')!,
+    items.find(i => i.path === '/communities')!,
+    items.find(i => i.path === '/profile')!,
+    items.find(i => i.path === '/settings')!,
+    ...(isAdmin ? [items.find(i => (i as any).admin)!] : []),
+  ]
+
+  function isItemActive(item: any) {
+    return item.path !== '__notif__' && (
+      pathname === item.path ||
+      (item.path !== '/feed' && item.path !== '/games' && pathname.startsWith(item.path)) ||
+      (item.path === '/games' && pathname.startsWith('/games'))
+    )
+  }
 
   return (
     <>
@@ -176,7 +206,7 @@ export default function Nav() {
 
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px' }}>
           {items.map(item => {
-            const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && item.path !== '/games' && pathname.startsWith(item.path)) || (item.path === '/games' && pathname.startsWith('/games')))
+            const isActive = isItemActive(item)
             const isNotif = item.path === '__notif__'
             const isMessages = item.path === '/messages'
             const isAdminItem = (item as any).admin === true
@@ -265,16 +295,17 @@ export default function Nav() {
         </div>
       </aside>
 
-      {/* BOTTOM NAV — Mobile */}
+      {/* BOTTOM NAV — Mobile (6 itens fixos: 5 principais + Mais) */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'rgba(13,13,18,0.95)', backdropFilter: 'blur(20px)',
+        background: 'rgba(13,13,18,0.97)', backdropFilter: 'blur(20px)',
         borderTop: '1px solid rgba(200,242,60,0.15)',
         display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-        padding: '8px 0 12px', zIndex: 100, fontFamily: "'Syne', sans-serif"
+        padding: '6px 4px calc(6px + env(safe-area-inset-bottom))',
+        zIndex: 100, fontFamily: "'Syne', sans-serif",
       }} className="nav-bottom">
-        {items.filter(i => !(i as any).admin).map(item => {
-          const isActive = item.path !== '__notif__' && (pathname === item.path || (item.path !== '/feed' && item.path !== '/games' && pathname.startsWith(item.path)) || (item.path === '/games' && pathname.startsWith('/games')))
+        {mobileCoreItems.map(item => {
+          const isActive = isItemActive(item)
           const isNotif = item.path === '__notif__'
           const isMessages = item.path === '/messages'
           return (
@@ -282,20 +313,21 @@ export default function Nav() {
               key={item.label}
               onClick={item.onClick}
               style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                 background: item.accent ? '#c8f23c' : 'transparent',
-                border: 'none', cursor: 'pointer', padding: item.accent ? '8px 16px' : '4px 12px',
-                borderRadius: item.accent ? 50 : 8, position: 'relative',
-                color: item.accent ? '#000' : isActive ? '#c8f23c' : '#555577',
+                border: 'none', cursor: 'pointer',
+                padding: item.accent ? '8px 14px' : '6px 8px',
+                borderRadius: item.accent ? 50 : 10, position: 'relative',
+                color: item.accent ? '#000' : isActive ? '#c8f23c' : '#666688',
                 boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.4)' : 'none',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s', flexShrink: 0, minWidth: 0,
               }}
             >
-              <span style={{ fontSize: 20, position: 'relative' }}>
+              <span style={{ fontSize: 19, position: 'relative', lineHeight: 1 }}>
                 {item.icon}
                 {isNotif && unreadCount > 0 && (
                   <span style={{
-                    position: 'absolute', top: -4, right: -8,
+                    position: 'absolute', top: -5, right: -9,
                     background: '#c8f23c', color: '#000',
                     fontSize: 9, fontWeight: 800, borderRadius: 999,
                     padding: '1px 4px', minWidth: 14, textAlign: 'center', lineHeight: 1.5,
@@ -305,7 +337,7 @@ export default function Nav() {
                 )}
                 {isMessages && dmUnreadCount > 0 && (
                   <span style={{
-                    position: 'absolute', top: -4, right: -8,
+                    position: 'absolute', top: -5, right: -9,
                     background: '#c8f23c', color: '#000',
                     fontSize: 9, fontWeight: 800, borderRadius: 999,
                     padding: '1px 4px', minWidth: 14, textAlign: 'center', lineHeight: 1.5,
@@ -314,11 +346,75 @@ export default function Nav() {
                   </span>
                 )}
               </span>
-              {!item.accent && <span style={{ fontSize: 10, fontWeight: 600 }}>{item.label}</span>}
+              {!item.accent && <span style={{ fontSize: 9, fontWeight: 600 }}>{item.label}</span>}
             </button>
           )
         })}
+
+        {/* Botão "Mais" */}
+        <button
+          onClick={() => setMoreOpen(true)}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            padding: '6px 8px', borderRadius: 10,
+            color: moreOpen ? '#c8f23c' : '#666688', flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: 19, lineHeight: 1 }}>⋯</span>
+          <span style={{ fontSize: 9, fontWeight: 600 }}>Mais</span>
+        </button>
       </nav>
+
+      {/* FOLHA "MAIS" — Mobile */}
+      {moreOpen && (
+        <>
+          <div
+            onClick={() => setMoreOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+              zIndex: 150, backdropFilter: 'blur(4px)',
+            }}
+            className="nav-more-overlay"
+          />
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0,
+            background: '#111118', borderTop: '1px solid rgba(200,242,60,0.15)',
+            borderRadius: '20px 20px 0 0', zIndex: 151,
+            padding: '20px 16px calc(20px + env(safe-area-inset-bottom))',
+            fontFamily: "'Syne', sans-serif",
+          }}
+          className="nav-more-sheet">
+            <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 999, margin: '0 auto 16px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              {mobileMoreItems.map(item => (
+                <button
+                  key={item.label}
+                  onClick={() => { item.onClick(); setMoreOpen(false) }}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                    background: 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14,
+                    padding: '14px 4px', cursor: 'pointer', color: '#c8c8e0',
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>{item.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, textAlign: 'center' }}>{item.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { handleLogout(); setMoreOpen(false) }}
+              style={{
+                width: '100%', marginTop: 16, padding: '12px 0', borderRadius: 12,
+                border: '1px solid rgba(255,68,102,0.2)', background: 'transparent',
+                color: '#ff4466', fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              ⏻ Sair
+            </button>
+          </div>
+        </>
+      )}
 
       {/* PAINEL DE NOTIFICAÇÕES */}
       {notifOpen && (
@@ -338,7 +434,8 @@ export default function Nav() {
             zIndex: 201, display: 'flex', flexDirection: 'column',
             fontFamily: "'Syne', sans-serif",
             animation: 'slideIn 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
-          }}>
+          }}
+          className="notif-panel">
             <div style={{
               padding: '20px 20px 16px',
               borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -484,6 +581,8 @@ export default function Nav() {
         @media (max-width: 767px) {
           .nav-bottom { display: flex !important; }
           .nav-sidebar { display: none !important; }
+          .notif-panel { width: 100% !important; }
+          body { padding-bottom: 66px; }
         }
       `}</style>
     </>
