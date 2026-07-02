@@ -160,6 +160,8 @@ export default function AbismoGamePage() {
     if (!name.trim()) { toast.error('Dá um nome pro personagem!'); return }
     if (!classId) { toast.error('Escolhe uma classe!'); return }
     if (pointsLeft !== 0) { toast.error(`Ainda faltam distribuir ${pointsLeft} pontos de atributo`); return }
+    console.log('[DEBUG] userId no momento do save:', userId)
+    console.log('[DEBUG] sessão atual:', await supabase.auth.getSession())
     setSaving(true)
     try {
       let avatarUrl = editingId ? avatarPreview : null
@@ -382,7 +384,7 @@ export default function AbismoGamePage() {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>Raça</label>
+                    <span style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>Raça</span>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       {RACES.map(r => (
                         <button key={r} onClick={() => setRace(r)}
@@ -430,7 +432,7 @@ export default function AbismoGamePage() {
 
               {step === 2 && (
                 <div>
-                  <label style={{ fontSize: 12, color: '#8888aa', marginBottom: 8, display: 'block' }}>Escolha a classe</label>
+                  <span style={{ fontSize: 12, color: '#8888aa', marginBottom: 8, display: 'block' }}>Escolha a classe</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {CLASSES.map(c => (
                       <button key={c.id} onClick={() => setClassId(c.id)}
@@ -455,7 +457,7 @@ export default function AbismoGamePage() {
               {step === 3 && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <label style={{ fontSize: 12, color: '#8888aa' }}>Distribua os atributos</label>
+                    <span style={{ fontSize: 12, color: '#8888aa' }}>Distribua os atributos</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: pointsLeft === 0 ? '#c8f23c' : '#ffaa00' }}>{pointsLeft} pontos restantes</span>
                   </div>
                   {ATTR_KEYS.map(key => (
@@ -474,7 +476,7 @@ export default function AbismoGamePage() {
               {step === 4 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <label style={{ fontSize: 12, color: '#8888aa', marginBottom: 8, display: 'block' }}>Perícias (até 4)</label>
+                    <span style={{ fontSize: 12, color: '#8888aa', marginBottom: 8, display: 'block' }}>Perícias (até 4)</span>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       {SKILLS.map(s => (
                         <button key={s} onClick={() => toggleSkill(s)}
