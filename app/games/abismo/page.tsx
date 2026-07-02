@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import Nav from '../components/Nav'
+import Link from 'next/link'
+import Nav from '../../components/Nav'
 import toast from 'react-hot-toast'
 
 // ============ TIPOS ============
@@ -77,7 +78,7 @@ function mod(score: number) {
 }
 
 // ============ COMPONENTE ============
-export default function CharactersPage() {
+export default function AbismoGamePage() {
   const router = useRouter()
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -286,13 +287,28 @@ export default function CharactersPage() {
       <Nav />
 
       <main className="max-w-5xl mx-auto px-4 py-8 md:pl-24">
-        <div className="flex items-center justify-between mb-8">
+        <Link href="/games" className="text-xs text-gray-500 hover:text-purple-400 inline-flex items-center gap-1 mb-4">
+          ← Voltar pra Jogos
+        </Link>
+
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-3xl">🎰</span>
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <span className="text-purple-400">🎭</span> Seus Personagens
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Fichas usadas no Abismo das Fichas</p>
+            <h1 className="text-2xl font-bold text-white">Abismo das Fichas</h1>
+            <p className="text-sm text-gray-500">Roguelike de cartas multiplayer</p>
           </div>
+        </div>
+
+        {/* Placeholder da área de jogo em si — entra aqui quando o Abismo for integrado */}
+        <div className="mt-6 mb-8 rounded-xl border border-dashed border-purple-900/50 p-6 text-center">
+          <p className="text-sm text-gray-500">O jogo em si ainda vai entrar aqui (multiplayer via Supabase Realtime).</p>
+          <p className="text-xs text-gray-600 mt-1">Por enquanto, crie e gerencie seus personagens abaixo.</p>
+        </div>
+
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <span className="text-purple-400">🎭</span> Seus Personagens
+          </h2>
           <button
             onClick={openCreate}
             className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-medium hover:opacity-90 transition shadow-[0_0_20px_rgba(168,85,247,0.35)]"
