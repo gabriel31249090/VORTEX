@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Nav from '../../components/Nav'
 import toast from 'react-hot-toast'
-
-const Nav = () => null
 
 // ============ TIPOS ============
 type ClassId = 'gambler' | 'trickster' | 'knight' | 'necromancer' | 'dealer'
