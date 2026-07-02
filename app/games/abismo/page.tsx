@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Nav from '@/app/components/Nav'
 import toast from 'react-hot-toast'
+
+const Nav = () => null
 
 // ============ TIPOS ============
 type ClassId = 'gambler' | 'trickster' | 'knight' | 'necromancer' | 'dealer'
@@ -106,7 +107,11 @@ export default function AbismoGamePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
     setUserId(user.id)
-    const { data, error } = await supabase.from('characters').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    const { data, error } = await supabase
+      .from('characters')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
     if (error) toast.error('Erro ao carregar personagens')
     else setCharacters(data as Character[])
     setLoading(false)
@@ -160,21 +165,21 @@ export default function AbismoGamePage() {
     try {
       let avatarUrl = editingId ? avatarPreview : null
       if (avatarFile) {
-        const ext = avatarFile.name.split('.').pop() ?? 'png'
+        const ext = avatarFile.name.split('.').pop()
         const path = `${userId}/${Date.now()}.${ext}`
-        const { error: uploadError } = await supabase.storage.from('characters').upload(path, avatarFile, { upsert: true })
+        const { error: uploadError } = await supabase.storage
+          .from('characters')
+          .upload(path, avatarFile, { upsert: true })
         if (uploadError) throw uploadError
         const { data: urlData } = supabase.storage.from('characters').getPublicUrl(path)
         avatarUrl = urlData.publicUrl
       }
       const cls = CLASSES.find(c => c.id === classId)!
-      const hpMax = cls.hp + Math.floor((attrs.con - 10) / 2)
+      const hpMax = cls.hp + Math.floor((attrs.con - 10) / 2) * 2
       const armorClass = 10 + Math.floor((attrs.des - 10) / 2) + cls.armorBonus
-      const savedHpCurrent = editingId ? characters.find(c => c.id === editingId)?.hp_current : null
-      const hpCurrent = editingId ? Math.min(savedHpCurrent ?? hpMax, hpMax) : hpMax
       const payload = {
         user_id: userId, name: name.trim(), race, class: classId,
-        hp_max: hpMax, hp_current: hpCurrent, armor_class: armorClass, speed: 9,
+        hp_max: hpMax, hp_current: hpMax, armor_class: armorClass, speed: 9,
         for: attrs.for, des: attrs.des, con: attrs.con, int: attrs.int, sab: attrs.sab, car: attrs.car,
         skills, notes, avatar_url: avatarUrl,
       }
@@ -183,7 +188,9 @@ export default function AbismoGamePage() {
         if (error) throw error
         toast.success('Personagem atualizado!')
       } else {
-        const { error } = await supabase.from('characters').insert({ ...payload, level: 1, xp: 0, inventory: [] })
+        const { error } = await supabase.from('characters').insert({
+          ...payload, level: 1, xp: 0, inventory: [],
+        })
         if (error) throw error
         toast.success('Personagem criado!')
       }
@@ -360,12 +367,20 @@ export default function AbismoGamePage() {
               {step === 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <label style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>Nome do personagem</label>
-                    <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Kael, o Sombrio"
+                    <label htmlFor="char-name" style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>
+                      Nome do personagem
+                    </label>
+                    <input
+                      id="char-name"
+                      name="char-name"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="Ex: Kael, o Sombrio"
                       style={{
                         width: '100%', background: '#1a1726', border: '1px solid rgba(200,242,60,0.15)', borderRadius: 8,
                         padding: '10px 12px', color: '#f0f0f8', fontSize: 14, outline: 'none',
-                      }} />
+                      }}
+                    />
                   </div>
                   <div>
                     <label style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>Raça</label>
@@ -381,16 +396,33 @@ export default function AbismoGamePage() {
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>Avatar (opcional)</label>
+                    <label htmlFor="avatar-upload" style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>
+                      Avatar (opcional)
+                    </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div onClick={() => fileInputRef.current?.click()} style={{
-                        width: 64, height: 64, borderRadius: 10, background: '#1a1726',
-                        border: '1px solid rgba(200,242,60,0.2)', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-                      }}>
-                        {avatarPreview ? <img src={avatarPreview} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ color: '#666688', fontSize: 12 }}>+</span>}
-                      </div>
-                      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarSelect} />
+                      <label
+                        htmlFor="avatar-upload"
+                        style={{
+                          width: 64, height: 64, borderRadius: 10, background: '#1a1726',
+                          border: '1px solid rgba(200,242,60,0.2)', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                        }}
+                      >
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="Avatar preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ color: '#666688', fontSize: 12 }}>+</span>
+                        )}
+                      </label>
+                      <input
+                        id="avatar-upload"
+                        name="avatar"
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={handleAvatarSelect}
+                      />
                       <span style={{ fontSize: 12, color: '#8888aa' }}>Clique pra escolher</span>
                     </div>
                   </div>
@@ -457,13 +489,21 @@ export default function AbismoGamePage() {
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>Anotações (opcional)</label>
-                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                    <label htmlFor="char-notes" style={{ fontSize: 12, color: '#8888aa', marginBottom: 6, display: 'block' }}>
+                      Anotações (opcional)
+                    </label>
+                    <textarea
+                      id="char-notes"
+                      name="char-notes"
+                      value={notes}
+                      onChange={e => setNotes(e.target.value)}
+                      rows={3}
                       placeholder="História, personalidade, objetivos..."
                       style={{
                         width: '100%', background: '#1a1726', border: '1px solid rgba(200,242,60,0.15)', borderRadius: 8,
                         padding: '10px 12px', color: '#f0f0f8', fontSize: 13, outline: 'none', resize: 'none',
-                      }} />
+                      }}
+                    />
                   </div>
                 </div>
               )}
