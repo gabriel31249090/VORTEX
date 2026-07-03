@@ -8,14 +8,7 @@
 // SHOP_ITEMS localmente (duplicado e simplificado). Agora usa poker.ts e constants.ts
 // de verdade, que já tínhamos da Fase 1.
 
-// Minimal local fallbacks for constants (originally from ../constants).
-// Kept here to avoid a missing-module compile error while allowing this
-// file to remain self-contained. If a real constants module exists, it
-// should replace these definitions.
-const SUITS = { hearts: 'hearts', diamonds: 'diamonds', clubs: 'clubs', spades: 'spades' } as const
-const RV: Record<string, number> = { J: 11, Q: 12, K: 13, A: 14 }
-const SHOP_ITEMS: Record<string, any> = {}
-const RELICS: Record<string, any> = {}
+import { SUITS, RV, SHOP_ITEMS, RELICS } from '../constants'
 import type { PlayingCard, ClassId, EnemyDef, Suit } from './types'
 import { evalHand, calcDamage } from '../poker'
 
