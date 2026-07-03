@@ -7,14 +7,30 @@ import { createClient } from '@/lib/supabase'
 import { generateMap, type FloorMap } from './mapGenerator'
 import type { CombatState } from './combatEngine'
 
+export type ClassId = string
+
 export type RunStatus = 'waiting' | 'map' | 'combat' | 'won' | 'lost'
+
+/** Stats do personagem que sobrevivem entre um combate e outro dentro da mesma run. */
+export type RunPlayerStats = {
+  characterId: string
+  characterName: string
+  classId: ClassId
+  hp: number
+  maxHp: number
+  gold: number
+  relics: string[]
+  inventory: string[]
+}
 
 export type AbismoRun = {
   id: string
   host_user_id: string
   host_character_id: string
+  host_stats: RunPlayerStats
   guest_user_id: string | null
   guest_character_id: string | null
+  guest_stats: RunPlayerStats | null
   floor_map: FloorMap
   current_node_id: string
   combat_state: CombatState | null
@@ -24,14 +40,15 @@ export type AbismoRun = {
 }
 
 /** Cria uma sala nova. O host já entra direto no mapa; fica 'waiting' até um segundo jogador entrar. */
-export async function createRun(hostUserId: string, hostCharacterId: string): Promise<AbismoRun> {
+export async function createRun(hostUserId: string, hostStats: RunPlayerStats): Promise<AbismoRun> {
   const supabase = createClient()
   const floorMap = generateMap()
   const { data, error } = await supabase
     .from('abismo_runs')
     .insert({
       host_user_id: hostUserId,
-      host_character_id: hostCharacterId,
+      host_character_id: hostStats.characterId,
+      host_stats: hostStats,
       floor_map: floorMap,
       current_node_id: floorMap[0][0].id,
       status: 'waiting',
@@ -43,11 +60,16 @@ export async function createRun(hostUserId: string, hostCharacterId: string): Pr
 }
 
 /** Segundo jogador entra numa sala existente usando o ID da run (compartilhado por link/código). */
-export async function joinRun(runId: string, guestUserId: string, guestCharacterId: string): Promise<AbismoRun> {
+export async function joinRun(runId: string, guestUserId: string, guestStats: RunPlayerStats): Promise<AbismoRun> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('abismo_runs')
-    .update({ guest_user_id: guestUserId, guest_character_id: guestCharacterId, status: 'map' })
+    .update({
+      guest_user_id: guestUserId,
+      guest_character_id: guestStats.characterId,
+      guest_stats: guestStats,
+      status: 'map',
+    })
     .eq('id', runId)
     .is('guest_user_id', null) // evita 2 pessoas entrarem na mesma vaga
     .select()
@@ -80,10 +102,12 @@ export function subscribeToRun(runId: string, onUpdate: (run: AbismoRun) => void
   }
 }
 
-/** Salva progresso (mapa, nó atual, estado de combate, status). Last-write-wins — ok porque o motor já é turn-based. */
+/** Salva progresso (mapa, nó atual, estado de combate, stats dos jogadores, status). */
 export async function updateRun(
   runId: string,
-  patch: Partial<Pick<AbismoRun, 'floor_map' | 'current_node_id' | 'combat_state' | 'status'>>
+  patch: Partial<
+    Pick<AbismoRun, 'floor_map' | 'current_node_id' | 'combat_state' | 'status' | 'host_stats' | 'guest_stats'>
+  >
 ): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase

@@ -63,6 +63,11 @@ export function getNode(mapData: FloorMap, id: string): MapNode | null {
   return null
 }
 
+export function getNodeById(mapData: FloorMap, id: string | null): MapNode | null {
+  if (!id) return null
+  return getNode(mapData, id)
+}
+
 /** Um nó é acessível se for o nó atual (ainda não visitado) ou estiver conectado a partir do nó atual. */
 export function isNodeAccessible(mapData: FloorMap, currentNodeId: string, nodeId: string): boolean {
   if (nodeId === currentNodeId) return true
