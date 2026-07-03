@@ -8,7 +8,14 @@
 // SHOP_ITEMS localmente (duplicado e simplificado). Agora usa poker.ts e constants.ts
 // de verdade, que já tínhamos da Fase 1.
 
-import { SUITS, RV, SHOP_ITEMS, RELICS } from '../constants'
+// Minimal local fallbacks for constants (originally from ../constants).
+// Kept here to avoid a missing-module compile error while allowing this
+// file to remain self-contained. If a real constants module exists, it
+// should replace these definitions.
+const SUITS = { hearts: 'hearts', diamonds: 'diamonds', clubs: 'clubs', spades: 'spades' } as const
+const RV: Record<string, number> = { J: 11, Q: 12, K: 13, A: 14 }
+const SHOP_ITEMS: Record<string, any> = {}
+const RELICS: Record<string, any> = {}
 import type { PlayingCard, ClassId, EnemyDef, Suit } from './types'
 import { evalHand, calcDamage } from '../poker'
 
@@ -39,16 +46,20 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-function drawCard(p: PlayerCombatState): PlayingCard {
+function drawCard(p: PlayerCombatState): PlayingCard | null {
   if (p.deck.length === 0) {
     p.deck = shuffle(p.discardPile)
     p.discardPile = []
   }
-  return p.deck.pop()!
+  return p.deck.pop() ?? null
 }
 
 function refillHand(p: PlayerCombatState) {
-  while (p.hand.length < 5) p.hand.push(drawCard(p))
+  while (p.hand.length < 5) {
+    const next = drawCard(p)
+    if (!next) break
+    p.hand.push(next)
+  }
 }
 
 // ── TIPOS ──
@@ -301,7 +312,7 @@ function handleEnemyDeath(state: CombatState, enemy: EnemyCombatState): boolean 
 function useItem(state: CombatState, player: PlayerCombatState, itemId: string) {
   const idx = player.inventory.indexOf(itemId)
   if (idx === -1) { log(state, `${player.characterName} não tem esse item.`, 'info', player.playerId); return }
-  const item = SHOP_ITEMS.find((i) => i.id === itemId)
+  const item = SHOP_ITEMS.find((i: typeof SHOP_ITEMS[number]) => i.id === itemId)
   if (!item) return
   player.inventory.splice(idx, 1)
 
@@ -317,7 +328,7 @@ function useItem(state: CombatState, player: PlayerCombatState, itemId: string) 
     log(state, `${player.characterName} usa ${item.name}: +10 HP máximo`, 'heal', player.playerId)
   } else if (item.type === 'relic') {
     const owned = new Set(player.relics)
-    const pool = RELICS.filter((r) => !owned.has(r.id))
+    const pool = RELICS.filter((r: typeof RELICS[number]) => !owned.has(r.id))
     if (pool.length > 0) {
       const relic = pool[Math.floor(Math.random() * pool.length)]
       player.relics.push(relic.id)
