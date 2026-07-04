@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../components/Nav'
 import toast from 'react-hot-toast'
+import { createRun, type RunPlayerStats } from '@/lib/abismo/runSync'
 
 // ============ TIPOS ============
 type ClassId = 'gambler' | 'trickster' | 'knight' | 'necromancer' | 'dealer'
@@ -85,6 +86,7 @@ export default function AbismoGamePage() {
   const [showWizard, setShowWizard] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [startingRunId, setStartingRunId] = useState<string | null>(null)
 
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
@@ -206,6 +208,29 @@ export default function AbismoGamePage() {
     else { toast.success('Personagem deletado'); load() }
   }
 
+  async function handlePlay(c: Character) {
+    if (!userId) return
+    setStartingRunId(c.id)
+    try {
+      const stats: RunPlayerStats = {
+        characterId: c.id,
+        characterName: c.name,
+        classId: c.class,
+        hp: c.hp_current,
+        maxHp: c.hp_max,
+        gold: 0,
+        relics: [],
+        inventory: [],
+      }
+      const run = await createRun(userId, stats)
+      router.push(`/games/abismo/play/${run.id}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao iniciar a run')
+    } finally {
+      setStartingRunId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#0d0d12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -316,21 +341,36 @@ export default function AbismoGamePage() {
                     </div>
                   </div>
 
-                  <div className="char-actions" style={{ display: 'flex', gap: 8, opacity: 0, transition: 'opacity 0.2s' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <button
-                      onClick={() => openEdit(c)}
+                      onClick={() => handlePlay(c)}
+                      disabled={startingRunId === c.id}
                       style={{
-                        flex: 1, padding: '6px 0', borderRadius: 8, border: '1px solid rgba(200,242,60,0.2)',
-                        background: 'transparent', color: '#c8f23c', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        width: '100%', padding: '8px 0', borderRadius: 8, border: 'none',
+                        background: startingRunId === c.id ? '#555' : '#c8f23c',
+                        color: '#000', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                        fontFamily: "'Syne', sans-serif", opacity: startingRunId === c.id ? 0.6 : 1,
+                        boxShadow: startingRunId === c.id ? 'none' : '0 0 12px rgba(200,242,60,0.3)',
                       }}
-                    >Editar</button>
-                    <button
-                      onClick={() => handleDelete(c.id)}
-                      style={{
-                        flex: 1, padding: '6px 0', borderRadius: 8, border: '1px solid rgba(255,68,102,0.2)',
-                        background: 'transparent', color: '#ff4466', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                      }}
-                    >Deletar</button>
+                    >
+                      {startingRunId === c.id ? 'Entrando no abismo...' : '▶ Jogar'}
+                    </button>
+                    <div className="char-actions" style={{ display: 'flex', gap: 8, opacity: 0, transition: 'opacity 0.2s' }}>
+                      <button
+                        onClick={() => openEdit(c)}
+                        style={{
+                          flex: 1, padding: '6px 0', borderRadius: 8, border: '1px solid rgba(200,242,60,0.2)',
+                          background: 'transparent', color: '#c8f23c', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        }}
+                      >Editar</button>
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        style={{
+                          flex: 1, padding: '6px 0', borderRadius: 8, border: '1px solid rgba(255,68,102,0.2)',
+                          background: 'transparent', color: '#ff4466', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        }}
+                      >Deletar</button>
+                    </div>
                   </div>
                 </div>
               )
