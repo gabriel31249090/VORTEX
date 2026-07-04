@@ -12,8 +12,9 @@ import {
 } from '@/lib/abismo/runSync'
 import { getNode, getNodeById, markVisited, TYPE_ICON, TYPE_LABEL, type MapNode } from '@/lib/abismo/mapGenerator'
 import { createCombatState, combatReducer, type CombatState } from '@/lib/abismo/combatEngine'
-import { ENEMIES, BOSSES, CLASS_META, CLASS_PASSIVES } from '@/lib/abismo/constants'
-import type { ClassId } from '@/lib/abismo/types'
+import { ENEMIES, BOSSES, CLASS_META, CLASS_PASSIVES, RELICS } from '@/lib/abismo/constants'
+import { buyItem, sellRelic, resolveEventAction, pickShopStock, pickRandomEvent } from '@/lib/abismo/economy'
+import type { ClassId, ShopItemDef, EventDef } from '@/lib/abismo/types'
 
 export default function AbismoPlayPage() {
   const router = useRouter()
@@ -32,6 +33,11 @@ export default function AbismoPlayPage() {
   const [runFull, setRunFull] = useState(false)
   const [myCharacters, setMyCharacters] = useState<any[]>([])
   const [joining, setJoining] = useState(false)
+
+  // Sessões locais de loja/evento (não precisam ser sincronizadas — só afetam quem clicou o nó)
+  const [shopStock, setShopStock] = useState<ShopItemDef[] | null>(null)
+  const [activeEvent, setActiveEvent] = useState<EventDef | null>(null)
+  const [economyBusy, setEconomyBusy] = useState(false)
 
   useEffect(() => {
     combatStateRef.current = run?.combat_state ?? null
@@ -153,6 +159,7 @@ export default function AbismoPlayPage() {
 
     if (node.type === 'combat' || node.type === 'boss') {
       const enemyDef = pickEnemyForNode(node)
+      const extraDiscards = (myStats.extraDiscards || 0) + (myStats.bonusDiscardsNextCombat || 0)
       const combatState = createCombatState({
         enemyDef,
         playerHp: myStats.hp,
@@ -160,11 +167,16 @@ export default function AbismoPlayPage() {
         gold: myStats.gold,
         classId: myStats.classId as ClassId,
         relics: myStats.relics,
-        discardsBase: 3,
-        flatDmgBonus: 0,
+        discardsBase: 3 + extraDiscards,
+        flatDmgBonus: myStats.dmgBonus || 0,
       })
 
       const newMap = markVisited(run.floor_map, node.id)
+      // consome o bônus de uso único (se tinha) ao entrar no combate
+      const statsPatch = myStats.bonusDiscardsNextCombat
+        ? (isHost ? { host_stats: { ...myStats, bonusDiscardsNextCombat: 0 } } : { guest_stats: { ...myStats, bonusDiscardsNextCombat: 0 } })
+        : {}
+
       // tryStartCombat só trava a vez se ninguém mais já tiver travado antes
       // (evita os dois jogadores caírem em combate ao mesmo tempo por coincidência de cliques)
       const updated = await tryStartCombat(runId, userId, {
@@ -172,18 +184,71 @@ export default function AbismoPlayPage() {
         current_node_id: node.id,
         combat_state: combatState,
         status: 'combat',
+        ...statsPatch,
       })
       if (!updated) {
         toast.error('Seu parceiro já entrou em combate — espera a vez dele.')
         return
       }
       setRun(updated)
-    } else {
-      // loja/evento — placeholder simples por enquanto (Fase 3)
+    } else if (node.type === 'shop') {
       const newMap = markVisited(run.floor_map, node.id)
       await updateRun(runId, { floor_map: newMap, current_node_id: node.id })
-      toast('Loja e eventos chegam na próxima etapa! Por enquanto, siga em frente.', { icon: '🚧' })
+      setRun(prev => (prev ? { ...prev, floor_map: newMap, current_node_id: node.id } : prev))
+      setShopStock(pickShopStock(3))
+    } else if (node.type === 'event') {
+      const newMap = markVisited(run.floor_map, node.id)
+      await updateRun(runId, { floor_map: newMap, current_node_id: node.id })
+      setRun(prev => (prev ? { ...prev, floor_map: newMap, current_node_id: node.id } : prev))
+      setActiveEvent(pickRandomEvent())
     }
+  }
+
+  async function persistMyStats(next: RunPlayerStats) {
+    const patch = isHost ? { host_stats: next } : { guest_stats: next }
+    await updateRun(runId, patch)
+    setRun(prev => (prev ? { ...prev, ...patch } : prev))
+  }
+
+  async function handleBuyItem(item: ShopItemDef) {
+    if (!myStats || economyBusy) return
+    setEconomyBusy(true)
+    const result = buyItem(myStats, item)
+    if (!result.ok) {
+      toast.error(result.message)
+    } else {
+      await persistMyStats(result.stats)
+      toast.success(result.message)
+    }
+    setEconomyBusy(false)
+  }
+
+  async function handleSellRelic(relicId: string) {
+    if (!myStats || economyBusy) return
+    setEconomyBusy(true)
+    const result = sellRelic(myStats, relicId)
+    if (!result.ok) {
+      toast.error(result.message)
+    } else {
+      await persistMyStats(result.stats)
+      toast.success(result.message)
+    }
+    setEconomyBusy(false)
+  }
+
+  async function handleEventChoice(action: string) {
+    if (!myStats || economyBusy) return
+    setEconomyBusy(true)
+    const result = resolveEventAction(myStats, action)
+    if (!result.ok) {
+      toast.error(result.message)
+      setEconomyBusy(false)
+      return
+    }
+    await persistMyStats(result.stats)
+    toast(result.message, { icon: action === 'leave' ? '🚶' : '✨' })
+    setEconomyBusy(false)
+    setActiveEvent(null)
   }
 
   async function dispatchCombat(action: Parameters<typeof combatReducer>[1]) {
@@ -221,14 +286,17 @@ export default function AbismoPlayPage() {
   async function handleCombatResolution(state: CombatState | undefined) {
     if (!state || !run || !myStats) return
     if (state.status === 'won') {
+      const rawGain = state.gold - myStats.gold
+      const mult = myStats.goldMult || 1
+      const finalGain = Math.round(rawGain * mult)
       const updatedStats: RunPlayerStats = {
         ...myStats,
         hp: state.playerHp,
-        gold: state.gold,
+        gold: myStats.gold + finalGain,
       }
       const patch = isHost ? { host_stats: updatedStats } : { guest_stats: updatedStats }
       await updateRun(runId, { ...patch, status: 'map', combat_state: null, combat_turn_user_id: null })
-      toast.success('Vitória! Ganhou ' + (state.gold - myStats.gold) + ' fichas extras.')
+      toast.success('Vitória! Ganhou ' + finalGain + ' fichas extras.')
     } else if (state.status === 'lost') {
       await updateRun(runId, { status: 'lost', combat_turn_user_id: null })
     }
@@ -354,8 +422,27 @@ export default function AbismoPlayPage() {
           </p>
         )}
 
-        {(run.status === 'map' || run.status === 'waiting') && myStats && (
+        {(run.status === 'map' || run.status === 'waiting') && myStats && !shopStock && !activeEvent && (
           <MapScreen run={run} myStats={myStats} onNodeClick={handleNodeClick} isHost={isHost} onCopyInvite={handleCopyInviteLink} />
+        )}
+
+        {shopStock && myStats && (
+          <ShopScreen
+            stock={shopStock}
+            myStats={myStats}
+            busy={economyBusy}
+            onBuy={handleBuyItem}
+            onSellRelic={handleSellRelic}
+            onClose={() => setShopStock(null)}
+          />
+        )}
+
+        {activeEvent && myStats && (
+          <EventScreen
+            event={activeEvent}
+            busy={economyBusy}
+            onChoice={handleEventChoice}
+          />
         )}
 
         {run.status === 'combat' && run.combat_state && myStats && (
@@ -470,6 +557,125 @@ function MapScreen({ run, myStats, onNodeClick, isHost, onCopyInvite }: {
               )
             })}
           </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============ TELA DE LOJA ============
+function ShopScreen({ stock, myStats, busy, onBuy, onSellRelic, onClose }: {
+  stock: ShopItemDef[]
+  myStats: RunPlayerStats
+  busy: boolean
+  onBuy: (item: ShopItemDef) => void
+  onSellRelic: (relicId: string) => void
+  onClose: () => void
+}) {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700 }}>🏪 Loja do Abismo</h2>
+        <StatPill label="Suas fichas" value={String(myStats.gold)} color="#c8f23c" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 28 }}>
+        {stock.map(item => (
+          <div key={item.id} style={{ background: '#111118', borderRadius: 12, padding: 14, border: '1px solid rgba(200,242,60,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 22 }}>{item.icon}</span>
+              <p style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</p>
+            </div>
+            <p style={{ fontSize: 12, color: '#8888aa', marginBottom: 12, minHeight: 32 }}>{item.desc}</p>
+            <button
+              onClick={() => onBuy(item)}
+              disabled={busy || myStats.gold < item.cost}
+              style={{
+                width: '100%', padding: '8px 0', borderRadius: 8, border: 'none',
+                background: myStats.gold < item.cost ? '#333' : '#c8f23c',
+                color: myStats.gold < item.cost ? '#666' : '#000',
+                fontWeight: 700, fontSize: 13, cursor: busy || myStats.gold < item.cost ? 'default' : 'pointer',
+                fontFamily: "'Syne', sans-serif",
+              }}
+            >
+              Comprar · {item.cost} 🪙
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {myStats.relics.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: '#8888aa' }}>Vender relíquias (20 🪙 cada)</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 28 }}>
+            {myStats.relics.map((relicId, i) => {
+              const relic = RELICS.find(r => r.id === relicId)
+              if (!relic) return null
+              return (
+                <button
+                  key={`${relicId}-${i}`}
+                  onClick={() => onSellRelic(relicId)}
+                  disabled={busy}
+                  title={relic.desc}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+                    borderRadius: 10, border: '1px solid rgba(255,68,102,0.3)', background: 'rgba(255,68,102,0.06)',
+                    color: '#ff8899', fontSize: 12, fontWeight: 700, cursor: busy ? 'default' : 'pointer',
+                    fontFamily: "'Syne', sans-serif",
+                  }}
+                >
+                  <span>{relic.icon}</span> {relic.name}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      <button
+        onClick={onClose}
+        style={{
+          padding: '10px 24px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+          background: 'transparent', color: '#f0f0f8', fontWeight: 700, fontSize: 13,
+          cursor: 'pointer', fontFamily: "'Syne', sans-serif",
+        }}
+      >
+        Sair da loja
+      </button>
+    </div>
+  )
+}
+
+// ============ TELA DE EVENTO ============
+function EventScreen({ event, busy, onChoice }: {
+  event: EventDef
+  busy: boolean
+  onChoice: (action: string) => void
+}) {
+  return (
+    <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+      <span style={{ fontSize: 44, display: 'block', marginBottom: 8 }}>{event.icon}</span>
+      <h2 style={{ fontSize: 19, fontWeight: 800, marginBottom: 10 }}>{event.title}</h2>
+      <p style={{ fontSize: 13, color: '#8888aa', marginBottom: 28, lineHeight: 1.5 }}>{event.desc}</p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {event.choices.map((choice, i) => (
+          <button
+            key={i}
+            onClick={() => onChoice(choice.action)}
+            disabled={busy}
+            style={{
+              padding: '14px 16px', borderRadius: 10,
+              border: choice.action === 'leave' ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(200,242,60,0.25)',
+              background: choice.action === 'leave' ? 'transparent' : 'rgba(200,242,60,0.06)',
+              color: choice.action === 'leave' ? '#8888aa' : '#f0f0f8',
+              fontWeight: 600, fontSize: 13, cursor: busy ? 'default' : 'pointer',
+              fontFamily: "'Syne', sans-serif", textAlign: 'left',
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            {choice.txt}
+          </button>
         ))}
       </div>
     </div>

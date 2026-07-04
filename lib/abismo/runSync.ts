@@ -22,6 +22,12 @@ export type RunPlayerStats = {
   gold: number
   relics: string[]
   inventory: string[]
+  /** Bônus permanentes comprados na loja / ganhos em eventos, ao longo da run. */
+  extraDiscards?: number
+  dmgBonus?: number
+  goldMult?: number
+  /** Bônus de uso único, consumido no próximo combate que o jogador iniciar. */
+  bonusDiscardsNextCombat?: number
 }
 
 export type AbismoRun = {
@@ -133,7 +139,7 @@ export async function updateRun(
 export async function tryStartCombat(
   runId: string,
   userId: string,
-  patch: Pick<AbismoRun, 'floor_map' | 'current_node_id' | 'combat_state' | 'status'>
+  patch: Partial<Pick<AbismoRun, 'floor_map' | 'current_node_id' | 'combat_state' | 'status' | 'host_stats' | 'guest_stats'>>
 ): Promise<AbismoRun | null> {
   const supabase = createClient()
   const { data, error } = await supabase
