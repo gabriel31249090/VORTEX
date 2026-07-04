@@ -833,7 +833,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         <div className="ab-content">
           <div className="ab-hud-top">ANDAR · <b>{state.enemy.type}</b> · COMBATE</div>
 
-          {/* Arena 2.5D */}
+          {/* Arena 2.5D — só o inimigo aqui, sem elementos flutuantes por cima */}
           <div className="ab-arena">
             <div className="ab-enemy-zone">
               <div className="ab-enemy-platform" />
@@ -850,7 +850,10 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
             </div>
 
             <div className="ab-arena-floor" />
+          </div>
 
+          {/* Painel do jogador + fichas — linha normal, nunca sobrepõe a arena */}
+          <div className="ab-status-row">
             <div className={`ab-player-panel ${playerShake ? 'ab-shake' : ''}`}>
               <div className="ab-player-name-row">
                 <div className="ab-player-portrait">
