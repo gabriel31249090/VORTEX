@@ -1,508 +1,264 @@
 // lib/abismo/combatEngine.ts
-// Motor de combate cooperativo (2 jogadores) estilo Pokémon/Persona:
-// turnos em bloco, cada jogador escolhe 2 ações antes de qualquer uma resolver.
-// Puro (sem DOM/rede) — a sincronização multiplayer via Supabase Realtime
-// fica numa camada por cima (runSync.ts) que só chama submitActions() pra cada jogador.
-//
-// ⚠️ Reconciliado por Claude: esse arquivo antes redefinia SUITS/RANKS/RV/evalHand/
-// SHOP_ITEMS localmente (duplicado e simplificado). Agora usa poker.ts e constants.ts
-// de verdade, que já tínhamos da Fase 1.
+import type { PlayingCard, EnemyInstance, EnemyDef, ClassId, Suit, HandEval } from './types'
+import { RANKS, RV, SUITS } from './constants'
+import { evalHand, calcDamage } from './poker'
 
-import { SUITS, RV, SHOP_ITEMS, RELICS } from '../constants'
-import type { PlayingCard, ClassId, EnemyDef, Suit } from './types'
-import { evalHand, calcDamage } from '../poker'
-
-// ── DECK ──
-// Ranks completos do baralho de combate. RV (de constants.ts) só mapeia J/Q/K/A
-// (11-14); ranks numéricos usam o próprio valor — isso bate com a avaliação de
-// poker.ts, que trata Ás como 14 (alto) e reconhece a sequência A-2-3-4-5 (roleta baixa).
-const DECK_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
-
-function rankValue(r: string): number {
-  return RV[r] ?? Number(r)
+export type CombatState = {
+  enemy: EnemyInstance
+  playerHp: number
+  playerMaxHp: number
+  armor: number
+  poisonTurns: number
+  gold: number
+  deck: PlayingCard[]
+  hand: PlayingCard[]
+  selected: number[] // índices selecionados na mão
+  discardsLeft: number
+  turn: number
+  log: string[]
+  lastHandEval: HandEval | null
+  surviveBonus: number
+  status: 'playing' | 'won' | 'lost'
+  seeIntent: boolean // relíquia jokers_eye
+  flatDmgBonus: number
+  relics: string[]
+  classId: ClassId | null
 }
+
+export type CombatAction =
+  | { type: 'TOGGLE_CARD'; index: number }
+  | { type: 'DISCARD_SELECTED' }
+  | { type: 'PLAY_HAND' }
+  | { type: 'ENEMY_TURN' }
+  | { type: 'REFILL_HAND' }
+  | { type: 'LOG'; message: string }
 
 function buildDeck(): PlayingCard[] {
   const deck: PlayingCard[] = []
-  for (const s of Object.keys(SUITS) as Suit[]) {
-    for (const r of DECK_RANKS) deck.push({ r, s, v: rankValue(r) })
-  }
-  return shuffle(deck)
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
-function drawCard(p: PlayerCombatState): PlayingCard | null {
-  if (p.deck.length === 0) {
-    p.deck = shuffle(p.discardPile)
-    p.discardPile = []
-  }
-  return p.deck.pop() ?? null
-}
-
-function refillHand(p: PlayerCombatState) {
-  while (p.hand.length < 5) {
-    const next = drawCard(p)
-    if (!next) break
-    p.hand.push(next)
-  }
-}
-
-// ── TIPOS ──
-export type PlayerId = 'p1' | 'p2'
-
-export type EnemyInstance = EnemyDef & {
-  isBoss?: boolean
-  revived?: boolean
-  usedOffer?: boolean
-  riso?: boolean
-}
-
-export type EnemyCombatState = EnemyInstance & { alive: boolean; maxHp: number }
-
-export type PlayerAction =
-  | { type: 'attack'; targetIndex?: number }
-  | { type: 'defend' }
-  | { type: 'item'; itemId: string }
-  | { type: 'special'; cardIndices: number[]; targetIndex?: number }
-
-export type CombatLogKind = 'info' | 'dmg' | 'crit' | 'gold' | 'poison' | 'boss' | 'heal'
-export type CombatLogEntry = { text: string; kind: CombatLogKind; playerId?: PlayerId }
-
-export type PlayerCombatState = {
-  playerId: PlayerId
-  characterName: string
-  classId: ClassId
-  hp: number
-  maxHp: number
-  gold: number
-  defending: boolean // reduz 50% do próximo dano recebido, depois reseta
-  hand: PlayingCard[]
-  deck: PlayingCard[]
-  discardPile: PlayingCard[]
-  inventory: string[] // ids de SHOP_ITEMS já comprados
-  relics: string[]
-  flatDmgBonus: number
-  surviveBonus: number // usado pelo relic 'blood_pact': +1 dano permanente por turno sobrevivido
-  alive: boolean
-}
-
-export type CombatState = {
-  players: Record<PlayerId, PlayerCombatState>
-  enemies: EnemyCombatState[]
-  turnNum: number
-  log: CombatLogEntry[]
-  phase: 'awaitingActions' | 'won' | 'lost'
-  pendingActions: Partial<Record<PlayerId, [PlayerAction, PlayerAction]>>
-}
-
-export type CombatResult =
-  | { kind: 'awaitingActions'; state: CombatState } // ainda falta 1 jogador confirmar
-  | { kind: 'turnResolved'; state: CombatState }
-  | { kind: 'won'; state: CombatState; goldEarned: number }
-  | { kind: 'lost'; state: CombatState }
-
-const BASE_ATTACK_DMG: [number, number] = [6, 10]
-
-function log(state: CombatState, text: string, kind: CombatLogKind = 'info', playerId?: PlayerId) {
-  state.log.push({ text, kind, playerId })
-}
-
-// ── SETUP ──
-export function initCombat(params: {
-  players: {
-    playerId: PlayerId
-    characterName: string
-    classId: ClassId
-    hp: number
-    maxHp: number
-    gold: number
-    relics: string[]
-    inventory: string[]
-  }[]
-  enemies: EnemyDef[]
-  isBoss: boolean
-  floorScale?: number
-}): CombatState {
-  const scale = params.isBoss ? 1 : params.floorScale ?? 1
-
-  const players: Record<string, PlayerCombatState> = {}
-  for (const p of params.players) {
-    const pcs: PlayerCombatState = {
-      playerId: p.playerId,
-      characterName: p.characterName,
-      classId: p.classId,
-      hp: p.hp,
-      maxHp: p.maxHp,
-      gold: p.gold,
-      defending: false,
-      hand: [],
-      deck: buildDeck(),
-      discardPile: [],
-      inventory: p.inventory,
-      relics: p.relics,
-      flatDmgBonus: 0, // armadura tratada via 'defending', não via HP direto aqui
-      surviveBonus: 0,
-      alive: true,
+  const suits: Suit[] = ['H', 'D', 'S', 'C']
+  for (const s of suits) {
+    for (const r of RANKS) {
+      const v = RV[r] ?? Number(r)
+      deck.push({ r, s, v })
     }
-    refillHand(pcs)
-    players[p.playerId] = pcs
   }
-
-  const enemies: EnemyCombatState[] = params.enemies.map((e) => ({
-    ...e,
-    isBoss: params.isBoss,
-    maxHp: Math.floor(e.hp * scale),
-    hp: Math.floor(e.hp * scale),
-    atk: [Math.floor(e.atk[0] * scale), Math.floor(e.atk[1] * scale)] as [number, number],
-    alive: true,
-  }))
-
-  const state: CombatState = {
-    players: players as Record<PlayerId, PlayerCombatState>,
-    enemies,
-    turnNum: 1,
-    log: [],
-    phase: 'awaitingActions',
-    pendingActions: {},
+  // shuffle (Fisher-Yates)
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[deck[i], deck[j]] = [deck[j], deck[i]]
   }
-
-  log(state, params.isBoss ? `⚠️ BOSS: ${enemies.map((e) => e.name).join(', ')} surge das sombras!` : `${enemies.map((e) => e.name).join(', ')} bloqueia o caminho!`, params.isBoss ? 'boss' : 'info')
-
-  return state
+  return deck
 }
 
-// ── SUBMISSÃO DE AÇÕES ──
-/**
- * Cada jogador chama isso com suas 2 ações escolhidas. Quando os 2 jogadores
- * vivos já submeteram, o turno resolve automaticamente.
- */
-export function submitActions(prev: CombatState, playerId: PlayerId, actions: [PlayerAction, PlayerAction]): CombatResult {
-  const state = cloneState(prev)
-  if (state.phase !== 'awaitingActions') return { kind: 'awaitingActions', state }
+export function createCombatState(params: {
+  enemyDef: EnemyDef
+  playerHp: number
+  playerMaxHp: number
+  gold: number
+  classId: ClassId | null
+  relics: string[]
+  discardsBase: number
+  flatDmgBonus: number
+}): CombatState {
+  const { enemyDef, playerHp, playerMaxHp, gold, classId, relics, discardsBase, flatDmgBonus } = params
 
-  state.pendingActions[playerId] = actions
+  const deck = buildDeck()
+  const hand: PlayingCard[] = []
+  for (let i = 0; i < 5; i++) hand.push(deck.pop()!)
 
-  const alivePlayerIds = (Object.keys(state.players) as PlayerId[]).filter((id) => state.players[id].alive)
-  const allSubmitted = alivePlayerIds.every((id) => state.pendingActions[id])
+  let armor = 0
+  if (classId === 'knight') armor += 4
+  if (relics.includes('iron_shield')) armor += 3
 
-  if (!allSubmitted) {
-    log(state, `${state.players[playerId].characterName} confirmou as ações. Aguardando o outro jogador...`, 'info', playerId)
-    return { kind: 'awaitingActions', state }
+  const enemy: EnemyInstance = {
+    ...enemyDef,
+    maxHp: enemyDef.hp,
+    hp: enemyDef.hp,
   }
 
-  return resolveTurn(state, alivePlayerIds)
+  return {
+    enemy,
+    playerHp,
+    playerMaxHp,
+    armor,
+    poisonTurns: 0,
+    gold,
+    deck,
+    hand,
+    selected: [],
+    discardsLeft: discardsBase + (classId === 'trickster' ? 1 : 0),
+    turn: 1,
+    log: [`Um ${enemyDef.name} bloqueia seu caminho!`],
+    lastHandEval: null,
+    surviveBonus: 0,
+    status: 'playing',
+    seeIntent: relics.includes('jokers_eye'),
+    flatDmgBonus,
+    relics,
+    classId,
+  }
 }
 
-// ── RESOLUÇÃO DO TURNO ──
-function resolveTurn(state: CombatState, alivePlayerIds: PlayerId[]): CombatResult {
-  const order: PlayerId[] = (['p1', 'p2'] as PlayerId[]).filter((id) => alivePlayerIds.includes(id))
+function drawCard(state: CombatState): PlayingCard {
+  if (state.deck.length === 0) {
+    // reembaralha um baralho novo se acabar (não deveria acontecer em runs normais)
+    state.deck = buildDeck()
+  }
+  return state.deck.pop()!
+}
 
-  // Ação 1 de cada jogador, depois ação 2 de cada jogador
-  for (const slot of [0, 1] as const) {
-    for (const pid of order) {
-      const actions = state.pendingActions[pid]
-      if (!actions) continue
-      const player = state.players[pid]
-      if (!player.alive) continue
-      const action = actions[slot]
-      const result = applyPlayerAction(state, player, action)
-      if (result === 'won') {
-        state.phase = 'won'
-        state.pendingActions = {}
-        return { kind: 'won', state, goldEarned: sumGoldReward(state) }
+export function combatReducer(state: CombatState, action: CombatAction): CombatState {
+  if (state.status !== 'playing' && action.type !== 'LOG') return state
+
+  switch (action.type) {
+    case 'TOGGLE_CARD': {
+      const already = state.selected.includes(action.index)
+      let selected: number[]
+      if (already) {
+        selected = state.selected.filter(i => i !== action.index)
+      } else {
+        if (state.selected.length >= 5) return state
+        selected = [...state.selected, action.index]
+      }
+      return { ...state, selected }
+    }
+
+    case 'DISCARD_SELECTED': {
+      if (state.discardsLeft <= 0 || state.selected.length === 0) return state
+      const newHand = [...state.hand]
+      const sortedIdx = [...state.selected].sort((a, b) => b - a)
+      for (const idx of sortedIdx) newHand.splice(idx, 1, drawCard(state))
+      return {
+        ...state,
+        hand: newHand,
+        selected: [],
+        discardsLeft: state.discardsLeft - 1,
+        log: [...state.log, 'Você trocou suas cartas.'],
       }
     }
-  }
 
-  // Turno do(s) inimigo(s)
-  enemyPhase(state)
+    case 'PLAY_HAND': {
+      if (state.selected.length !== 5) return state
+      const playedCards = state.selected.map(i => state.hand[i])
+      const ev = evalHand(playedCards)
+      const dmg = calcDamage(ev, {
+        flatDmgBonus: state.flatDmgBonus,
+        surviveBonus: state.surviveBonus,
+        classId: state.classId,
+        relics: state.relics,
+        hand: playedCards,
+      })
 
-  if (state.phase === 'lost') {
-    state.pendingActions = {}
-    return { kind: 'lost', state }
-  }
+      let enemy = { ...state.enemy, hp: Math.max(0, state.enemy.hp - dmg) }
+      let playerHp = state.playerHp
+      let gold = state.gold
+      let poisonTurns = state.poisonTurns
+      let armor = state.armor
+      const log = [...state.log, `Você jogou ${ev.tipo} e causou ${dmg} de dano!`]
 
-  if (state.phase === 'won') {
-    state.pendingActions = {}
-    return { kind: 'won', state, goldEarned: sumGoldReward(state) }
-  }
+      // Efeitos de naipe dominante
+      if (ev.naipeDominante === 'H') {
+        const healBonus = state.relics.includes('blood_chip') ? 1.5 : 1
+        const heal = Math.floor(dmg * 0.3 * healBonus)
+        playerHp = Math.min(state.playerMaxHp, playerHp + heal)
+        log.push(`Copas cura ${heal} HP.`)
+      }
+      if (ev.naipeDominante === 'D') {
+        const bonusGold = Math.floor(dmg * 0.5)
+        gold += bonusGold
+        log.push(`Ouros rende ${bonusGold} fichas extras.`)
+      }
+      if (ev.naipeDominante === 'C') {
+        const poisonAdd = state.relics.includes('poison_ring') ? 3 : 1
+        poisonTurns += poisonAdd
+        log.push('Paus aplica veneno no inimigo.')
+      }
 
-  // Prepara próximo turno
-  state.turnNum++
-  state.pendingActions = {}
-  for (const pid of order) {
-    const p = state.players[pid]
-    p.defending = false
-    if (p.relics.includes('blood_pact')) p.surviveBonus += 1
-    refillHand(p)
-  }
+      // Vida sugada pra necromante
+      if (state.classId === 'necromancer') {
+        const lifesteal = Math.floor(dmg * 0.15)
+        playerHp = Math.min(state.playerMaxHp, playerHp + lifesteal)
+      }
 
-  return { kind: 'turnResolved', state }
-}
+      // Relíquia hollow_crown
+      if (state.relics.includes('hollow_crown') && (ev.tipo === 'Quadra' || ev.tipo === 'Straight Flush' || ev.tipo === 'Royal Flush')) {
+        armor = Math.max(0, armor - 5)
+      }
 
-function applyPlayerAction(state: CombatState, player: PlayerCombatState, action: PlayerAction): 'ok' | 'won' {
-  switch (action.type) {
-    case 'attack': {
-      const target = pickEnemyTarget(state, action.targetIndex)
-      if (!target) return 'ok'
-      const dmg = BASE_ATTACK_DMG[0] + Math.floor(Math.random() * (BASE_ATTACK_DMG[1] - BASE_ATTACK_DMG[0] + 1)) + player.flatDmgBonus
-      target.hp = Math.max(0, target.hp - dmg)
-      log(state, `${player.characterName} ataca ${target.name}: ${dmg} dano!`, 'dmg', player.playerId)
-      if (target.hp <= 0 && !handleEnemyDeath(state, target)) return 'won'
-      return 'ok'
-    }
-    case 'defend': {
-      player.defending = true
-      log(state, `${player.characterName} se defende.`, 'info', player.playerId)
-      return 'ok'
-    }
-    case 'item': {
-      useItem(state, player, action.itemId)
-      return 'ok'
-    }
-    case 'special': {
-      const target = pickEnemyTarget(state, action.targetIndex)
-      if (!target) return 'ok'
-      const won = useSpecial(state, player, target, action.cardIndices)
-      if (won) return 'won'
-      return 'ok'
-    }
-  }
-}
+      if (enemy.hp <= 0) {
+        log.push(`${enemy.name} foi derrotado!`)
+        return {
+          ...state, enemy, playerHp, gold, poisonTurns, armor, log,
+          hand: [], selected: [], lastHandEval: ev, status: 'won',
+        }
+      }
 
-function pickEnemyTarget(state: CombatState, targetIndex?: number): EnemyCombatState | null {
-  const aliveEnemies = state.enemies.filter((e) => e.alive)
-  if (aliveEnemies.length === 0) return null
-  if (targetIndex !== undefined) {
-    const byIndex = state.enemies[targetIndex]
-    if (byIndex && byIndex.alive) return byIndex
-  }
-  return aliveEnemies[0]
-}
+      // repõe as cartas jogadas
+      const newHand = [...state.hand]
+      const sortedIdx = [...state.selected].sort((a, b) => b - a)
+      for (const idx of sortedIdx) newHand.splice(idx, 1, drawCard(state))
 
-/** Retorna false se o combate foi vencido (todos os inimigos mortos) */
-function handleEnemyDeath(state: CombatState, enemy: EnemyCombatState): boolean {
-  // Dealer Sem Rosto revive uma vez com 40 HP
-  if (enemy.id === 'faceless_dealer' && !enemy.revived) {
-    enemy.revived = true
-    enemy.hp = 40
-    log(state, '🎰 O Dealer Sem Rosto REVIVE com 40 HP!', 'boss')
-    return true
-  }
-  enemy.alive = false
-  log(state, `✦ ${enemy.name} derrotado!`, 'gold')
-  return state.enemies.some((e) => e.alive)
-}
-
-function useItem(state: CombatState, player: PlayerCombatState, itemId: string) {
-  const idx = player.inventory.indexOf(itemId)
-  if (idx === -1) { log(state, `${player.characterName} não tem esse item.`, 'info', player.playerId); return }
-  const item = SHOP_ITEMS.find((i: typeof SHOP_ITEMS[number]) => i.id === itemId)
-  if (!item) return
-  player.inventory.splice(idx, 1)
-
-  if (item.type === 'heal' && item.val) {
-    player.hp = Math.min(player.maxHp, player.hp + item.val)
-    log(state, `${player.characterName} usa ${item.name}: +${item.val} HP`, 'heal', player.playerId)
-  } else if (item.type === 'stat' && item.stat === 'dmg_flat' && item.val) {
-    player.flatDmgBonus += item.val
-    log(state, `${player.characterName} usa ${item.name}: +${item.val} dano permanente`, 'info', player.playerId)
-  } else if (item.type === 'stat' && item.stat === 'maxhp') {
-    player.maxHp += 10
-    player.hp = Math.min(player.maxHp, player.hp + 5)
-    log(state, `${player.characterName} usa ${item.name}: +10 HP máximo`, 'heal', player.playerId)
-  } else if (item.type === 'relic') {
-    const owned = new Set(player.relics)
-    const pool = RELICS.filter((r: typeof RELICS[number]) => !owned.has(r.id))
-    if (pool.length > 0) {
-      const relic = pool[Math.floor(Math.random() * pool.length)]
-      player.relics.push(relic.id)
-      log(state, `${player.characterName} usa ${item.name}: encontrou a relíquia ${relic.name}!`, 'info', player.playerId)
-    } else {
-      log(state, `${player.characterName} usa ${item.name}, mas já tem todas as relíquias.`, 'info', player.playerId)
-    }
-  } else {
-    // stats como 'discard' e 'gold_mult' afetam a run fora do combate (loja/mapa),
-    // não têm efeito imediato aqui — só consome o item.
-    log(state, `${player.characterName} usa ${item.name}.`, 'info', player.playerId)
-  }
-}
-
-/** Retorna true se o combate foi vencido */
-function useSpecial(state: CombatState, player: PlayerCombatState, target: EnemyCombatState, cardIndices: number[]): boolean {
-  const validIndices = cardIndices.filter((i) => i >= 0 && i < player.hand.length)
-  if (validIndices.length === 0) {
-    log(state, `${player.characterName} tentou usar uma habilidade sem cartas válidas.`, 'info', player.playerId)
-    return false
-  }
-  const cards = validIndices.map((i) => player.hand[i])
-
-  let dmg: number
-  let suitLabel: string
-  const sideEffects: string[] = []
-
-  if (cards.length === 5) {
-    const ev = evalHand(cards)
-    dmg = calcDamage(ev, {
-      flatDmgBonus: player.flatDmgBonus,
-      surviveBonus: player.surviveBonus,
-      classId: player.classId,
-      relics: player.relics,
-      hand: cards,
-    })
-    suitLabel = `${ev.tipo} (${SUITS[ev.naipeDominante].name})`
-
-    if (ev.naipeDominante === 'H') {
-      let heal = Math.ceil(dmg * 0.3)
-      if (player.relics.includes('blood_chip')) heal = Math.ceil(heal * 1.5)
-      if (player.classId === 'necromancer') heal = Math.ceil(dmg * 0.5)
-      player.hp = Math.min(player.maxHp, player.hp + heal)
-      sideEffects.push(`💚 +${heal} HP`)
-    } else if (ev.naipeDominante === 'D') {
-      let bonus = Math.ceil(dmg * 0.5)
-      if (player.classId === 'gambler') bonus *= 2
-      player.gold += bonus
-      sideEffects.push(`💰 +${bonus}`)
-    }
-  } else {
-    // Combo parcial (menos de 5 cartas): efeito reduzido proporcional, sem
-    // passar pelo avaliador de poker de verdade (que exige mão de 5).
-    const sumVal = cards.reduce((sum, c) => sum + c.v, 0)
-    dmg = Math.max(1, Math.floor(sumVal / 3) + player.flatDmgBonus + player.surviveBonus)
-    const suits = cards.map((c) => c.s)
-    const dominant = suits
-      .sort((a: Suit, b: Suit) => suits.filter((s: Suit) => s === a).length - suits.filter((s: Suit) => s === b).length)
-      .pop()!
-    suitLabel = `Combo de ${cards.length} carta(s) (${SUITS[dominant].name})`
-    if (dominant === 'H') {
-      const heal = Math.ceil(dmg * 0.3)
-      player.hp = Math.min(player.maxHp, player.hp + heal)
-      sideEffects.push(`💚 +${heal} HP`)
-    }
-  }
-
-  target.hp = Math.max(0, target.hp - dmg)
-  log(state, `${player.characterName} usa ${suitLabel} → ${dmg} dano!${sideEffects.length ? ' | ' + sideEffects.join(' | ') : ''}`, dmg >= 20 ? 'crit' : 'dmg', player.playerId)
-
-  // Descarta as cartas usadas
-  const selSet = new Set(validIndices)
-  cards.forEach((c) => player.discardPile.push(c))
-  player.hand = player.hand.filter((_, i: number) => !selSet.has(i))
-
-  if (target.hp <= 0) return !handleEnemyDeath(state, target)
-  return false
-}
-
-// ── TURNO DO(S) INIMIGO(S) ──
-function enemyPhase(state: CombatState) {
-  const alivePlayers = (Object.keys(state.players) as PlayerId[])
-    .map((id) => state.players[id])
-    .filter((p) => p.alive)
-  if (alivePlayers.length === 0) return
-
-  for (const enemy of state.enemies) {
-    if (!enemy.alive) continue
-    const targetPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
-    let atkDmg = enemy.atk[0] + Math.floor(Math.random() * (enemy.atk[1] - enemy.atk[0] + 1))
-
-    if (targetPlayer.defending) {
-      atkDmg = Math.floor(atkDmg * 0.5)
-      targetPlayer.defending = false
+      return {
+        ...state, enemy, playerHp, gold, poisonTurns, armor, log,
+        hand: newHand, selected: [], lastHandEval: ev,
+        surviveBonus: state.relics.includes('blood_pact') ? state.surviveBonus + 1 : state.surviveBonus,
+      }
     }
 
-    if (targetPlayer.relics.includes('mirror_shard') && Math.random() < 0.3) {
-      const reflected = Math.floor(atkDmg * 0.3)
-      enemy.hp = Math.max(0, enemy.hp - reflected)
-      log(state, `🪞 Estilhaço Espelhado reflete ${reflected} dano em ${enemy.name}!`, 'info')
+    case 'ENEMY_TURN': {
+      if (state.status !== 'playing') return state
+      let enemy = { ...state.enemy }
+      let playerHp = state.playerHp
+      let armor = state.armor
+      const log = [...state.log]
+
+      // veneno tira HP do inimigo no início do turno dele
+      if (state.poisonTurns > 0) {
+        enemy.hp = Math.max(0, enemy.hp - 4)
+        log.push(`Veneno causa 4 de dano em ${enemy.name}.`)
+        if (enemy.hp <= 0) {
+          log.push(`${enemy.name} sucumbiu ao veneno!`)
+          return { ...state, enemy, log, status: 'won' }
+        }
+      }
+
+      const [min, max] = enemy.atk
+      let dmg = Math.floor(Math.random() * (max - min + 1)) + min
+
+      // reflexo de dano (mirror_shard)
+      const reflect = state.relics.includes('mirror_shard') && Math.random() < 0.3
+
+      let absorbed = Math.min(armor, dmg)
+      const remaining = dmg - absorbed
+      armor -= absorbed
+      playerHp = Math.max(0, playerHp - remaining)
+      log.push(`${enemy.name} ataca causando ${dmg} de dano${absorbed > 0 ? ` (${absorbed} absorvido pela armadura)` : ''}.`)
+
+      if (reflect) {
+        const reflectDmg = Math.floor(dmg * 0.3)
+        enemy.hp = Math.max(0, enemy.hp - reflectDmg)
+        log.push(`Estilhaço Espelhado reflete ${reflectDmg} de volta!`)
+      }
+
+      const poisonTurns = Math.max(0, state.poisonTurns - 1)
+
+      if (enemy.hp <= 0) {
+        log.push(`${enemy.name} foi derrotado!`)
+        return { ...state, enemy, playerHp, armor, poisonTurns, log, status: 'won' }
+      }
+
+      if (playerHp <= 0) {
+        log.push('Você caiu no abismo...')
+        return { ...state, enemy, playerHp: 0, armor, poisonTurns, log, status: 'lost' }
+      }
+
+      return { ...state, enemy, playerHp, armor, poisonTurns, log, turn: state.turn + 1 }
     }
 
-    targetPlayer.hp = Math.max(0, targetPlayer.hp - atkDmg)
-    log(state, `${enemy.name} ataca ${targetPlayer.characterName}: ${atkDmg} dano!`, 'dmg')
+    case 'LOG':
+      return { ...state, log: [...state.log, action.message] }
 
-    applyEnemySpecial(state, enemy, targetPlayer)
-
-    if (targetPlayer.hp <= 0) {
-      targetPlayer.alive = false
-      log(state, `💀 ${targetPlayer.characterName} caiu!`, 'boss')
-    }
-
-    if (!enemy.alive) continue // pode ter morrido pelo reflect
-  }
-
-  const stillAlive = (Object.keys(state.players) as PlayerId[]).some((id) => state.players[id].alive)
-  if (!stillAlive) {
-    state.phase = 'lost'
-    log(state, '💀 O grupo foi derrotado...', 'boss')
-  }
-}
-
-function applyEnemySpecial(state: CombatState, enemy: EnemyCombatState, targetPlayer: PlayerCombatState) {
-  if (enemy.id === 'chip_rat' && state.turnNum % 3 === 0) {
-    const stolen = Math.min(5, targetPlayer.gold)
-    targetPlayer.gold = Math.max(0, targetPlayer.gold - stolen)
-    if (stolen > 0) log(state, `🐀 Rato roubou ${stolen} fichas de ${targetPlayer.characterName}!`, 'gold')
-  }
-  if (enemy.id === 'card_golem') {
-    enemy.atk = [enemy.atk[0] + 1, enemy.atk[1] + 1]
-    log(state, `🃏 Golem ficou mais forte! Atk: ${enemy.atk[0]}-${enemy.atk[1]}`, 'info')
-  }
-  if (enemy.id === 'bone_croupier' && state.turnNum === 3 && !enemy.usedOffer) {
-    enemy.usedOffer = true
-    targetPlayer.hp = Math.max(0, targetPlayer.hp - 15)
-    log(state, `💀 Oferta Final: 15 dano fixo em ${targetPlayer.characterName}!`, 'boss')
-  }
-  if (enemy.id === 'joker' && state.turnNum % 2 === 0) {
-    const bonus = Math.floor(enemy.atk[1] * 0.5)
-    targetPlayer.hp = Math.max(0, targetPlayer.hp - bonus)
-    log(state, `🃏 Coringa Selvagem: +${bonus} dano extra em ${targetPlayer.characterName}!`, 'boss')
-  }
-  if (enemy.id === 'the_house') {
-    const stolen = Math.min(15, targetPlayer.gold)
-    targetPlayer.gold = Math.max(0, targetPlayer.gold - stolen)
-    if (stolen > 0) log(state, `🏚️ A Casa sangrou ${stolen} fichas de ${targetPlayer.characterName}!`, 'gold')
-  }
-  if (enemy.id === 'joker') {
-    if (!enemy.riso) {
-      enemy.riso = true
-      enemy.hp = Math.min(enemy.maxHp, enemy.hp + 15)
-      log(state, '🃏 Riso Final: Coringa cura 15 HP!', 'boss')
-    } else {
-      enemy.riso = false
-    }
-  }
-}
-
-function sumGoldReward(state: CombatState): number {
-  const first = state.enemies[0]
-  const goldMin = first?.reward?.gold?.[0] ?? 15
-  const goldMax = first?.reward?.gold?.[1] ?? 30
-  const earned = Math.floor(goldMin + Math.random() * (goldMax - goldMin))
-  for (const pid of Object.keys(state.players) as PlayerId[]) {
-    state.players[pid].gold += earned
-  }
-  return earned
-}
-
-// ── HELPERS ──
-function cloneState(state: CombatState): CombatState {
-  const players: Record<string, PlayerCombatState> = {}
-  for (const pid of Object.keys(state.players)) {
-    const p = state.players[pid as PlayerId]
-    players[pid] = { ...p, hand: [...p.hand], deck: [...p.deck], discardPile: [...p.discardPile], inventory: [...p.inventory], relics: [...p.relics] }
-  }
-  return {
-    ...state,
-    players: players as Record<PlayerId, PlayerCombatState>,
-    enemies: state.enemies.map((e) => ({ ...e, atk: [...e.atk] as [number, number] })),
-    log: [...state.log],
-    pendingActions: { ...state.pendingActions },
+    default:
+      return state
   }
 }
