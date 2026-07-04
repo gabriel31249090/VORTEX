@@ -25,6 +25,11 @@ export default function AbismoPlayPage() {
   const [run, setRun] = useState<AbismoRun | null>(null)
   const [loading, setLoading] = useState(true)
   const [playingHand, setPlayingHand] = useState(false)
+  const combatStateRef = useRef<CombatState | null>(null)
+
+  useEffect(() => {
+    combatStateRef.current = run?.combat_state ?? null
+  }, [run?.combat_state])
 
   const isHost = run?.host_user_id === userId
   const myStats = isHost ? run?.host_stats : run?.guest_stats
@@ -111,15 +116,18 @@ export default function AbismoPlayPage() {
   }
 
   async function dispatchCombat(action: Parameters<typeof combatReducer>[1]) {
-    if (!run || !run.combat_state) return
-    const next = combatReducer(run.combat_state, action)
+    const current = combatStateRef.current
+    if (!current) return
+    const next = combatReducer(current, action)
+    combatStateRef.current = next
+    setRun(prev => (prev ? { ...prev, combat_state: next } : prev))
     await updateRun(runId, { combat_state: next })
     return next
   }
 
   async function handlePlayHand() {
-    if (!run?.combat_state || playingHand) return
-    if (run.combat_state.selected.length !== 5) {
+    if (!combatStateRef.current || playingHand) return
+    if (combatStateRef.current.selected.length !== 5) {
       toast.error('Selecione exatamente 5 cartas')
       return
     }
