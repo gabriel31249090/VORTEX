@@ -216,6 +216,7 @@ export default function AbismoGamePage() {
         characterId: c.id,
         characterName: c.name,
         classId: c.class,
+        avatarUrl: c.avatar_url,
         hp: c.hp_current,
         maxHp: c.hp_max,
         gold: 0,

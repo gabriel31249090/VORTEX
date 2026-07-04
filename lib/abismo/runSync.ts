@@ -16,6 +16,7 @@ export type RunPlayerStats = {
   characterId: string
   characterName: string
   classId: ClassId
+  avatarUrl: string | null
   hp: number
   maxHp: number
   gold: number

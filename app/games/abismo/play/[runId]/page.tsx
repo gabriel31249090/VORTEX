@@ -96,7 +96,7 @@ export default function AbismoPlayPage() {
         gold: myStats.gold,
         classId: myStats.classId as ClassId,
         relics: myStats.relics,
-        discardsBase: 2,
+        discardsBase: 3,
         flatDmgBonus: 0,
       })
 
@@ -261,11 +261,14 @@ function MapScreen({ run, myStats, onNodeClick }: {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-        <StatPill label="HP" value={`${myStats.hp}/${myStats.maxHp}`} color="#ff4466" />
-        <StatPill label="Fichas" value={String(myStats.gold)} color="#c8f23c" />
-        <StatPill label="Classe" value={CLASS_META[myStats.classId as ClassId]?.name || myStats.classId} color="#60a5fa" />
-        <StatPill label="Relíquias" value={String(myStats.relics.length)} color="#a78bfa" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <PlayerPortrait avatarUrl={myStats.avatarUrl} classId={myStats.classId} size={56} />
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <StatPill label="HP" value={`${myStats.hp}/${myStats.maxHp}`} color="#ff4466" />
+          <StatPill label="Fichas" value={String(myStats.gold)} color="#c8f23c" />
+          <StatPill label="Classe" value={CLASS_META[myStats.classId as ClassId]?.name || myStats.classId} color="#60a5fa" />
+          <StatPill label="Relíquias" value={String(myStats.relics.length)} color="#a78bfa" />
+        </div>
       </div>
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>🗺️ O Abismo</h2>
@@ -314,6 +317,24 @@ function StatPill({ label, value, color }: { label: string; value: string; color
   )
 }
 
+function PlayerPortrait({ avatarUrl, classId, size = 56 }: { avatarUrl: string | null; classId: string; size?: number }) {
+  const meta = CLASS_META[classId as ClassId]
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 12, overflow: 'hidden',
+      background: '#1a1726', border: '1px solid rgba(200,242,60,0.25)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.4, flexShrink: 0,
+    }}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        meta?.icon || '🎭'
+      )}
+    </div>
+  )
+}
+
 // ============ TELA DE COMBATE ============
 function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, onPlayHand }: {
   state: CombatState
@@ -326,21 +347,76 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
   const enemyHpPct = Math.max(0, (state.enemy.hp / state.enemy.maxHp) * 100)
   const playerHpPct = Math.max(0, (state.playerHp / state.playerMaxHp) * 100)
 
+  const prevEnemyHp = useRef(state.enemy.hp)
+  const prevPlayerHp = useRef(state.playerHp)
+  const [enemyFx, setEnemyFx] = useState<{ id: number; dmg: number } | null>(null)
+  const [playerFx, setPlayerFx] = useState<{ id: number; dmg: number; heal: boolean } | null>(null)
+  const [enemyShake, setEnemyShake] = useState(false)
+  const [playerShake, setPlayerShake] = useState(false)
+  const fxId = useRef(0)
+
+  useEffect(() => {
+    if (state.enemy.hp < prevEnemyHp.current) {
+      const dmg = prevEnemyHp.current - state.enemy.hp
+      fxId.current += 1
+      setEnemyFx({ id: fxId.current, dmg })
+      setEnemyShake(true)
+      setTimeout(() => setEnemyShake(false), 350)
+      setTimeout(() => setEnemyFx(null), 900)
+    }
+    prevEnemyHp.current = state.enemy.hp
+  }, [state.enemy.hp])
+
+  useEffect(() => {
+    if (state.playerHp !== prevPlayerHp.current) {
+      const diff = state.playerHp - prevPlayerHp.current
+      fxId.current += 1
+      setPlayerFx({ id: fxId.current, dmg: Math.abs(diff), heal: diff > 0 })
+      if (diff < 0) {
+        setPlayerShake(true)
+        setTimeout(() => setPlayerShake(false), 350)
+      }
+      setTimeout(() => setPlayerFx(null), 900)
+    }
+    prevPlayerHp.current = state.playerHp
+  }, [state.playerHp])
+
   return (
     <div>
       {/* Inimigo */}
-      <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span style={{ fontSize: 48 }}>{state.enemy.icon}</span>
+      <div style={{ textAlign: 'center', marginBottom: 20, position: 'relative' }}>
+        <div
+          className={enemyShake ? 'fx-shake' : ''}
+          style={{ display: 'inline-block', position: 'relative' }}
+        >
+          <span style={{ fontSize: 48, display: 'block' }}>{state.enemy.icon}</span>
+          {enemyFx && (
+            <span key={enemyFx.id} className="fx-float-dmg" style={{ color: '#ff4466' }}>
+              -{enemyFx.dmg}
+            </span>
+          )}
+        </div>
         <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{state.enemy.name}</h2>
         <p style={{ fontSize: 12, color: '#8888aa' }}>{state.enemy.type}</p>
         <div style={{ height: 10, background: '#1a1726', borderRadius: 999, marginTop: 8, overflow: 'hidden', maxWidth: 300, marginInline: 'auto' }}>
-          <div style={{ width: `${enemyHpPct}%`, height: '100%', background: '#ff4466', transition: 'width 0.3s' }} />
+          <div style={{ width: `${enemyHpPct}%`, height: '100%', background: '#ff4466', transition: 'width 0.4s ease' }} />
         </div>
         <p style={{ fontSize: 11, color: '#666688', marginTop: 2 }}>{state.enemy.hp}/{state.enemy.maxHp} HP</p>
       </div>
 
-      {/* Status do jogador */}
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+      {/* Retrato + status do jogador */}
+      <div
+        className={playerShake ? 'fx-shake' : ''}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap', position: 'relative' }}
+      >
+        <div style={{ position: 'relative' }}>
+          <PlayerPortrait avatarUrl={myStats.avatarUrl} classId={myStats.classId} size={48} />
+          {playerFx && (
+            <span key={playerFx.id} className="fx-float-dmg" style={{ color: playerFx.heal ? '#c8f23c' : '#ff4466', left: '50%' }}>
+              {playerFx.heal ? '+' : '-'}{playerFx.dmg}
+            </span>
+          )}
+        </div>
         <StatPill label="Seu HP" value={`${state.playerHp}/${state.playerMaxHp}`} color="#ff4466" />
         <StatPill label="Armadura" value={String(state.armor)} color="#60a5fa" />
         <StatPill label="Fichas" value={String(state.gold)} color="#c8f23c" />
@@ -363,6 +439,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
               key={i}
               onClick={() => onToggleCard(i)}
               disabled={playingHand}
+              className="fx-card"
               style={{
                 width: 56, height: 78, borderRadius: 8,
                 border: selected ? '2px solid #c8f23c' : '1px solid rgba(255,255,255,0.15)',
@@ -370,7 +447,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 cursor: playingHand ? 'default' : 'pointer',
                 transform: selected ? 'translateY(-8px)' : 'none',
-                transition: 'all 0.15s', fontWeight: 800,
+                fontWeight: 800,
                 boxShadow: selected ? '0 4px 12px rgba(200,242,60,0.4)' : '0 2px 4px rgba(0,0,0,0.3)',
               }}
             >
@@ -416,6 +493,39 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
           {playingHand ? 'Jogando...' : '✦ Jogar Mão ✦'}
         </button>
       </div>
+
+      <style>{`
+        @keyframes fxShake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-6px); }
+          40% { transform: translateX(6px); }
+          60% { transform: translateX(-4px); }
+          80% { transform: translateX(4px); }
+        }
+        .fx-shake { animation: fxShake 0.35s ease; }
+
+        @keyframes fxFloatDmg {
+          0% { transform: translate(-50%, 0); opacity: 1; }
+          100% { transform: translate(-50%, -40px); opacity: 0; }
+        }
+        .fx-float-dmg {
+          position: absolute;
+          top: -8px;
+          left: 50%;
+          font-size: 18px;
+          font-weight: 800;
+          animation: fxFloatDmg 0.9s ease-out forwards;
+          pointer-events: none;
+          text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+
+        .fx-card {
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .fx-card:hover:not(:disabled) {
+          transform: translateY(-4px) scale(1.03);
+        }
+      `}</style>
     </div>
   )
 }
