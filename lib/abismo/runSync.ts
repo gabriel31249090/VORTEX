@@ -35,6 +35,8 @@ export type AbismoRun = {
   floor_map: FloorMap
   current_node_id: string
   combat_state: CombatState | null
+  /** Quem tá com a vez de combate agora. null = ninguém em combate (mapa livre pros dois). */
+  combat_turn_user_id: string | null
   status: RunStatus
   created_at: string
   updated_at: string
@@ -53,6 +55,7 @@ export async function createRun(hostUserId: string, hostStats: RunPlayerStats): 
       floor_map: floorMap,
       current_node_id: floorMap[0][0].id,
       status: 'waiting',
+      combat_turn_user_id: null,
     })
     .select()
     .single()
@@ -103,11 +106,14 @@ export function subscribeToRun(runId: string, onUpdate: (run: AbismoRun) => void
   }
 }
 
-/** Salva progresso (mapa, nó atual, estado de combate, stats dos jogadores, status). */
+/** Salva progresso (mapa, nó atual, estado de combate, stats dos jogadores, status, vez de combate). */
 export async function updateRun(
   runId: string,
   patch: Partial<
-    Pick<AbismoRun, 'floor_map' | 'current_node_id' | 'combat_state' | 'status' | 'host_stats' | 'guest_stats'>
+    Pick<
+      AbismoRun,
+      'floor_map' | 'current_node_id' | 'combat_state' | 'status' | 'host_stats' | 'guest_stats' | 'combat_turn_user_id'
+    >
   >
 ): Promise<void> {
   const supabase = createClient()
@@ -116,6 +122,29 @@ export async function updateRun(
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq('id', runId)
   if (error) throw error
+}
+
+/**
+ * Tenta travar a vez de combate pro usuário. Usa uma condição atômica no
+ * WHERE (combat_turn_user_id is null) pra evitar que os dois jogadores
+ * entrem em combate ao mesmo tempo por uma coincidência de cliques.
+ * Retorna null se a vez já tiver sido tomada por outro jogador antes.
+ */
+export async function tryStartCombat(
+  runId: string,
+  userId: string,
+  patch: Pick<AbismoRun, 'floor_map' | 'current_node_id' | 'combat_state' | 'status'>
+): Promise<AbismoRun | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('abismo_runs')
+    .update({ ...patch, combat_turn_user_id: userId, updated_at: new Date().toISOString() })
+    .eq('id', runId)
+    .is('combat_turn_user_id', null)
+    .select()
+    .single()
+  if (error) return null
+  return data as AbismoRun
 }
 
 export async function deleteRun(runId: string): Promise<void> {

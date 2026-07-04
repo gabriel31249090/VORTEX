@@ -7,7 +7,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import Nav from '../../../../components/Nav'
 import {
-  getRun, updateRun, subscribeToRun, deleteRun,
+  getRun, updateRun, subscribeToRun, deleteRun, joinRun, tryStartCombat,
   type AbismoRun, type RunPlayerStats,
 } from '@/lib/abismo/runSync'
 import { getNode, getNodeById, markVisited, TYPE_ICON, TYPE_LABEL, type MapNode } from '@/lib/abismo/mapGenerator'
@@ -27,12 +27,20 @@ export default function AbismoPlayPage() {
   const [playingHand, setPlayingHand] = useState(false)
   const combatStateRef = useRef<CombatState | null>(null)
 
+  // Fluxo de entrada como convidado
+  const [needsToJoin, setNeedsToJoin] = useState(false)
+  const [runFull, setRunFull] = useState(false)
+  const [myCharacters, setMyCharacters] = useState<any[]>([])
+  const [joining, setJoining] = useState(false)
+
   useEffect(() => {
     combatStateRef.current = run?.combat_state ?? null
   }, [run?.combat_state])
 
   const isHost = run?.host_user_id === userId
   const myStats = isHost ? run?.host_stats : run?.guest_stats
+  // É a minha vez de lutar? (null = ninguém tá em combate; caso contrário só quem travou a vez joga)
+  const isMyTurn = !!run && !!userId && run.combat_turn_user_id === userId
 
   useEffect(() => {
     async function init() {
@@ -46,6 +54,29 @@ export default function AbismoPlayPage() {
         router.push('/games/abismo')
         return
       }
+
+      const isHostUser = initial.host_user_id === user.id
+      const isGuestUser = initial.guest_user_id === user.id
+
+      if (!isHostUser && !isGuestUser) {
+        if (initial.guest_user_id) {
+          // já tem 2 jogadores e não é nenhum dos dois
+          setRunFull(true)
+          setLoading(false)
+          return
+        }
+        // precisa escolher um personagem pra entrar como convidado
+        const { data: chars } = await supabase
+          .from('characters')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+        setMyCharacters(chars || [])
+        setNeedsToJoin(true)
+        setLoading(false)
+        return
+      }
+
       setRun(initial)
       setLoading(false)
     }
@@ -59,6 +90,39 @@ export default function AbismoPlayPage() {
     })
     return unsubscribe
   }, [runId])
+
+  async function handleJoin(character: any) {
+    if (!userId) return
+    setJoining(true)
+    try {
+      const stats: RunPlayerStats = {
+        characterId: character.id,
+        characterName: character.name,
+        classId: character.class,
+        avatarUrl: character.avatar_url,
+        hp: character.hp_current,
+        maxHp: character.hp_max,
+        gold: 0,
+        relics: [],
+        inventory: [],
+      }
+      const updated = await joinRun(runId, userId, stats)
+      setRun(updated)
+      setNeedsToJoin(false)
+      toast.success(`Você entrou como ${character.name}!`)
+    } catch (err: any) {
+      toast.error(err.message || 'Não foi possível entrar — a vaga pode já ter sido preenchida')
+      setRunFull(true)
+      setNeedsToJoin(false)
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  function handleCopyInviteLink() {
+    navigator.clipboard.writeText(window.location.href)
+    toast.success('Link copiado! Manda pro seu amigo entrar.')
+  }
 
   async function handleLeave() {
     if (isHost && run?.status !== 'won' && run?.status !== 'lost') {
@@ -77,7 +141,7 @@ export default function AbismoPlayPage() {
   }
 
   async function handleNodeClick(node: MapNode) {
-    if (!run || !myStats) return
+    if (!run || !myStats || !userId) return
     if (node.visited) return
 
     const cur = getNodeById(run.floor_map, run.current_node_id)
@@ -101,12 +165,19 @@ export default function AbismoPlayPage() {
       })
 
       const newMap = markVisited(run.floor_map, node.id)
-      await updateRun(runId, {
+      // tryStartCombat só trava a vez se ninguém mais já tiver travado antes
+      // (evita os dois jogadores caírem em combate ao mesmo tempo por coincidência de cliques)
+      const updated = await tryStartCombat(runId, userId, {
         floor_map: newMap,
         current_node_id: node.id,
         combat_state: combatState,
         status: 'combat',
       })
+      if (!updated) {
+        toast.error('Seu parceiro já entrou em combate — espera a vez dele.')
+        return
+      }
+      setRun(updated)
     } else {
       // loja/evento — placeholder simples por enquanto (Fase 3)
       const newMap = markVisited(run.floor_map, node.id)
@@ -116,6 +187,7 @@ export default function AbismoPlayPage() {
   }
 
   async function dispatchCombat(action: Parameters<typeof combatReducer>[1]) {
+    if (!isMyTurn) return
     const current = combatStateRef.current
     if (!current) return
     const next = combatReducer(current, action)
@@ -126,6 +198,7 @@ export default function AbismoPlayPage() {
   }
 
   async function handlePlayHand() {
+    if (!isMyTurn) return
     if (!combatStateRef.current || playingHand) return
     if (combatStateRef.current.selected.length !== 5) {
       toast.error('Selecione exatamente 5 cartas')
@@ -154,29 +227,98 @@ export default function AbismoPlayPage() {
         gold: state.gold,
       }
       const patch = isHost ? { host_stats: updatedStats } : { guest_stats: updatedStats }
-      await updateRun(runId, { ...patch, status: 'map', combat_state: null })
+      await updateRun(runId, { ...patch, status: 'map', combat_state: null, combat_turn_user_id: null })
       toast.success('Vitória! Ganhou ' + (state.gold - myStats.gold) + ' fichas extras.')
     } else if (state.status === 'lost') {
-      await updateRun(runId, { status: 'lost' })
+      await updateRun(runId, { status: 'lost', combat_turn_user_id: null })
     }
   }
 
   async function handleDiscard() {
+    if (!isMyTurn) return
     await dispatchCombat({ type: 'DISCARD_SELECTED' })
   }
 
   async function handleToggleCard(index: number) {
+    if (!isMyTurn) return
     if (playingHand) return
     await dispatchCombat({ type: 'TOGGLE_CARD', index })
   }
 
-  if (loading || !run) {
+  if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#0d0d12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: 32, height: 32, border: '2px solid #c8f23c', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
+  }
+
+  if (runFull) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0d0d12', color: '#f0f0f8', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif", gap: 12, textAlign: 'center', padding: 20 }}>
+        <span style={{ fontSize: 40 }}>🚪</span>
+        <h1 style={{ fontSize: 20, fontWeight: 800 }}>Essa run já tem 2 jogadores</h1>
+        <p style={{ fontSize: 13, color: '#8888aa' }}>A vaga de convidado já foi preenchida.</p>
+        <button
+          onClick={() => router.push('/games/abismo')}
+          style={{ marginTop: 12, padding: '12px 28px', borderRadius: 10, border: 'none', background: '#c8f23c', color: '#000', fontWeight: 700, cursor: 'pointer', fontFamily: "'Syne', sans-serif" }}
+        >
+          Voltar pros Personagens
+        </button>
+      </div>
+    )
+  }
+
+  if (needsToJoin) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0d0d12', color: '#f0f0f8', fontFamily: "'Syne', sans-serif" }}>
+        <Nav />
+        <main style={{ maxWidth: 600, margin: '0 auto', padding: '32px 16px', paddingLeft: 'calc(220px + 24px)' }} className="abismo-play-main">
+          <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🎰 Você foi convidado pro Abismo!</h1>
+          <p style={{ fontSize: 13, color: '#8888aa', marginBottom: 24 }}>Escolha um personagem pra entrar nessa run.</p>
+
+          {myCharacters.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', border: '1px dashed rgba(200,242,60,0.15)', borderRadius: 12 }}>
+              <p style={{ color: '#8888aa', marginBottom: 12 }}>Você ainda não tem nenhum personagem.</p>
+              <button
+                onClick={() => router.push('/games/abismo')}
+                style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: '#c8f23c', color: '#000', fontWeight: 700, cursor: 'pointer', fontFamily: "'Syne', sans-serif" }}
+              >
+                Criar um personagem
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              {myCharacters.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => handleJoin(c)}
+                  disabled={joining}
+                  style={{
+                    textAlign: 'left', borderRadius: 12, border: '1px solid rgba(200,242,60,0.15)',
+                    background: '#111118', padding: 14, cursor: joining ? 'default' : 'pointer',
+                    opacity: joining ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <PlayerPortrait avatarUrl={c.avatar_url} classId={c.class} size={44} />
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: 14 }}>{c.name}</p>
+                      <p style={{ fontSize: 11, color: '#8888aa' }}>{c.race} · Nv.{c.level}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+    )
+  }
+
+  if (!run) {
+    return null
   }
 
   if (run.status === 'lost') {
@@ -206,25 +348,29 @@ export default function AbismoPlayPage() {
           ← Sair da run
         </button>
 
-        {run.status === 'waiting' && (
+        {run.status === 'waiting' && !run.guest_user_id && (
           <p style={{ textAlign: 'center', fontSize: 12, color: '#666688', marginBottom: 16 }}>
-            🕐 Jogando solo por enquanto — o convite de um segundo jogador chega numa próxima etapa.
+            🕐 Aguardando um segundo jogador (opcional) — convide um amigo ou continue sozinho.
           </p>
         )}
 
         {(run.status === 'map' || run.status === 'waiting') && myStats && (
-          <MapScreen run={run} myStats={myStats} onNodeClick={handleNodeClick} />
+          <MapScreen run={run} myStats={myStats} onNodeClick={handleNodeClick} isHost={isHost} onCopyInvite={handleCopyInviteLink} />
         )}
 
         {run.status === 'combat' && run.combat_state && myStats && (
-          <CombatScreen
-            state={run.combat_state}
-            myStats={myStats}
-            playingHand={playingHand}
-            onToggleCard={handleToggleCard}
-            onDiscard={handleDiscard}
-            onPlayHand={handlePlayHand}
-          />
+          isMyTurn ? (
+            <CombatScreen
+              state={run.combat_state}
+              myStats={myStats}
+              playingHand={playingHand}
+              onToggleCard={handleToggleCard}
+              onDiscard={handleDiscard}
+              onPlayHand={handlePlayHand}
+            />
+          ) : (
+            <CombatSpectatorScreen run={run} />
+          )
         )}
 
         {run.status === 'won' && (
@@ -252,16 +398,18 @@ export default function AbismoPlayPage() {
 }
 
 // ============ TELA DE MAPA ============
-function MapScreen({ run, myStats, onNodeClick }: {
+function MapScreen({ run, myStats, onNodeClick, isHost, onCopyInvite }: {
   run: AbismoRun
   myStats: RunPlayerStats
   onNodeClick: (node: MapNode) => void
+  isHost: boolean
+  onCopyInvite: () => void
 }) {
   const currentNode = getNodeById(run.floor_map, run.current_node_id)
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
         <PlayerPortrait avatarUrl={myStats.avatarUrl} classId={myStats.classId} size={56} />
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <StatPill label="HP" value={`${myStats.hp}/${myStats.maxHp}`} color="#ff4466" />
@@ -270,6 +418,26 @@ function MapScreen({ run, myStats, onNodeClick }: {
           <StatPill label="Relíquias" value={String(myStats.relics.length)} color="#a78bfa" />
         </div>
       </div>
+
+      {isHost && !run.guest_user_id && (
+        <button
+          onClick={onCopyInvite}
+          style={{
+            marginBottom: 20, padding: '10px 18px', borderRadius: 10,
+            border: '1px dashed rgba(200,242,60,0.3)', background: 'rgba(200,242,60,0.05)',
+            color: '#c8f23c', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            fontFamily: "'Syne', sans-serif", display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          🔗 Convidar amigo (copiar link)
+        </button>
+      )}
+
+      {run.guest_user_id && (
+        <p style={{ fontSize: 12, color: '#8888aa', marginBottom: 20 }}>
+          👥 Jogando com {isHost ? run.guest_stats?.characterName : run.host_stats.characterName}
+        </p>
+      )}
 
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>🗺️ O Abismo</h2>
 
@@ -331,6 +499,47 @@ function PlayerPortrait({ avatarUrl, classId, size = 56 }: { avatarUrl: string |
       ) : (
         meta?.icon || '🎭'
       )}
+    </div>
+  )
+}
+
+// ============ TELA DE ESPECTADOR (parceiro em combate) ============
+function CombatSpectatorScreen({ run }: { run: AbismoRun }) {
+  const state = run.combat_state
+  if (!state) return null
+
+  const fighterStats = run.combat_turn_user_id === run.host_user_id ? run.host_stats : run.guest_stats
+  const enemyHpPct = Math.max(0, (state.enemy.hp / state.enemy.maxHp) * 100)
+  const playerHpPct = Math.max(0, (state.playerHp / state.playerMaxHp) * 100)
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 24,
+        padding: '8px 16px', borderRadius: 999, background: 'rgba(200,242,60,0.06)',
+        border: '1px dashed rgba(200,242,60,0.25)', color: '#c8f23c', fontSize: 13, fontWeight: 700,
+      }}>
+        👀 {fighterStats?.characterName || 'Seu parceiro'} tá em combate — aguarde a vez dele
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <span style={{ fontSize: 40, display: 'block' }}>{state.enemy.icon}</span>
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>{state.enemy.name}</h2>
+        <div style={{ height: 8, background: '#1a1726', borderRadius: 999, marginTop: 8, overflow: 'hidden', maxWidth: 260, marginInline: 'auto' }}>
+          <div style={{ width: `${enemyHpPct}%`, height: '100%', background: '#ff4466', transition: 'width 0.4s ease' }} />
+        </div>
+        <p style={{ fontSize: 11, color: '#666688', marginTop: 2 }}>{state.enemy.hp}/{state.enemy.maxHp} HP</p>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+        <PlayerPortrait avatarUrl={fighterStats?.avatarUrl ?? null} classId={fighterStats?.classId || ''} size={44} />
+        <StatPill label={`HP de ${fighterStats?.characterName || 'parceiro'}`} value={`${state.playerHp}/${state.playerMaxHp}`} color="#ff4466" />
+        <StatPill label="Fichas" value={String(state.gold)} color="#c8f23c" />
+      </div>
+
+      <div style={{ background: '#111118', borderRadius: 10, padding: 12, maxHeight: 100, overflowY: 'auto', fontSize: 12, color: '#8888aa', maxWidth: 400, marginInline: 'auto' }}>
+        {state.log.slice(-5).map((l, i) => <p key={i} style={{ margin: '2px 0' }}>{l}</p>)}
+      </div>
     </div>
   )
 }
