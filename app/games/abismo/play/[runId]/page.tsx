@@ -198,7 +198,13 @@ export default function AbismoPlayPage() {
           ← Sair da run
         </button>
 
-        {run.status === 'map' && myStats && (
+        {run.status === 'waiting' && (
+          <p style={{ textAlign: 'center', fontSize: 12, color: '#666688', marginBottom: 16 }}>
+            🕐 Jogando solo por enquanto — o convite de um segundo jogador chega numa próxima etapa.
+          </p>
+        )}
+
+        {(run.status === 'map' || run.status === 'waiting') && myStats && (
           <MapScreen run={run} myStats={myStats} onNodeClick={handleNodeClick} />
         )}
 
