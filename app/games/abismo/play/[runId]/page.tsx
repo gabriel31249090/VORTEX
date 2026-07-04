@@ -811,7 +811,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
 
   return (
     <div className="ab-root">
-      {/* Boot transition — sibling da arena, não descendente (perspective não afeta position:fixed) */}
+      {/* Boot transition — fica fora da stage, cobre a tela inteira */}
       <div className={`ab-boot ${booting ? 'active' : ''}`}>
         <div className="ab-boot-lines">
           <p>&gt; conectando ao nó...</p>
@@ -822,105 +822,116 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         </div>
       </div>
 
-      <div className="ab-hud-top">ANDAR · <b>{state.enemy.type}</b> · COMBATE</div>
-
-      {/* Arena 2.5D */}
-      <div className="ab-arena">
-        <div className="ab-enemy-zone">
-          <div className="ab-enemy-platform" />
-          <div className={`ab-enemy-sprite ${enemyShake ? 'ab-shake' : ''}`}>
-            {state.enemy.icon}
-            {enemyFx && <span key={enemyFx.id} className="ab-dmg-float">-{enemyFx.dmg}</span>}
-          </div>
-          <div className="ab-enemy-card">
-            <div className="ab-enemy-name">{state.enemy.name}</div>
-            <div className="ab-enemy-type">{state.enemy.type}</div>
-            <div className="ab-hpbar-wrap"><div className="ab-hpbar-fill" style={{ width: `${enemyHpPct}%` }} /></div>
-            <div className="ab-enemy-hp-num">{state.enemy.hp} / {state.enemy.maxHp} HP</div>
-          </div>
+      <div className="ab-stage">
+        <div className="ab-bg-anim">
+          <span className="ab-blob ab-blob-1" />
+          <span className="ab-blob ab-blob-2" />
+          <span className="ab-blob ab-blob-3" />
+          <div className="ab-stage-scanlines" />
         </div>
 
-        <div className="ab-arena-floor" />
+        <div className="ab-content">
+          <div className="ab-hud-top">ANDAR · <b>{state.enemy.type}</b> · COMBATE</div>
 
-        <div className={`ab-player-panel ${playerShake ? 'ab-shake' : ''}`}>
-          <div className="ab-player-name-row">
-            <div className="ab-player-portrait">
-              {myStats.avatarUrl ? <img src={myStats.avatarUrl} alt="" /> : (meta?.icon || '🎭')}
-              {playerFx && (
-                <span key={playerFx.id} className="ab-dmg-float" style={{ color: playerFx.heal ? 'var(--ab-lime)' : 'var(--ab-blood)' }}>
-                  {playerFx.heal ? '+' : '-'}{playerFx.dmg}
-                </span>
-              )}
+          {/* Arena 2.5D */}
+          <div className="ab-arena">
+            <div className="ab-enemy-zone">
+              <div className="ab-enemy-platform" />
+              <div className={`ab-enemy-sprite ${enemyShake ? 'ab-shake' : ''}`}>
+                {state.enemy.icon}
+                {enemyFx && <span key={enemyFx.id} className="ab-dmg-float">-{enemyFx.dmg}</span>}
+              </div>
+              <div className="ab-enemy-card">
+                <div className="ab-enemy-name">{state.enemy.name}</div>
+                <div className="ab-enemy-type">{state.enemy.type}</div>
+                <div className="ab-hpbar-wrap"><div className="ab-hpbar-fill" style={{ width: `${enemyHpPct}%` }} /></div>
+                <div className="ab-enemy-hp-num">{state.enemy.hp} / {state.enemy.maxHp} HP</div>
+              </div>
             </div>
-            <div>
-              <div className="ab-player-name">{myStats.characterName}</div>
-              <div className="ab-player-class">{meta?.name || myStats.classId}</div>
+
+            <div className="ab-arena-floor" />
+
+            <div className={`ab-player-panel ${playerShake ? 'ab-shake' : ''}`}>
+              <div className="ab-player-name-row">
+                <div className="ab-player-portrait">
+                  {myStats.avatarUrl ? <img src={myStats.avatarUrl} alt="" /> : (meta?.icon || '🎭')}
+                  {playerFx && (
+                    <span key={playerFx.id} className="ab-dmg-float" style={{ color: playerFx.heal ? 'var(--ab-lime)' : 'var(--ab-blood)' }}>
+                      {playerFx.heal ? '+' : '-'}{playerFx.dmg}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <div className="ab-player-name">{myStats.characterName}</div>
+                  <div className="ab-player-class">{meta?.name || myStats.classId}</div>
+                </div>
+              </div>
+              <div className="ab-stat-row">
+                <span className="ab-stat-label">HP</span>
+                <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${playerHpPct}%`, background: 'var(--ab-blood)' }} /></div>
+                <span className="ab-stat-num">{state.playerHp}/{state.playerMaxHp}</span>
+              </div>
+              <div className="ab-stat-row">
+                <span className="ab-stat-label">DEF</span>
+                <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${armorPct}%`, background: '#60a5fa' }} /></div>
+                <span className="ab-stat-num">{state.armor}</span>
+              </div>
+            </div>
+
+            <div className="ab-gold-badge">
+              <div className="ab-gold-label">Fichas</div>
+              <div className="ab-gold-num">{state.gold}</div>
             </div>
           </div>
-          <div className="ab-stat-row">
-            <span className="ab-stat-label">HP</span>
-            <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${playerHpPct}%`, background: 'var(--ab-blood)' }} /></div>
-            <span className="ab-stat-num">{state.playerHp}/{state.playerMaxHp}</span>
+
+          {/* Log de batalha */}
+          <div className="ab-log">
+            {state.log.slice(-4).map((l, i) => <p key={i}>{l}</p>)}
           </div>
-          <div className="ab-stat-row">
-            <span className="ab-stat-label">DEF</span>
-            <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${armorPct}%`, background: '#60a5fa' }} /></div>
-            <span className="ab-stat-num">{state.armor}</span>
+
+          {state.lastHandEval && (
+            <p className="ab-last-hand">Última mão: {state.lastHandEval.tipo}</p>
+          )}
+
+          {/* Leque de cartas */}
+          <div className="ab-hand">
+            {state.hand.map((card, i) => {
+              const selected = state.selected.includes(i)
+              const isRed = card.s === 'H' || card.s === 'D'
+              return (
+                <button
+                  key={i}
+                  onClick={() => onToggleCard(i)}
+                  disabled={playingHand}
+                  className={`ab-card ${isRed ? 'red' : 'black'} ${selected ? 'selected' : ''}`}
+                >
+                  <span className="ab-card-r">{card.r}</span>
+                  <span className="ab-card-s">{symbols[card.s]}</span>
+                </button>
+              )
+            })}
           </div>
-        </div>
 
-        <div className="ab-gold-badge">
-          <div className="ab-gold-label">Fichas</div>
-          <div className="ab-gold-num">{state.gold}</div>
-        </div>
-      </div>
-
-      {/* Log de batalha */}
-      <div className="ab-log">
-        {state.log.slice(-4).map((l, i) => <p key={i}>{l}</p>)}
-      </div>
-
-      {state.lastHandEval && (
-        <p className="ab-last-hand">Última mão: {state.lastHandEval.tipo}</p>
-      )}
-
-      {/* Leque de cartas */}
-      <div className="ab-hand">
-        {state.hand.map((card, i) => {
-          const selected = state.selected.includes(i)
-          const isRed = card.s === 'H' || card.s === 'D'
-          return (
+          {/* Ações */}
+          <div className="ab-actions">
             <button
-              key={i}
-              onClick={() => onToggleCard(i)}
-              disabled={playingHand}
-              className={`ab-card ${isRed ? 'red' : 'black'} ${selected ? 'selected' : ''}`}
+              onClick={onDiscard}
+              disabled={playingHand || state.discardsLeft <= 0 || state.selected.length === 0}
+              className="ab-btn ab-btn-ghost"
+              style={{ opacity: state.discardsLeft <= 0 || state.selected.length === 0 ? 0.4 : 1 }}
             >
-              <span className="ab-card-r">{card.r}</span>
-              <span className="ab-card-s">{symbols[card.s]}</span>
+              Trocar ({state.discardsLeft})
             </button>
-          )
-        })}
-      </div>
-
-      {/* Ações */}
-      <div className="ab-actions">
-        <button
-          onClick={onDiscard}
-          disabled={playingHand || state.discardsLeft <= 0 || state.selected.length === 0}
-          className="ab-btn ab-btn-ghost"
-          style={{ opacity: state.discardsLeft <= 0 || state.selected.length === 0 ? 0.4 : 1 }}
-        >
-          Trocar ({state.discardsLeft})
-        </button>
-        <button
-          onClick={onPlayHand}
-          disabled={playingHand || state.selected.length !== 5}
-          className="ab-btn ab-btn-main"
-          style={{ opacity: state.selected.length === 5 ? 1 : 0.5 }}
-        >
-          {playingHand ? 'Jogando...' : '✦ Jogar Mão ✦'}
-        </button>
+            <button
+              onClick={onPlayHand}
+              disabled={playingHand || state.selected.length !== 5}
+              className="ab-btn ab-btn-main"
+              style={{ opacity: state.selected.length === 5 ? 1 : 0.5 }}
+            >
+              {playingHand ? 'Jogando...' : '✦ Jogar Mão ✦'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <style>{`
@@ -934,9 +945,39 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
           --ab-blood: #ff3d63;
           --ab-glitch: #34e8d0;
           --ab-gold: #ffcf4d;
+          --ab-void-purple: #8b5cf6;
           --ab-text-dim: #8888aa;
           --ab-font-mono: 'JetBrains Mono', monospace;
           position: relative;
+        }
+
+        .ab-stage {
+          position: relative;
+          max-width: 640px;
+          margin: 0 auto;
+          border-radius: 16px;
+          overflow: hidden;
+          border: 1px solid var(--ab-border);
+          background: #0a0912;
+        }
+        .ab-content { position: relative; z-index: 2; padding: 20px 20px 24px; }
+
+        .ab-bg-anim { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
+        .ab-blob {
+          position: absolute; border-radius: 50%; filter: blur(50px); opacity: 0.35;
+          animation: ab-drift 14s ease-in-out infinite;
+        }
+        .ab-blob-1 { width: 220px; height: 220px; background: var(--ab-void-purple, #8b5cf6); top: -40px; left: -40px; animation-duration: 16s; }
+        .ab-blob-2 { width: 180px; height: 180px; background: var(--ab-lime); bottom: -30px; right: -30px; animation-duration: 19s; animation-delay: -4s; }
+        .ab-blob-3 { width: 150px; height: 150px; background: var(--ab-glitch); top: 40%; right: 20%; animation-duration: 13s; animation-delay: -8s; opacity: 0.22; }
+        @keyframes ab-drift {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(24px, -18px) scale(1.08); }
+          66% { transform: translate(-18px, 14px) scale(0.94); }
+        }
+        .ab-stage-scanlines {
+          position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+          background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.35) 3px, rgba(0,0,0,0.35) 4px);
         }
 
         .ab-hud-top {
