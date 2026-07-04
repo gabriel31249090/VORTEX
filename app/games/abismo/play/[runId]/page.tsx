@@ -750,7 +750,7 @@ function CombatSpectatorScreen({ run }: { run: AbismoRun }) {
   )
 }
 
-// ============ TELA DE COMBATE ============
+// ============ TELA DE COMBATE (visual: leque de cartas, arena 2.5D, boot transition) ============
 function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, onPlayHand }: {
   state: CombatState
   myStats: RunPlayerStats
@@ -761,6 +761,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
 }) {
   const enemyHpPct = Math.max(0, (state.enemy.hp / state.enemy.maxHp) * 100)
   const playerHpPct = Math.max(0, (state.playerHp / state.playerMaxHp) * 100)
+  const armorPct = Math.min(100, (state.armor / 20) * 100)
 
   const prevEnemyHp = useRef(state.enemy.hp)
   const prevPlayerHp = useRef(state.playerHp)
@@ -769,6 +770,15 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
   const [enemyShake, setEnemyShake] = useState(false)
   const [playerShake, setPlayerShake] = useState(false)
   const fxId = useRef(0)
+
+  // Transição de "boot" ao entrar num combate novo (só na primeira renderização)
+  const [booting, setBooting] = useState(() => state.turn === 1 && state.log.length <= 1)
+  useEffect(() => {
+    if (booting) {
+      const t = setTimeout(() => setBooting(false), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [])
 
   useEffect(() => {
     if (state.enemy.hp < prevEnemyHp.current) {
@@ -796,149 +806,312 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
     prevPlayerHp.current = state.playerHp
   }, [state.playerHp])
 
+  const symbols: Record<string, string> = { H: '♥', D: '♦', S: '♠', C: '♣' }
+  const meta = CLASS_META[myStats.classId as ClassId]
+
   return (
-    <div>
-      {/* Inimigo */}
-      <div style={{ textAlign: 'center', marginBottom: 20, position: 'relative' }}>
-        <div
-          className={enemyShake ? 'fx-shake' : ''}
-          style={{ display: 'inline-block', position: 'relative' }}
-        >
-          <span style={{ fontSize: 48, display: 'block' }}>{state.enemy.icon}</span>
-          {enemyFx && (
-            <span key={enemyFx.id} className="fx-float-dmg" style={{ color: '#ff4466' }}>
-              -{enemyFx.dmg}
-            </span>
-          )}
+    <div className="ab-root">
+      {/* Boot transition — sibling da arena, não descendente (perspective não afeta position:fixed) */}
+      <div className={`ab-boot ${booting ? 'active' : ''}`}>
+        <div className="ab-boot-lines">
+          <p>&gt; conectando ao nó...</p>
+          <p>&gt; carregando entidade: <span className="ab-boot-warn">{state.enemy.name.toUpperCase().replace(/\s/g, '_')}.exe</span></p>
+          <p>&gt; sincronizando mão de 5 cartas...</p>
+          <p className="ab-boot-ok">&gt; combate pronto. boa sorte, {myStats.characterName}.</p>
+          <p>&gt;_</p>
         </div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{state.enemy.name}</h2>
-        <p style={{ fontSize: 12, color: '#8888aa' }}>{state.enemy.type}</p>
-        <div style={{ height: 10, background: '#1a1726', borderRadius: 999, marginTop: 8, overflow: 'hidden', maxWidth: 300, marginInline: 'auto' }}>
-          <div style={{ width: `${enemyHpPct}%`, height: '100%', background: '#ff4466', transition: 'width 0.4s ease' }} />
-        </div>
-        <p style={{ fontSize: 11, color: '#666688', marginTop: 2 }}>{state.enemy.hp}/{state.enemy.maxHp} HP</p>
       </div>
 
-      {/* Retrato + status do jogador */}
-      <div
-        className={playerShake ? 'fx-shake' : ''}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 20, flexWrap: 'wrap', position: 'relative' }}
-      >
-        <div style={{ position: 'relative' }}>
-          <PlayerPortrait avatarUrl={myStats.avatarUrl} classId={myStats.classId} size={48} />
-          {playerFx && (
-            <span key={playerFx.id} className="fx-float-dmg" style={{ color: playerFx.heal ? '#c8f23c' : '#ff4466', left: '50%' }}>
-              {playerFx.heal ? '+' : '-'}{playerFx.dmg}
-            </span>
-          )}
+      <div className="ab-hud-top">ANDAR · <b>{state.enemy.type}</b> · COMBATE</div>
+
+      {/* Arena 2.5D */}
+      <div className="ab-arena">
+        <div className="ab-enemy-zone">
+          <div className="ab-enemy-platform" />
+          <div className={`ab-enemy-sprite ${enemyShake ? 'ab-shake' : ''}`}>
+            {state.enemy.icon}
+            {enemyFx && <span key={enemyFx.id} className="ab-dmg-float">-{enemyFx.dmg}</span>}
+          </div>
+          <div className="ab-enemy-card">
+            <div className="ab-enemy-name">{state.enemy.name}</div>
+            <div className="ab-enemy-type">{state.enemy.type}</div>
+            <div className="ab-hpbar-wrap"><div className="ab-hpbar-fill" style={{ width: `${enemyHpPct}%` }} /></div>
+            <div className="ab-enemy-hp-num">{state.enemy.hp} / {state.enemy.maxHp} HP</div>
+          </div>
         </div>
-        <StatPill label="Seu HP" value={`${state.playerHp}/${state.playerMaxHp}`} color="#ff4466" />
-        <StatPill label="Armadura" value={String(state.armor)} color="#60a5fa" />
-        <StatPill label="Fichas" value={String(state.gold)} color="#c8f23c" />
-        <StatPill label="Trocas" value={String(state.discardsLeft)} color="#a78bfa" />
+
+        <div className="ab-arena-floor" />
+
+        <div className={`ab-player-panel ${playerShake ? 'ab-shake' : ''}`}>
+          <div className="ab-player-name-row">
+            <div className="ab-player-portrait">
+              {myStats.avatarUrl ? <img src={myStats.avatarUrl} alt="" /> : (meta?.icon || '🎭')}
+              {playerFx && (
+                <span key={playerFx.id} className="ab-dmg-float" style={{ color: playerFx.heal ? 'var(--ab-lime)' : 'var(--ab-blood)' }}>
+                  {playerFx.heal ? '+' : '-'}{playerFx.dmg}
+                </span>
+              )}
+            </div>
+            <div>
+              <div className="ab-player-name">{myStats.characterName}</div>
+              <div className="ab-player-class">{meta?.name || myStats.classId}</div>
+            </div>
+          </div>
+          <div className="ab-stat-row">
+            <span className="ab-stat-label">HP</span>
+            <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${playerHpPct}%`, background: 'var(--ab-blood)' }} /></div>
+            <span className="ab-stat-num">{state.playerHp}/{state.playerMaxHp}</span>
+          </div>
+          <div className="ab-stat-row">
+            <span className="ab-stat-label">DEF</span>
+            <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${armorPct}%`, background: '#60a5fa' }} /></div>
+            <span className="ab-stat-num">{state.armor}</span>
+          </div>
+        </div>
+
+        <div className="ab-gold-badge">
+          <div className="ab-gold-label">Fichas</div>
+          <div className="ab-gold-num">{state.gold}</div>
+        </div>
       </div>
 
       {/* Log de batalha */}
-      <div style={{ background: '#111118', borderRadius: 10, padding: 12, maxHeight: 100, overflowY: 'auto', marginBottom: 20, fontSize: 12, color: '#8888aa' }}>
-        {state.log.slice(-5).map((l, i) => <p key={i} style={{ margin: '2px 0' }}>{l}</p>)}
+      <div className="ab-log">
+        {state.log.slice(-4).map((l, i) => <p key={i}>{l}</p>)}
       </div>
 
-      {/* Mão de cartas */}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+      {state.lastHandEval && (
+        <p className="ab-last-hand">Última mão: {state.lastHandEval.tipo}</p>
+      )}
+
+      {/* Leque de cartas */}
+      <div className="ab-hand">
         {state.hand.map((card, i) => {
           const selected = state.selected.includes(i)
           const isRed = card.s === 'H' || card.s === 'D'
-          const symbols: Record<string, string> = { H: '♥', D: '♦', S: '♠', C: '♣' }
           return (
             <button
               key={i}
               onClick={() => onToggleCard(i)}
               disabled={playingHand}
-              className="fx-card"
-              style={{
-                width: 56, height: 78, borderRadius: 8,
-                border: selected ? '2px solid #c8f23c' : '1px solid rgba(255,255,255,0.15)',
-                background: '#fff', color: isRed ? '#e11d48' : '#111',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                cursor: playingHand ? 'default' : 'pointer',
-                transform: selected ? 'translateY(-8px)' : 'none',
-                fontWeight: 800,
-                boxShadow: selected ? '0 4px 12px rgba(200,242,60,0.4)' : '0 2px 4px rgba(0,0,0,0.3)',
-              }}
+              className={`ab-card ${isRed ? 'red' : 'black'} ${selected ? 'selected' : ''}`}
             >
-              <span style={{ fontSize: 16 }}>{card.r}</span>
-              <span style={{ fontSize: 18 }}>{symbols[card.s]}</span>
+              <span className="ab-card-r">{card.r}</span>
+              <span className="ab-card-s">{symbols[card.s]}</span>
             </button>
           )
         })}
       </div>
 
-      {state.lastHandEval && (
-        <p style={{ textAlign: 'center', fontSize: 12, color: '#c8f23c', marginBottom: 12 }}>
-          Última mão: {state.lastHandEval.tipo}
-        </p>
-      )}
-
       {/* Ações */}
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+      <div className="ab-actions">
         <button
           onClick={onDiscard}
           disabled={playingHand || state.discardsLeft <= 0 || state.selected.length === 0}
-          style={{
-            padding: '10px 20px', borderRadius: 10, border: '1px solid rgba(200,242,60,0.2)',
-            background: 'transparent', color: '#c8f23c', fontWeight: 700, fontSize: 13,
-            cursor: 'pointer', fontFamily: "'Syne', sans-serif",
-            opacity: state.discardsLeft <= 0 || state.selected.length === 0 ? 0.4 : 1,
-          }}
+          className="ab-btn ab-btn-ghost"
+          style={{ opacity: state.discardsLeft <= 0 || state.selected.length === 0 ? 0.4 : 1 }}
         >
           Trocar ({state.discardsLeft})
         </button>
         <button
           onClick={onPlayHand}
           disabled={playingHand || state.selected.length !== 5}
-          style={{
-            padding: '10px 28px', borderRadius: 10, border: 'none',
-            background: state.selected.length === 5 ? '#c8f23c' : '#333',
-            color: state.selected.length === 5 ? '#000' : '#666',
-            fontWeight: 800, fontSize: 13, cursor: playingHand ? 'default' : 'pointer',
-            fontFamily: "'Syne', sans-serif",
-            boxShadow: state.selected.length === 5 ? '0 0 16px rgba(200,242,60,0.4)' : 'none',
-          }}
+          className="ab-btn ab-btn-main"
+          style={{ opacity: state.selected.length === 5 ? 1 : 0.5 }}
         >
           {playingHand ? 'Jogando...' : '✦ Jogar Mão ✦'}
         </button>
       </div>
 
       <style>{`
-        @keyframes fxShake {
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        .ab-root {
+          --ab-bg3: #1c1830;
+          --ab-bg4: #241f3d;
+          --ab-border: rgba(200,242,60,0.14);
+          --ab-lime: #c8f23c;
+          --ab-blood: #ff3d63;
+          --ab-glitch: #34e8d0;
+          --ab-gold: #ffcf4d;
+          --ab-text-dim: #8888aa;
+          --ab-font-mono: 'JetBrains Mono', monospace;
+          position: relative;
+        }
+
+        .ab-hud-top {
+          text-align: center; font-family: var(--ab-font-mono); font-size: 10px;
+          letter-spacing: .2em; color: var(--ab-text-dim); text-transform: uppercase;
+          margin-bottom: 8px;
+        }
+        .ab-hud-top b { color: var(--ab-glitch); }
+
+        .ab-arena {
+          position: relative; min-height: 320px;
+          display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+          perspective: 1200px;
+          margin-bottom: 16px;
+        }
+
+        .ab-enemy-zone { position: relative; margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
+        .ab-enemy-platform {
+          width: 220px; height: 76px;
+          background: linear-gradient(180deg, rgba(255,61,99,0.16), rgba(255,61,99,0.02));
+          border: 1px solid rgba(255,61,99,0.35);
+          transform: rotateX(62deg); border-radius: 50%;
+          box-shadow: 0 0 40px rgba(255,61,99,0.15) inset;
+          margin-bottom: -26px;
+        }
+        .ab-enemy-sprite {
+          font-size: 52px; filter: drop-shadow(0 12px 18px rgba(255,61,99,0.35));
+          animation: ab-float-enemy 3.2s ease-in-out infinite;
+          position: relative; z-index: 2;
+        }
+        @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        .ab-enemy-card {
+          margin-top: 8px; padding: 8px 20px; text-align: center;
+          background: var(--ab-bg3); border: 1px solid rgba(255,61,99,0.3);
+          clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+          min-width: 200px;
+        }
+        .ab-enemy-name { font-weight: 800; font-size: 14px; }
+        .ab-enemy-type { font-size: 10px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+        .ab-hpbar-wrap { height: 7px; background: rgba(255,255,255,0.06); margin-top: 7px; border-radius: 2px; overflow: hidden; }
+        .ab-hpbar-fill { height: 100%; background: linear-gradient(90deg, var(--ab-blood), #ff7a93); transition: width .4s ease; }
+        .ab-enemy-hp-num { font-family: var(--ab-font-mono); font-size: 10px; color: var(--ab-text-dim); margin-top: 4px; }
+
+        .ab-dmg-float {
+          position: absolute; top: -10px; left: 50%; font-family: var(--ab-font-mono);
+          font-weight: 700; font-size: 20px; color: var(--ab-blood);
+          pointer-events: none; z-index: 30;
+          text-shadow: 2px 0 0 rgba(52,232,208,.7), -2px 0 0 rgba(255,61,99,.9);
+          animation: ab-dmg-float .85s ease-out forwards;
+        }
+        @keyframes ab-dmg-float {
+          0% { transform: translate(-50%,0) scale(1); opacity: 1; }
+          30% { transform: translate(-52%,-10px) scale(1.15); }
+          100% { transform: translate(-48%,-48px) scale(0.9); opacity: 0; }
+        }
+
+        .ab-arena-floor {
+          width: 92%; max-width: 700px; height: 1px; margin: 14px 0 0;
+          background: linear-gradient(90deg, transparent, rgba(200,242,60,0.25), transparent);
+        }
+
+        .ab-player-panel {
+          position: absolute; left: 0; bottom: 0; z-index: 20;
+          background: var(--ab-bg3); border: 1px solid var(--ab-border);
+          clip-path: polygon(0 0, 100% 0, 92% 100%, 0% 100%);
+          padding: 10px 30px 10px 14px; min-width: 190px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .ab-player-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+        .ab-player-portrait {
+          width: 34px; height: 34px; border-radius: 8px; background: var(--ab-bg4);
+          border: 1px solid var(--ab-lime); display: flex; align-items: center; justify-content: center;
+          font-size: 18px; overflow: hidden; position: relative; flex-shrink: 0;
+        }
+        .ab-player-portrait img { width: 100%; height: 100%; object-fit: cover; }
+        .ab-player-name { font-weight: 700; font-size: 12px; }
+        .ab-player-class { font-size: 9px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .08em; }
+        .ab-stat-row { display: flex; align-items: center; gap: 6px; font-family: var(--ab-font-mono); font-size: 10px; margin-top: 5px; }
+        .ab-stat-label { width: 26px; color: var(--ab-text-dim); font-size: 9px; text-transform: uppercase; }
+        .ab-stat-bar-wrap { flex: 1; height: 5px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+        .ab-stat-bar-fill { height: 100%; transition: width .4s ease; }
+        .ab-stat-num { min-width: 42px; text-align: right; }
+
+        .ab-gold-badge {
+          position: absolute; right: 0; bottom: 0; z-index: 20;
+          background: var(--ab-bg3); border: 1px solid rgba(255,207,77,0.35);
+          clip-path: polygon(8% 0, 100% 0, 100% 100%, 0% 100%);
+          padding: 8px 14px 8px 22px; text-align: right; min-width: 110px;
+        }
+        .ab-gold-label { font-size: 9px; color: var(--ab-text-dim); letter-spacing: .12em; text-transform: uppercase; }
+        .ab-gold-num { font-family: var(--ab-font-mono); font-size: 18px; font-weight: 700; color: var(--ab-gold); }
+
+        .ab-log {
+          background: #111118; border-radius: 10px; padding: 10px 12px; max-height: 90px;
+          overflow-y: auto; margin: 0 auto 12px; font-size: 12px; color: var(--ab-text-dim);
+          max-width: 500px;
+        }
+        .ab-log p { margin: 2px 0; }
+
+        .ab-last-hand { text-align: center; font-size: 12px; color: var(--ab-lime); margin-bottom: 10px; font-family: var(--ab-font-mono); }
+
+        .ab-hand {
+          position: relative; height: 130px; display: flex; align-items: flex-end;
+          justify-content: center; margin-top: 6px;
+        }
+        .ab-card {
+          position: absolute; width: 64px; height: 90px; border-radius: 9px;
+          background: linear-gradient(160deg, #fdfdfd, #e8e8ee);
+          border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          cursor: pointer; transition: transform .25s cubic-bezier(.2,.9,.3,1.3), box-shadow .2s ease;
+          transform-origin: bottom center; font-family: var(--ab-font-mono); padding: 0;
+        }
+        .ab-card .ab-card-r { font-size: 17px; font-weight: 700; }
+        .ab-card .ab-card-s { font-size: 20px; margin-top: 2px; }
+        .ab-card.red { color: var(--ab-blood); }
+        .ab-card.black { color: #171725; }
+        .ab-card.selected { box-shadow: 0 0 0 3px var(--ab-lime), 0 12px 24px rgba(200,242,60,0.35); }
+        .ab-card:disabled { cursor: default; }
+
+        .ab-hand .ab-card:nth-child(1) { transform: translateX(-115px) rotate(-14deg) translateY(11px); z-index: 1; }
+        .ab-hand .ab-card:nth-child(2) { transform: translateX(-60px) rotate(-7deg) translateY(2px); z-index: 2; }
+        .ab-hand .ab-card:nth-child(3) { transform: translateX(0) rotate(0deg) translateY(-5px); z-index: 3; }
+        .ab-hand .ab-card:nth-child(4) { transform: translateX(60px) rotate(7deg) translateY(2px); z-index: 2; }
+        .ab-hand .ab-card:nth-child(5) { transform: translateX(115px) rotate(14deg) translateY(11px); z-index: 1; }
+
+        .ab-hand .ab-card:nth-child(1):hover:not(:disabled), .ab-hand .ab-card:nth-child(1).selected { transform: translateX(-115px) rotate(-14deg) translateY(-12px); }
+        .ab-hand .ab-card:nth-child(2):hover:not(:disabled), .ab-hand .ab-card:nth-child(2).selected { transform: translateX(-60px) rotate(-7deg) translateY(-22px); }
+        .ab-hand .ab-card:nth-child(3):hover:not(:disabled), .ab-hand .ab-card:nth-child(3).selected { transform: translateX(0) rotate(0deg) translateY(-30px); }
+        .ab-hand .ab-card:nth-child(4):hover:not(:disabled), .ab-hand .ab-card:nth-child(4).selected { transform: translateX(60px) rotate(7deg) translateY(-22px); }
+        .ab-hand .ab-card:nth-child(5):hover:not(:disabled), .ab-hand .ab-card:nth-child(5).selected { transform: translateX(115px) rotate(14deg) translateY(-12px); }
+
+        .ab-actions { display: flex; gap: 12px; justify-content: center; margin: 18px 0 8px; }
+        .ab-btn {
+          font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px;
+          padding: 11px 22px; cursor: pointer; border: none;
+          clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+        }
+        .ab-btn-ghost { background: transparent; border: 1px solid var(--ab-border); color: var(--ab-lime); }
+        .ab-btn-main { background: var(--ab-lime); color: #0a0912; box-shadow: 0 0 20px rgba(200,242,60,0.35); }
+        .ab-btn:disabled { cursor: default; }
+
+        .ab-shake {
+          animation: ab-shake-kf 0.35s ease;
+        }
+        @keyframes ab-shake-kf {
           0%, 100% { transform: translateX(0); }
           20% { transform: translateX(-6px); }
           40% { transform: translateX(6px); }
           60% { transform: translateX(-4px); }
           80% { transform: translateX(4px); }
         }
-        .fx-shake { animation: fxShake 0.35s ease; }
 
-        @keyframes fxFloatDmg {
-          0% { transform: translate(-50%, 0); opacity: 1; }
-          100% { transform: translate(-50%, -40px); opacity: 0; }
+        .ab-boot {
+          position: fixed; inset: 0; background: #000; z-index: 300;
+          display: flex; flex-direction: column; justify-content: center; padding: 60px;
+          font-family: var(--ab-font-mono, monospace); color: var(--ab-glitch, #34e8d0); font-size: 13px;
+          opacity: 0; pointer-events: none;
         }
-        .fx-float-dmg {
-          position: absolute;
-          top: -8px;
-          left: 50%;
-          font-size: 18px;
-          font-weight: 800;
-          animation: fxFloatDmg 0.9s ease-out forwards;
-          pointer-events: none;
-          text-shadow: 0 2px 6px rgba(0,0,0,0.6);
-        }
+        .ab-boot.active { opacity: 1; pointer-events: all; animation: ab-boot-out 0.9s ease forwards; animation-delay: 1.1s; }
+        .ab-boot-lines p { margin: 3px 0; opacity: 0; animation: ab-line-in .25s ease forwards; }
+        .ab-boot-lines p:nth-child(1) { animation-delay: .05s; }
+        .ab-boot-lines p:nth-child(2) { animation-delay: .18s; }
+        .ab-boot-lines p:nth-child(3) { animation-delay: .34s; }
+        .ab-boot-lines p:nth-child(4) { animation-delay: .52s; }
+        .ab-boot-lines p:nth-child(5) { animation-delay: .74s; }
+        @keyframes ab-line-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes ab-boot-out { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+        .ab-boot-ok { color: var(--ab-lime, #c8f23c); font-weight: 700; }
+        .ab-boot-warn { color: var(--ab-gold, #ffcf4d); }
 
-        .fx-card {
-          transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        .fx-card:hover:not(:disabled) {
-          transform: translateY(-4px) scale(1.03);
+        @media (max-width: 600px) {
+          .ab-player-panel, .ab-gold-badge { position: static; margin: 8px auto; display: inline-block; }
+          .ab-arena { align-items: center; }
         }
       `}</style>
     </div>
