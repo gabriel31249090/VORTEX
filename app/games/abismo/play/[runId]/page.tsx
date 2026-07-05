@@ -694,8 +694,15 @@ function StatPill({ label, value, color }: { label: string; value: string; color
   )
 }
 
+// Sprite/retrato com fallback de verdade: se a imagem existir mas falhar ao carregar
+// (URL expirada, bucket privado, path errado etc), cai pro ícone da classe em vez de
+// ficar com o quadrado vazio (o `avatarUrl ? <img> : icon` original só cobria o caso
+// de avatarUrl ser null — não cobria erro de carregamento).
 function PlayerPortrait({ avatarUrl, classId, size = 56 }: { avatarUrl: string | null; classId: string; size?: number }) {
   const meta = CLASS_META[classId as ClassId]
+  const [broken, setBroken] = useState(false)
+  const showImg = !!avatarUrl && !broken
+
   return (
     <div style={{
       width: size, height: size, borderRadius: 12, overflow: 'hidden',
@@ -703,8 +710,13 @@ function PlayerPortrait({ avatarUrl, classId, size = 56 }: { avatarUrl: string |
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.4, flexShrink: 0,
     }}>
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      {showImg ? (
+        <img
+          src={avatarUrl!}
+          alt=""
+          onError={() => setBroken(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
       ) : (
         meta?.icon || '🎭'
       )}
@@ -750,6 +762,17 @@ function CombatSpectatorScreen({ run }: { run: AbismoRun }) {
         {state.log.slice(-5).map((l, i) => <p key={i} style={{ margin: '2px 0' }}>{l}</p>)}
       </div>
     </div>
+  )
+}
+
+// Sprite do jogador dentro da arena de combate — mesma correção de fallback do PlayerPortrait.
+function PlayerBattleSprite({ avatarUrl, icon }: { avatarUrl: string | null; icon: string }) {
+  const [broken, setBroken] = useState(false)
+  const showImg = !!avatarUrl && !broken
+  return showImg ? (
+    <img src={avatarUrl!} alt="" onError={() => setBroken(true)} />
+  ) : (
+    <span>{icon}</span>
   )
 }
 
@@ -859,7 +882,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
                 <div className={`ab-player-stage ${playerShake ? 'ab-shake' : ''}`}>
                   <div className="ab-player-platform" />
                   <div className="ab-player-sprite">
-                    {myStats.avatarUrl ? <img src={myStats.avatarUrl} alt="" /> : (meta?.icon || '🎭')}
+                    <PlayerBattleSprite avatarUrl={myStats.avatarUrl} icon={meta?.icon || '🎭'} />
                     {playerFx && (
                       <span key={playerFx.id} className="ab-dmg-float" style={{ color: playerFx.heal ? 'var(--ab-lime)' : 'var(--ab-blood)' }}>
                         {playerFx.heal ? '+' : '-'}{playerFx.dmg}
