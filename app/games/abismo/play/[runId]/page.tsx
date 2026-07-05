@@ -566,7 +566,7 @@ function MapScreen({ run, myStats, onNodeClick, isHost, onCopyInvite }: {
   )
 }
 
-// ============ TELA DE LOJA ============
+// ============ TELA DE LOJA — cena imersiva do Mercador do Abismo ============
 function ShopScreen({ stock, myStats, busy, onBuy, onSellRelic, onClose }: {
   stock: ShopItemDef[]
   myStats: RunPlayerStats
@@ -575,112 +575,356 @@ function ShopScreen({ stock, myStats, busy, onBuy, onSellRelic, onClose }: {
   onSellRelic: (relicId: string) => void
   onClose: () => void
 }) {
+  const [boot, setBoot] = useState(true)
+  useEffect(() => {
+    const t = setTimeout(() => setBoot(false), 1400)
+    return () => clearTimeout(t)
+  }, [])
+
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700 }}>🏪 Loja do Abismo</h2>
-        <StatPill label="Suas fichas" value={String(myStats.gold)} color="#c8f23c" />
+    <div className="ab-shop-root">
+      <div className={`ab-shop-boot ${boot ? 'active' : ''}`}>
+        <p>&gt; conectando ao nó...</p>
+        <p>&gt; entidade detectada: <span className="ab-shop-boot-warn">MERCADOR_ESPECTRAL.exe</span></p>
+        <p className="ab-shop-boot-ok">&gt; estoque sincronizado.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 28 }}>
-        {stock.map(item => (
-          <div key={item.id} style={{ background: '#111118', borderRadius: 12, padding: 14, border: '1px solid rgba(200,242,60,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 22 }}>{item.icon}</span>
-              <p style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</p>
+      <div className="ab-shop-stage">
+        <div className="ab-bg-anim">
+          <span className="ab-blob ab-blob-1" />
+          <span className="ab-blob ab-blob-2" />
+          <span className="ab-blob ab-blob-3" />
+          <div className="ab-stage-scanlines" />
+        </div>
+
+        <div className="ab-shop-content">
+          <div className="ab-hud-top">NÓ · <b>LOJA</b> · MERCADOR</div>
+
+          <div className="ab-shop-scene">
+            <div className="ab-shop-merchant-zone">
+              <div className="ab-shop-platform" />
+              <div className="ab-shop-merchant">🧙‍♂️</div>
+              <div className="ab-shop-speech">"Fichas compram poder... e o poder sempre cobra o seu preço."</div>
             </div>
-            <p style={{ fontSize: 12, color: '#8888aa', marginBottom: 12, minHeight: 32 }}>{item.desc}</p>
-            <button
-              onClick={() => onBuy(item)}
-              disabled={busy || myStats.gold < item.cost}
-              style={{
-                width: '100%', padding: '8px 0', borderRadius: 8, border: 'none',
-                background: myStats.gold < item.cost ? '#333' : '#c8f23c',
-                color: myStats.gold < item.cost ? '#666' : '#000',
-                fontWeight: 700, fontSize: 13, cursor: busy || myStats.gold < item.cost ? 'default' : 'pointer',
-                fontFamily: "'Syne', sans-serif",
-              }}
-            >
-              Comprar · {item.cost} 🪙
-            </button>
-          </div>
-        ))}
-      </div>
 
-      {myStats.relics.length > 0 && (
-        <>
-          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: '#8888aa' }}>Vender relíquias (20 🪙 cada)</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 28 }}>
-            {myStats.relics.map((relicId, i) => {
-              const relic = RELICS.find(r => r.id === relicId)
-              if (!relic) return null
+            <div className="ab-shop-gold-badge">
+              <div className="ab-gold-label">Fichas</div>
+              <div className="ab-gold-num">{myStats.gold}</div>
+            </div>
+          </div>
+
+          <div className="ab-shop-fan">
+            {stock.map((item, i) => {
+              const affordable = myStats.gold >= item.cost
               return (
                 <button
-                  key={`${relicId}-${i}`}
-                  onClick={() => onSellRelic(relicId)}
-                  disabled={busy}
-                  title={relic.desc}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
-                    borderRadius: 10, border: '1px solid rgba(255,68,102,0.3)', background: 'rgba(255,68,102,0.06)',
-                    color: '#ff8899', fontSize: 12, fontWeight: 700, cursor: busy ? 'default' : 'pointer',
-                    fontFamily: "'Syne', sans-serif",
-                  }}
+                  key={item.id}
+                  onClick={() => onBuy(item)}
+                  disabled={busy || !affordable}
+                  className={`ab-shop-card ${!affordable ? 'locked' : ''}`}
+                  title={item.desc}
                 >
-                  <span>{relic.icon}</span> {relic.name}
+                  <span className="ab-shop-card-icon">{item.icon}</span>
+                  <span className="ab-shop-card-name">{item.name}</span>
+                  <span className="ab-shop-card-desc">{item.desc}</span>
+                  <span className="ab-shop-card-price">{item.cost} 🪙</span>
                 </button>
               )
             })}
           </div>
-        </>
-      )}
 
-      <button
-        onClick={onClose}
-        style={{
-          padding: '10px 24px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
-          background: 'transparent', color: '#f0f0f8', fontWeight: 700, fontSize: 13,
-          cursor: 'pointer', fontFamily: "'Syne', sans-serif",
-        }}
-      >
-        Sair da loja
-      </button>
+          {myStats.relics.length > 0 && (
+            <div className="ab-shop-satchel">
+              <div className="ab-shop-satchel-title">🎒 Vender relíquias · 20 🪙 cada</div>
+              <div className="ab-shop-satchel-row">
+                {myStats.relics.map((relicId, i) => {
+                  const relic = RELICS.find(r => r.id === relicId)
+                  if (!relic) return null
+                  return (
+                    <button
+                      key={`${relicId}-${i}`}
+                      onClick={() => onSellRelic(relicId)}
+                      disabled={busy}
+                      title={relic.desc}
+                      className="ab-shop-relic-slot"
+                    >
+                      <span className="ab-relic-icon">{relic.icon}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="ab-shop-actions">
+            <button onClick={onClose} className="ab-shop-btn-ghost">Sair da loja</button>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        .ab-shop-root {
+          --ab-bg3: #1c1830; --ab-bg4: #241f3d; --ab-border: rgba(200,242,60,0.14);
+          --ab-lime: #c8f23c; --ab-blood: #ff3d63; --ab-glitch: #34e8d0;
+          --ab-gold: #ffcf4d; --ab-void-purple: #8b5cf6; --ab-text-dim: #8888aa;
+          --ab-font-mono: 'JetBrains Mono', monospace;
+          position: relative;
+        }
+        .ab-shop-stage {
+          position: relative; max-width: 900px; margin: 0 auto; border-radius: 16px;
+          overflow: hidden; border: 1px solid var(--ab-border); background: #0a0912;
+        }
+        .ab-shop-content { position: relative; z-index: 2; padding: 24px 28px 28px; }
+
+        .ab-bg-anim { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
+        .ab-blob {
+          position: absolute; border-radius: 50%; filter: blur(50px); opacity: 0.35;
+          animation: ab-drift 14s ease-in-out infinite;
+        }
+        .ab-blob-1 { width: 220px; height: 220px; background: var(--ab-void-purple); top: -40px; left: -40px; animation-duration: 16s; }
+        .ab-blob-2 { width: 180px; height: 180px; background: var(--ab-lime); bottom: -30px; right: -30px; animation-duration: 19s; animation-delay: -4s; }
+        .ab-blob-3 { width: 150px; height: 150px; background: var(--ab-glitch); top: 40%; right: 20%; animation-duration: 13s; animation-delay: -8s; opacity: 0.22; }
+        @keyframes ab-drift {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(24px, -18px) scale(1.08); }
+          66% { transform: translate(-18px, 14px) scale(0.94); }
+        }
+        .ab-stage-scanlines {
+          position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+          background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.35) 3px, rgba(0,0,0,0.35) 4px);
+        }
+        .ab-hud-top {
+          text-align: center; font-family: var(--ab-font-mono); font-size: 10px;
+          letter-spacing: .2em; color: var(--ab-text-dim); text-transform: uppercase;
+          margin-bottom: 8px;
+        }
+        .ab-hud-top b { color: var(--ab-glitch); }
+        @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes ab-boot-out { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+        .ab-shop-scene { position: relative; min-height: 220px; margin-bottom: 20px; }
+        .ab-shop-merchant-zone {
+          display: flex; flex-direction: column; align-items: center; text-align: center;
+          padding-top: 8px;
+        }
+        .ab-shop-platform {
+          width: 200px; height: 60px; border-radius: 50%;
+          background: linear-gradient(180deg, rgba(139,92,246,0.18), rgba(139,92,246,0.02));
+          border: 1px solid rgba(139,92,246,0.35);
+          box-shadow: 0 0 40px rgba(139,92,246,0.15) inset;
+          margin-bottom: -30px; transform: rotateX(62deg);
+        }
+        .ab-shop-merchant {
+          font-size: 64px; line-height: 1; position: relative; z-index: 2;
+          filter: drop-shadow(0 12px 16px rgba(139,92,246,0.4));
+          animation: ab-float-enemy 3.6s ease-in-out infinite;
+        }
+        .ab-shop-speech {
+          margin-top: 10px; max-width: 380px; font-size: 12px; font-style: italic;
+          color: var(--ab-text-dim); font-family: var(--ab-font-mono); line-height: 1.5;
+        }
+        .ab-shop-gold-badge {
+          position: absolute; top: 0; right: 0;
+          background: var(--ab-bg3); border: 1px solid rgba(255,207,77,0.35);
+          clip-path: polygon(8% 0, 100% 0, 100% 100%, 0% 100%);
+          padding: 8px 14px 8px 22px; text-align: right; min-width: 110px;
+        }
+
+        .ab-shop-fan {
+          position: relative; height: 190px; display: flex; align-items: flex-end;
+          justify-content: center; margin: 8px 0 24px;
+        }
+        .ab-shop-card {
+          position: absolute; width: 150px; height: 190px; border-radius: 12px; padding: 14px 12px;
+          display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+          background: linear-gradient(160deg, var(--ab-bg4), #171327);
+          border: 1px solid var(--ab-border); cursor: pointer; color: #f0f0f8;
+          font-family: 'Syne', sans-serif;
+          transition: transform .25s cubic-bezier(.2,.9,.3,1.3), box-shadow .2s ease, border-color .2s ease;
+          transform-origin: bottom center;
+        }
+        .ab-shop-card-icon { font-size: 28px; }
+        .ab-shop-card-name { font-size: 13px; font-weight: 700; }
+        .ab-shop-card-desc { font-size: 10px; color: var(--ab-text-dim); line-height: 1.4; flex: 1; }
+        .ab-shop-card-price {
+          font-family: var(--ab-font-mono); font-size: 13px; font-weight: 700; color: var(--ab-gold);
+          border-top: 1px dashed rgba(255,207,77,0.25); padding-top: 6px; width: 100%;
+        }
+        .ab-shop-card:not(.locked):hover { border-color: var(--ab-lime); box-shadow: 0 0 20px rgba(200,242,60,0.25); }
+        .ab-shop-card.locked { opacity: 0.4; cursor: default; }
+        .ab-shop-card:disabled { cursor: default; }
+
+        .ab-shop-fan .ab-shop-card:nth-child(1) { transform: translateX(-118px) rotate(-8deg) translateY(6px); z-index: 1; }
+        .ab-shop-fan .ab-shop-card:nth-child(2) { transform: translateX(0) rotate(0deg) translateY(-8px); z-index: 2; }
+        .ab-shop-fan .ab-shop-card:nth-child(3) { transform: translateX(118px) rotate(8deg) translateY(6px); z-index: 1; }
+        .ab-shop-fan .ab-shop-card:nth-child(1):not(.locked):hover { transform: translateX(-118px) rotate(-8deg) translateY(-14px); }
+        .ab-shop-fan .ab-shop-card:nth-child(2):not(.locked):hover { transform: translateX(0) rotate(0deg) translateY(-26px); }
+        .ab-shop-fan .ab-shop-card:nth-child(3):not(.locked):hover { transform: translateX(118px) rotate(8deg) translateY(-14px); }
+
+        .ab-shop-satchel { margin-bottom: 24px; }
+        .ab-shop-satchel-title {
+          font-size: 12px; font-weight: 700; color: var(--ab-text-dim); margin-bottom: 10px;
+          text-transform: uppercase; letter-spacing: .08em; font-family: var(--ab-font-mono);
+        }
+        .ab-shop-satchel-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .ab-shop-relic-slot {
+          width: 44px; height: 44px; border-radius: 10px; background: var(--ab-bg4);
+          border: 1px solid rgba(255,61,99,0.3); display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: box-shadow .2s ease;
+        }
+        .ab-shop-relic-slot:hover:not(:disabled) { box-shadow: 0 0 14px rgba(255,61,99,0.3); }
+        .ab-shop-relic-slot:disabled { cursor: default; opacity: 0.6; }
+        .ab-shop-relic-slot .ab-relic-icon { font-size: 20px; }
+
+        .ab-shop-actions { text-align: center; }
+        .ab-shop-btn-ghost {
+          font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px;
+          padding: 11px 22px; cursor: pointer; background: transparent;
+          border: 1px solid var(--ab-border); color: var(--ab-lime);
+          clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+        }
+        .ab-shop-btn-ghost:hover { box-shadow: 0 0 14px rgba(200,242,60,0.2); }
+
+        .ab-shop-boot {
+          position: fixed; inset: 0; background: #000; z-index: 300;
+          display: flex; flex-direction: column; justify-content: center; padding: 60px;
+          font-family: var(--ab-font-mono, monospace); color: var(--ab-glitch, #34e8d0); font-size: 13px;
+          opacity: 0; pointer-events: none;
+        }
+        .ab-shop-boot.active { opacity: 1; pointer-events: all; animation: ab-boot-out 0.7s ease forwards; animation-delay: .7s; }
+        .ab-shop-boot p { margin: 3px 0; }
+        .ab-shop-boot-ok { color: var(--ab-lime, #c8f23c); font-weight: 700; }
+        .ab-shop-boot-warn { color: var(--ab-gold, #ffcf4d); }
+
+        @media (max-width: 560px) {
+          .ab-shop-fan { flex-direction: column; height: auto; gap: 12px; }
+          .ab-shop-fan .ab-shop-card { position: static; transform: none !important; width: 100%; height: auto; min-height: 140px; }
+          .ab-shop-gold-badge { position: static; margin: 0 auto 12px; }
+        }
+      `}</style>
     </div>
   )
 }
 
-// ============ TELA DE EVENTO ============
+// ============ TELA DE EVENTO — cena narrativa ============
 function EventScreen({ event, busy, onChoice }: {
   event: EventDef
   busy: boolean
   onChoice: (action: string) => void
 }) {
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
-      <span style={{ fontSize: 44, display: 'block', marginBottom: 8 }}>{event.icon}</span>
-      <h2 style={{ fontSize: 19, fontWeight: 800, marginBottom: 10 }}>{event.title}</h2>
-      <p style={{ fontSize: 13, color: '#8888aa', marginBottom: 28, lineHeight: 1.5 }}>{event.desc}</p>
+    <div className="ab-event-root">
+      <div className="ab-event-stage">
+        <div className="ab-bg-anim">
+          <span className="ab-blob ab-blob-1" />
+          <span className="ab-blob ab-blob-2" />
+          <span className="ab-blob ab-blob-3" />
+          <div className="ab-stage-scanlines" />
+        </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {event.choices.map((choice, i) => (
-          <button
-            key={i}
-            onClick={() => onChoice(choice.action)}
-            disabled={busy}
-            style={{
-              padding: '14px 16px', borderRadius: 10,
-              border: choice.action === 'leave' ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(200,242,60,0.25)',
-              background: choice.action === 'leave' ? 'transparent' : 'rgba(200,242,60,0.06)',
-              color: choice.action === 'leave' ? '#8888aa' : '#f0f0f8',
-              fontWeight: 600, fontSize: 13, cursor: busy ? 'default' : 'pointer',
-              fontFamily: "'Syne', sans-serif", textAlign: 'left',
-              opacity: busy ? 0.6 : 1,
-            }}
-          >
-            {choice.txt}
-          </button>
-        ))}
+        <div className="ab-event-content">
+          <div className="ab-hud-top">NÓ · <b>EVENTO</b> · DESCONHECIDO</div>
+
+          <div className="ab-event-portal">
+            <span className="ab-event-icon">{event.icon}</span>
+          </div>
+
+          <div className="ab-event-scroll">
+            <p className="ab-event-log-line">&gt; registro_do_abismo.log</p>
+            <h2 className="ab-event-title">{event.title}</h2>
+            <p className="ab-event-desc">{event.desc}</p>
+          </div>
+
+          <div className="ab-event-choices">
+            {event.choices.map((choice, i) => (
+              <button
+                key={i}
+                onClick={() => onChoice(choice.action)}
+                disabled={busy}
+                className={`ab-event-choice ${choice.action === 'leave' ? 'leave' : ''}`}
+              >
+                {choice.txt}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      <style>{`
+        .ab-event-root {
+          --ab-bg3: #1c1830; --ab-bg4: #241f3d; --ab-border: rgba(200,242,60,0.14);
+          --ab-lime: #c8f23c; --ab-blood: #ff3d63; --ab-glitch: #34e8d0;
+          --ab-gold: #ffcf4d; --ab-void-purple: #8b5cf6; --ab-text-dim: #8888aa;
+          --ab-font-mono: 'JetBrains Mono', monospace;
+        }
+        .ab-event-stage {
+          position: relative; max-width: 640px; margin: 0 auto; border-radius: 16px;
+          overflow: hidden; border: 1px solid var(--ab-border); background: #0a0912;
+        }
+        .ab-event-content { position: relative; z-index: 2; padding: 28px 32px 32px; text-align: center; }
+
+        .ab-bg-anim { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
+        .ab-blob {
+          position: absolute; border-radius: 50%; filter: blur(50px); opacity: 0.35;
+          animation: ab-drift 14s ease-in-out infinite;
+        }
+        .ab-blob-1 { width: 220px; height: 220px; background: var(--ab-void-purple); top: -40px; left: -40px; animation-duration: 16s; }
+        .ab-blob-2 { width: 180px; height: 180px; background: var(--ab-lime); bottom: -30px; right: -30px; animation-duration: 19s; animation-delay: -4s; }
+        .ab-blob-3 { width: 150px; height: 150px; background: var(--ab-glitch); top: 40%; right: 20%; animation-duration: 13s; animation-delay: -8s; opacity: 0.22; }
+        @keyframes ab-drift {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(24px, -18px) scale(1.08); }
+          66% { transform: translate(-18px, 14px) scale(0.94); }
+        }
+        .ab-stage-scanlines {
+          position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+          background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.35) 3px, rgba(0,0,0,0.35) 4px);
+        }
+        .ab-hud-top {
+          text-align: center; font-family: var(--ab-font-mono); font-size: 10px;
+          letter-spacing: .2em; color: var(--ab-text-dim); text-transform: uppercase;
+          margin-bottom: 8px;
+        }
+        .ab-hud-top b { color: var(--ab-glitch); }
+        @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        .ab-event-portal {
+          width: 120px; height: 120px; margin: 8px auto 20px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          background: radial-gradient(circle, rgba(139,92,246,0.22), rgba(139,92,246,0.02) 70%);
+          border: 1px solid rgba(139,92,246,0.35);
+          box-shadow: 0 0 50px rgba(139,92,246,0.2);
+        }
+        .ab-event-icon { font-size: 52px; animation: ab-float-enemy 3.4s ease-in-out infinite; }
+
+        .ab-event-scroll {
+          background: var(--ab-bg3); border: 1px solid var(--ab-border);
+          clip-path: polygon(3% 0, 100% 0, 97% 100%, 0% 100%);
+          padding: 18px 26px; margin-bottom: 24px; text-align: left;
+        }
+        .ab-event-log-line {
+          font-family: var(--ab-font-mono); font-size: 10px; color: var(--ab-glitch);
+          letter-spacing: .05em; margin-bottom: 8px;
+        }
+        .ab-event-title { font-size: 19px; font-weight: 800; margin-bottom: 10px; font-family: 'Syne', sans-serif; }
+        .ab-event-desc { font-size: 13px; color: var(--ab-text-dim); line-height: 1.6; }
+
+        .ab-event-choices { display: flex; flex-direction: column; gap: 10px; }
+        .ab-event-choice {
+          padding: 14px 20px; text-align: left; font-family: 'Syne', sans-serif;
+          font-weight: 600; font-size: 13px; cursor: pointer; color: #f0f0f8;
+          background: rgba(200,242,60,0.06); border: 1px solid rgba(200,242,60,0.25);
+          clip-path: polygon(1.5% 0, 100% 0, 98.5% 100%, 0% 100%);
+          transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease;
+        }
+        .ab-event-choice:not(:disabled):hover { border-color: var(--ab-lime); box-shadow: 0 0 16px rgba(200,242,60,0.2); transform: translateX(2px); }
+        .ab-event-choice.leave { background: transparent; border-color: rgba(255,255,255,0.15); color: var(--ab-text-dim); }
+        .ab-event-choice:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+        @media (max-width: 560px) {
+          .ab-event-content { padding: 24px 18px 28px; }
+        }
+      `}</style>
     </div>
   )
 }
