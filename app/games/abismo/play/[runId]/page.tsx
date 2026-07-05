@@ -836,10 +836,12 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
           {/* Arena 2.5D — só o inimigo aqui, sem elementos flutuantes por cima */}
           <div className="ab-arena">
             <div className="ab-enemy-zone">
-              <div className="ab-enemy-platform" />
-              <div className={`ab-enemy-sprite ${enemyShake ? 'ab-shake' : ''}`}>
-                {state.enemy.icon}
-                {enemyFx && <span key={enemyFx.id} className="ab-dmg-float">-{enemyFx.dmg}</span>}
+              <div className="ab-enemy-stage">
+                <div className="ab-enemy-platform" />
+                <div className={`ab-enemy-sprite ${enemyShake ? 'ab-shake' : ''}`}>
+                  {state.enemy.icon}
+                  {enemyFx && <span key={enemyFx.id} className="ab-dmg-float">-{enemyFx.dmg}</span>}
+                </div>
               </div>
               <div className="ab-enemy-card">
                 <div className="ab-enemy-name">{state.enemy.name}</div>
@@ -1001,21 +1003,26 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
           gap: 12px; margin-top: 14px; margin-bottom: 8px; flex-wrap: wrap;
         }
 
-        .ab-enemy-zone { position: relative; margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
+        .ab-enemy-zone { position: relative; margin-top: 8px; display: flex; flex-direction: column; align-items: center; }
+
+        .ab-enemy-stage {
+          position: relative; height: 190px; width: 100%;
+          display: flex; align-items: flex-end; justify-content: center;
+        }
         .ab-enemy-platform {
-          width: 220px; height: 76px;
+          position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%) rotateX(62deg);
+          width: 260px; height: 84px; z-index: 1;
           background: linear-gradient(180deg, rgba(255,61,99,0.16), rgba(255,61,99,0.02));
           border: 1px solid rgba(255,61,99,0.35);
-          transform: rotateX(62deg); border-radius: 50%;
+          border-radius: 50%;
           box-shadow: 0 0 40px rgba(255,61,99,0.15) inset;
-          margin-bottom: -26px;
         }
         .ab-enemy-sprite {
-          font-size: 52px; filter: drop-shadow(0 12px 18px rgba(255,61,99,0.35));
+          position: relative; z-index: 2; font-size: 108px; line-height: 1;
+          filter: drop-shadow(0 14px 20px rgba(255,61,99,0.4));
           animation: ab-float-enemy 3.2s ease-in-out infinite;
-          position: relative; z-index: 2;
         }
-        @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
         .ab-enemy-card {
           margin-top: 8px; padding: 8px 20px; text-align: center;
