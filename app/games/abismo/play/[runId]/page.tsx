@@ -833,7 +833,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         <div className="ab-content">
           <div className="ab-hud-top">ANDAR · <b>{state.enemy.type}</b> · COMBATE</div>
 
-          {/* Arena 2.5D — só o inimigo aqui, sem elementos flutuantes por cima */}
+          {/* Arena diagonal estilo Pokémon: inimigo em cima-direita, jogador embaixo-esquerda */}
           <div className="ab-arena">
             <div className="ab-enemy-zone">
               <div className="ab-enemy-stage">
@@ -851,36 +851,34 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
               </div>
             </div>
 
-            <div className="ab-arena-floor" />
-          </div>
-
-          {/* Painel do jogador + fichas — linha normal, nunca sobrepõe a arena */}
-          <div className="ab-status-row">
-            <div className={`ab-player-panel ${playerShake ? 'ab-shake' : ''}`}>
-              <div className="ab-player-name-row">
-                <div className="ab-player-portrait">
-                  {myStats.avatarUrl ? <img src={myStats.avatarUrl} alt="" /> : (meta?.icon || '🎭')}
-                  {playerFx && (
-                    <span key={playerFx.id} className="ab-dmg-float" style={{ color: playerFx.heal ? 'var(--ab-lime)' : 'var(--ab-blood)' }}>
-                      {playerFx.heal ? '+' : '-'}{playerFx.dmg}
-                    </span>
-                  )}
+            <div className={`ab-player-zone ${playerShake ? 'ab-shake' : ''}`}>
+              <div className="ab-player-panel">
+                <div className="ab-player-name-row">
+                  <div className="ab-player-portrait">
+                    {myStats.avatarUrl ? <img src={myStats.avatarUrl} alt="" /> : (meta?.icon || '🎭')}
+                    {playerFx && (
+                      <span key={playerFx.id} className="ab-dmg-float" style={{ color: playerFx.heal ? 'var(--ab-lime)' : 'var(--ab-blood)' }}>
+                        {playerFx.heal ? '+' : '-'}{playerFx.dmg}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="ab-player-name">{myStats.characterName}</div>
+                    <div className="ab-player-class">{meta?.name || myStats.classId}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="ab-player-name">{myStats.characterName}</div>
-                  <div className="ab-player-class">{meta?.name || myStats.classId}</div>
+                <div className="ab-stat-row">
+                  <span className="ab-stat-label">HP</span>
+                  <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${playerHpPct}%`, background: 'var(--ab-blood)' }} /></div>
+                  <span className="ab-stat-num">{state.playerHp}/{state.playerMaxHp}</span>
+                </div>
+                <div className="ab-stat-row">
+                  <span className="ab-stat-label">DEF</span>
+                  <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${armorPct}%`, background: '#60a5fa' }} /></div>
+                  <span className="ab-stat-num">{state.armor}</span>
                 </div>
               </div>
-              <div className="ab-stat-row">
-                <span className="ab-stat-label">HP</span>
-                <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${playerHpPct}%`, background: 'var(--ab-blood)' }} /></div>
-                <span className="ab-stat-num">{state.playerHp}/{state.playerMaxHp}</span>
-              </div>
-              <div className="ab-stat-row">
-                <span className="ab-stat-label">DEF</span>
-                <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${armorPct}%`, background: '#60a5fa' }} /></div>
-                <span className="ab-stat-num">{state.armor}</span>
-              </div>
+              <div className="ab-player-platform" />
             </div>
 
             <div className="ab-gold-badge">
@@ -958,14 +956,14 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
 
         .ab-stage {
           position: relative;
-          max-width: 640px;
+          max-width: 880px;
           margin: 0 auto;
           border-radius: 16px;
           overflow: hidden;
           border: 1px solid var(--ab-border);
           background: #0a0912;
         }
-        .ab-content { position: relative; z-index: 2; padding: 20px 20px 24px; }
+        .ab-content { position: relative; z-index: 2; padding: 24px 28px 28px; }
 
         .ab-bg-anim { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
         .ab-blob {
@@ -993,42 +991,51 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         .ab-hud-top b { color: var(--ab-glitch); }
 
         .ab-arena {
-          position: relative; min-height: 200px;
-          display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+          position: relative; min-height: 380px; width: 100%;
           perspective: 1200px;
+          margin-bottom: 8px;
         }
 
-        .ab-status-row {
-          display: flex; align-items: flex-end; justify-content: space-between;
-          gap: 12px; margin-top: 14px; margin-bottom: 8px; flex-wrap: wrap;
+        .ab-enemy-zone {
+          position: absolute; top: 4px; right: 4%; z-index: 5;
+          display: flex; flex-direction: column; align-items: center;
         }
-
-        .ab-enemy-zone { position: relative; margin-top: 8px; display: flex; flex-direction: column; align-items: center; }
-
         .ab-enemy-stage {
-          position: relative; height: 190px; width: 100%;
+          position: relative; height: 150px; width: 200px;
           display: flex; align-items: flex-end; justify-content: center;
         }
         .ab-enemy-platform {
           position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%) rotateX(62deg);
-          width: 260px; height: 84px; z-index: 1;
+          width: 210px; height: 68px; z-index: 1;
           background: linear-gradient(180deg, rgba(255,61,99,0.16), rgba(255,61,99,0.02));
           border: 1px solid rgba(255,61,99,0.35);
           border-radius: 50%;
           box-shadow: 0 0 40px rgba(255,61,99,0.15) inset;
         }
         .ab-enemy-sprite {
-          position: relative; z-index: 2; font-size: 108px; line-height: 1;
-          filter: drop-shadow(0 14px 20px rgba(255,61,99,0.4));
+          position: relative; z-index: 2; font-size: 56px; line-height: 1;
+          filter: drop-shadow(0 12px 16px rgba(255,61,99,0.4));
           animation: ab-float-enemy 3.2s ease-in-out infinite;
         }
-        @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 
         .ab-enemy-card {
-          margin-top: 8px; padding: 8px 20px; text-align: center;
+          margin-top: 6px; padding: 8px 20px; text-align: center;
           background: var(--ab-bg3); border: 1px solid rgba(255,61,99,0.3);
           clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
-          min-width: 200px;
+          min-width: 190px;
+        }
+
+        .ab-player-zone {
+          position: absolute; bottom: 4px; left: 4%; z-index: 5;
+          display: flex; flex-direction: column; align-items: center;
+        }
+        .ab-player-platform {
+          width: 150px; height: 46px; margin-top: -8px;
+          background: linear-gradient(180deg, rgba(200,242,60,0.14), rgba(200,242,60,0.02));
+          border: 1px solid rgba(200,242,60,0.3);
+          transform: rotateX(62deg); border-radius: 50%;
+          box-shadow: 0 0 30px rgba(200,242,60,0.12) inset;
         }
         .ab-enemy-name { font-weight: 800; font-size: 14px; }
         .ab-enemy-type { font-size: 10px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
@@ -1049,11 +1056,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
           100% { transform: translate(-48%,-48px) scale(0.9); opacity: 0; }
         }
 
-        .ab-arena-floor {
-          width: 92%; max-width: 700px; height: 1px; margin: 14px 0 0;
-          background: linear-gradient(90deg, transparent, rgba(200,242,60,0.25), transparent);
-        }
-
+        
         .ab-player-panel {
           position: relative; z-index: 20;
           background: var(--ab-bg3); border: 1px solid var(--ab-border);
@@ -1077,7 +1080,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         .ab-stat-num { min-width: 42px; text-align: right; }
 
         .ab-gold-badge {
-          position: relative; z-index: 20;
+          position: absolute; top: 4px; left: 4%; z-index: 5;
           background: var(--ab-bg3); border: 1px solid rgba(255,207,77,0.35);
           clip-path: polygon(8% 0, 100% 0, 100% 100%, 0% 100%);
           padding: 8px 14px 8px 22px; text-align: right; min-width: 110px;
@@ -1164,8 +1167,11 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         .ab-boot-ok { color: var(--ab-lime, #c8f23c); font-weight: 700; }
         .ab-boot-warn { color: var(--ab-gold, #ffcf4d); }
 
-        @media (max-width: 600px) {
-          .ab-status-row { justify-content: center; }
+        @media (max-width: 700px) {
+          .ab-arena { min-height: 460px; }
+          .ab-enemy-zone { top: 4px; right: 50%; transform: translateX(50%); }
+          .ab-player-zone { bottom: 4px; left: 50%; transform: translateX(-50%); }
+          .ab-gold-badge { position: static; margin: 0 auto 8px; }
         }
       `}</style>
     </div>
