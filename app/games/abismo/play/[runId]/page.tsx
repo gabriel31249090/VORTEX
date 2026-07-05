@@ -991,10 +991,14 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         .ab-hud-top b { color: var(--ab-glitch); }
 
         .ab-arena {
-          position: relative; min-height: 320px;
+          position: relative; min-height: 200px;
           display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
           perspective: 1200px;
-          margin-bottom: 16px;
+        }
+
+        .ab-status-row {
+          display: flex; align-items: flex-end; justify-content: space-between;
+          gap: 12px; margin-top: 14px; margin-bottom: 8px; flex-wrap: wrap;
         }
 
         .ab-enemy-zone { position: relative; margin-top: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -1044,7 +1048,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         }
 
         .ab-player-panel {
-          position: absolute; left: 0; bottom: 0; z-index: 20;
+          position: relative; z-index: 20;
           background: var(--ab-bg3); border: 1px solid var(--ab-border);
           clip-path: polygon(0 0, 100% 0, 92% 100%, 0% 100%);
           padding: 10px 30px 10px 14px; min-width: 190px;
@@ -1066,7 +1070,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         .ab-stat-num { min-width: 42px; text-align: right; }
 
         .ab-gold-badge {
-          position: absolute; right: 0; bottom: 0; z-index: 20;
+          position: relative; z-index: 20;
           background: var(--ab-bg3); border: 1px solid rgba(255,207,77,0.35);
           clip-path: polygon(8% 0, 100% 0, 100% 100%, 0% 100%);
           padding: 8px 14px 8px 22px; text-align: right; min-width: 110px;
@@ -1154,8 +1158,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         .ab-boot-warn { color: var(--ab-gold, #ffcf4d); }
 
         @media (max-width: 600px) {
-          .ab-player-panel, .ab-gold-badge { position: static; margin: 8px auto; display: inline-block; }
-          .ab-arena { align-items: center; }
+          .ab-status-row { justify-content: center; }
         }
       `}</style>
     </div>
