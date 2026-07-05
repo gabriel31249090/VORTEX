@@ -75,6 +75,33 @@ function mod(score: number) {
   return m >= 0 ? `+${m}` : `${m}`
 }
 
+// Retrato com fallback: se avatar_url existir mas a imagem falhar ao carregar
+// (bucket não-público, arquivo ausente, URL expirada etc), cai pro ícone da classe
+// em vez de mostrar o alt text / ícone de imagem quebrada do navegador.
+function CharacterAvatar({ avatarUrl, icon, name, size = 56 }: { avatarUrl: string | null; icon: string; name: string; size?: number }) {
+  const [broken, setBroken] = useState(false)
+  const showImg = !!avatarUrl && !broken
+
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 10, background: '#1a1726',
+      border: '1px solid rgba(200,242,60,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.42, overflow: 'hidden', flexShrink: 0,
+    }}>
+      {showImg ? (
+        <img
+          src={avatarUrl!}
+          alt={name}
+          onError={() => setBroken(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      ) : (
+        icon || '🎭'
+      )}
+    </div>
+  )
+}
+
 export default function AbismoGamePage() {
   const router = useRouter()
   const supabase = createClient()
@@ -261,15 +288,7 @@ export default function AbismoGamePage() {
           </div>
         </div>
 
-        <div style={{
-          marginTop: 24, marginBottom: 32, borderRadius: 12,
-          border: '1px dashed rgba(200,242,60,0.15)', padding: 24, textAlign: 'center'
-        }}>
-          <p style={{ fontSize: 14, color: '#8888aa' }}>O jogo em si ainda vai entrar aqui (multiplayer via Supabase Realtime).</p>
-          <p style={{ fontSize: 12, color: '#666688', marginTop: 4 }}>Por enquanto, crie e gerencie seus personagens abaixo.</p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: '#f0f0f8', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#c8f23c' }}>🎭</span> Seus Personagens
           </h2>
@@ -312,15 +331,7 @@ export default function AbismoGamePage() {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.1)'; e.currentTarget.style.boxShadow = 'none' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    <div style={{
-                      width: 56, height: 56, borderRadius: 10, background: '#1a1726',
-                      border: '1px solid rgba(200,242,60,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 24, overflow: 'hidden', flexShrink: 0
-                    }}>
-                      {c.avatar_url ? (
-                        <img src={c.avatar_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (cls?.icon || '🎭')}
-                    </div>
+                    <CharacterAvatar avatarUrl={c.avatar_url} icon={cls?.icon || '🎭'} name={c.name} size={56} />
                     <div>
                       <h3 style={{ fontWeight: 700, color: '#f0f0f8', fontSize: 15 }}>{c.name}</h3>
                       <p style={{ fontSize: 12, color: '#8888aa' }}>{c.race} · {cls?.name} · Nv.{c.level}</p>
