@@ -404,11 +404,14 @@ export default function AbismoPlayPage() {
     )
   }
 
+  const isInCombatView = run.status === 'combat' && run.combat_state && myStats && isMyTurn
+  const mainMaxWidth = isInCombatView ? 1360 : 900
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d0d12', color: '#f0f0f8', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
 
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '32px 16px', paddingLeft: 'calc(220px + 24px)' }} className="abismo-play-main">
+      <main style={{ maxWidth: mainMaxWidth, margin: '0 auto', padding: '32px 16px', paddingLeft: 'calc(220px + 24px)' }} className="abismo-play-main">
         <button
           onClick={handleLeave}
           style={{ fontSize: 13, color: '#8888aa', background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 16 }}
@@ -833,28 +836,29 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         <div className="ab-content">
           <div className="ab-hud-top">ANDAR · <b>{state.enemy.type}</b> · COMBATE</div>
 
-          {/* Arena diagonal estilo Pokémon: inimigo em cima-direita, jogador embaixo-esquerda */}
-          <div className="ab-arena">
-            <div className="ab-enemy-zone">
-              <div className="ab-enemy-stage">
-                <div className="ab-enemy-platform" />
-                <div className={`ab-enemy-sprite ${enemyShake ? 'ab-shake' : ''}`}>
-                  {state.enemy.icon}
-                  {enemyFx && <span key={enemyFx.id} className="ab-dmg-float">-{enemyFx.dmg}</span>}
+          {/* Arena diagonal estilo Pokémon + painel de relíquias na lateral */}
+          <div className="ab-battle-row">
+            <div className="ab-arena">
+              <div className="ab-enemy-zone">
+                <div className="ab-enemy-stage">
+                  <div className="ab-enemy-platform" />
+                  <div className={`ab-enemy-sprite ${enemyShake ? 'ab-shake' : ''}`}>
+                    {state.enemy.icon}
+                    {enemyFx && <span key={enemyFx.id} className="ab-dmg-float">-{enemyFx.dmg}</span>}
+                  </div>
+                </div>
+                <div className="ab-enemy-card">
+                  <div className="ab-enemy-name">{state.enemy.name}</div>
+                  <div className="ab-enemy-type">{state.enemy.type}</div>
+                  <div className="ab-hpbar-wrap"><div className="ab-hpbar-fill" style={{ width: `${enemyHpPct}%` }} /></div>
+                  <div className="ab-enemy-hp-num">{state.enemy.hp} / {state.enemy.maxHp} HP</div>
                 </div>
               </div>
-              <div className="ab-enemy-card">
-                <div className="ab-enemy-name">{state.enemy.name}</div>
-                <div className="ab-enemy-type">{state.enemy.type}</div>
-                <div className="ab-hpbar-wrap"><div className="ab-hpbar-fill" style={{ width: `${enemyHpPct}%` }} /></div>
-                <div className="ab-enemy-hp-num">{state.enemy.hp} / {state.enemy.maxHp} HP</div>
-              </div>
-            </div>
 
-            <div className={`ab-player-zone ${playerShake ? 'ab-shake' : ''}`}>
-              <div className="ab-player-panel">
-                <div className="ab-player-name-row">
-                  <div className="ab-player-portrait">
+              <div className="ab-player-zone">
+                <div className={`ab-player-stage ${playerShake ? 'ab-shake' : ''}`}>
+                  <div className="ab-player-platform" />
+                  <div className="ab-player-sprite">
                     {myStats.avatarUrl ? <img src={myStats.avatarUrl} alt="" /> : (meta?.icon || '🎭')}
                     {playerFx && (
                       <span key={playerFx.id} className="ab-dmg-float" style={{ color: playerFx.heal ? 'var(--ab-lime)' : 'var(--ab-blood)' }}>
@@ -862,28 +866,46 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
                       </span>
                     )}
                   </div>
-                  <div>
-                    <div className="ab-player-name">{myStats.characterName}</div>
-                    <div className="ab-player-class">{meta?.name || myStats.classId}</div>
+                </div>
+                <div className="ab-player-card">
+                  <div className="ab-player-name">{myStats.characterName}</div>
+                  <div className="ab-player-class">{meta?.name || myStats.classId}</div>
+                  <div className="ab-stat-row">
+                    <span className="ab-stat-label">HP</span>
+                    <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${playerHpPct}%`, background: 'var(--ab-blood)' }} /></div>
+                    <span className="ab-stat-num">{state.playerHp}/{state.playerMaxHp}</span>
+                  </div>
+                  <div className="ab-stat-row">
+                    <span className="ab-stat-label">DEF</span>
+                    <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${armorPct}%`, background: '#60a5fa' }} /></div>
+                    <span className="ab-stat-num">{state.armor}</span>
                   </div>
                 </div>
-                <div className="ab-stat-row">
-                  <span className="ab-stat-label">HP</span>
-                  <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${playerHpPct}%`, background: 'var(--ab-blood)' }} /></div>
-                  <span className="ab-stat-num">{state.playerHp}/{state.playerMaxHp}</span>
-                </div>
-                <div className="ab-stat-row">
-                  <span className="ab-stat-label">DEF</span>
-                  <div className="ab-stat-bar-wrap"><div className="ab-stat-bar-fill" style={{ width: `${armorPct}%`, background: '#60a5fa' }} /></div>
-                  <span className="ab-stat-num">{state.armor}</span>
-                </div>
               </div>
-              <div className="ab-player-platform" />
+
+              <div className="ab-gold-badge">
+                <div className="ab-gold-label">Fichas</div>
+                <div className="ab-gold-num">{state.gold}</div>
+              </div>
             </div>
 
-            <div className="ab-gold-badge">
-              <div className="ab-gold-label">Fichas</div>
-              <div className="ab-gold-num">{state.gold}</div>
+            <div className="ab-relics-panel">
+              <div className="ab-relics-title">🎒 Relíquias</div>
+              {myStats.relics.length === 0 ? (
+                <p className="ab-relics-empty">Nenhuma ainda — encontre nos eventos e na loja.</p>
+              ) : (
+                <div className="ab-relics-grid">
+                  {myStats.relics.map((relicId, i) => {
+                    const relic = RELICS.find(r => r.id === relicId)
+                    if (!relic) return null
+                    return (
+                      <div key={`${relicId}-${i}`} className="ab-relic-slot" title={`${relic.name}: ${relic.desc}`}>
+                        <span className="ab-relic-icon">{relic.icon}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -956,7 +978,7 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
 
         .ab-stage {
           position: relative;
-          max-width: 880px;
+          max-width: 1360px;
           margin: 0 auto;
           border-radius: 16px;
           overflow: hidden;
@@ -990,59 +1012,111 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         }
         .ab-hud-top b { color: var(--ab-glitch); }
 
+        .ab-battle-row { display: flex; gap: 16px; align-items: stretch; }
+
         .ab-arena {
-          position: relative; min-height: 380px; width: 100%;
+          position: relative; min-height: 480px; flex: 1;
           perspective: 1200px;
           margin-bottom: 8px;
         }
 
         .ab-enemy-zone {
-          position: absolute; top: 4px; right: 4%; z-index: 5;
+          position: absolute; top: 16px; right: 6%; z-index: 5;
           display: flex; flex-direction: column; align-items: center;
         }
         .ab-enemy-stage {
-          position: relative; height: 150px; width: 200px;
+          position: relative; height: 160px; width: 220px;
           display: flex; align-items: flex-end; justify-content: center;
         }
         .ab-enemy-platform {
-          position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%) rotateX(62deg);
-          width: 210px; height: 68px; z-index: 1;
+          position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%) rotateX(62deg);
+          width: 220px; height: 72px; z-index: 1;
           background: linear-gradient(180deg, rgba(255,61,99,0.16), rgba(255,61,99,0.02));
           border: 1px solid rgba(255,61,99,0.35);
           border-radius: 50%;
           box-shadow: 0 0 40px rgba(255,61,99,0.15) inset;
         }
         .ab-enemy-sprite {
-          position: relative; z-index: 2; font-size: 56px; line-height: 1;
+          position: relative; z-index: 2; font-size: 62px; line-height: 1;
           filter: drop-shadow(0 12px 16px rgba(255,61,99,0.4));
           animation: ab-float-enemy 3.2s ease-in-out infinite;
         }
         @keyframes ab-float-enemy { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 
         .ab-enemy-card {
-          margin-top: 6px; padding: 8px 20px; text-align: center;
+          margin-top: 22px; padding: 8px 20px; text-align: center;
           background: var(--ab-bg3); border: 1px solid rgba(255,61,99,0.3);
           clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
           min-width: 190px;
         }
 
         .ab-player-zone {
-          position: absolute; bottom: 4px; left: 4%; z-index: 5;
-          display: flex; flex-direction: column; align-items: center;
+          position: absolute; bottom: 16px; left: 5%; z-index: 5;
+          display: flex; flex-direction: column-reverse; align-items: center;
+        }
+        .ab-player-stage {
+          position: relative; height: 130px; width: 170px;
+          display: flex; align-items: flex-end; justify-content: center;
         }
         .ab-player-platform {
-          width: 150px; height: 46px; margin-top: -8px;
+          position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%) rotateX(62deg);
+          width: 160px; height: 52px; z-index: 1;
           background: linear-gradient(180deg, rgba(200,242,60,0.14), rgba(200,242,60,0.02));
           border: 1px solid rgba(200,242,60,0.3);
-          transform: rotateX(62deg); border-radius: 50%;
+          border-radius: 50%;
           box-shadow: 0 0 30px rgba(200,242,60,0.12) inset;
         }
-        .ab-enemy-name { font-weight: 800; font-size: 14px; }
-        .ab-enemy-type { font-size: 10px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+        .ab-player-sprite {
+          position: relative; z-index: 2; width: 78px; height: 78px; border-radius: 14px;
+          background: var(--ab-bg4); border: 2px solid var(--ab-lime); overflow: hidden;
+          display: flex; align-items: center; justify-content: center; font-size: 40px;
+          box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        }
+        .ab-player-sprite img { width: 100%; height: 100%; object-fit: cover; }
+
+        .ab-player-card {
+          margin-bottom: 14px; padding: 10px 20px; text-align: left;
+          background: var(--ab-bg3); border: 1px solid var(--ab-border);
+          clip-path: polygon(0 0, 100% 0, 92% 100%, 0% 100%);
+          min-width: 200px;
+        }
+        .ab-player-name { font-weight: 700; font-size: 13px; }
+        .ab-player-class { font-size: 10px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+
         .ab-hpbar-wrap { height: 7px; background: rgba(255,255,255,0.06); margin-top: 7px; border-radius: 2px; overflow: hidden; }
         .ab-hpbar-fill { height: 100%; background: linear-gradient(90deg, var(--ab-blood), #ff7a93); transition: width .4s ease; }
+        .ab-enemy-name { font-weight: 800; font-size: 14px; }
+        .ab-enemy-type { font-size: 10px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
         .ab-enemy-hp-num { font-family: var(--ab-font-mono); font-size: 10px; color: var(--ab-text-dim); margin-top: 4px; }
 
+        .ab-stat-row { display: flex; align-items: center; gap: 6px; font-family: var(--ab-font-mono); font-size: 10px; margin-top: 5px; }
+        .ab-stat-label { width: 26px; color: var(--ab-text-dim); font-size: 9px; text-transform: uppercase; }
+        .ab-stat-bar-wrap { flex: 1; height: 5px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+        .ab-stat-bar-fill { height: 100%; transition: width .4s ease; }
+        .ab-stat-num { min-width: 42px; text-align: right; }
+
+        .ab-gold-badge {
+          position: absolute; top: 16px; left: 5%; z-index: 5;
+          background: var(--ab-bg3); border: 1px solid rgba(255,207,77,0.35);
+          clip-path: polygon(8% 0, 100% 0, 100% 100%, 0% 100%);
+          padding: 8px 14px 8px 22px; text-align: right; min-width: 110px;
+        }
+        .ab-gold-label { font-size: 9px; color: var(--ab-text-dim); letter-spacing: .12em; text-transform: uppercase; }
+        .ab-gold-num { font-family: var(--ab-font-mono); font-size: 18px; font-weight: 700; color: var(--ab-gold); }
+
+        .ab-relics-panel {
+          width: 170px; flex-shrink: 0; background: #111118;
+          border: 1px solid var(--ab-border); border-radius: 12px; padding: 14px;
+        }
+        .ab-relics-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .08em; }
+        .ab-relics-empty { font-size: 11px; color: var(--ab-text-dim); line-height: 1.5; }
+        .ab-relics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .ab-relic-slot {
+          width: 44px; height: 44px; border-radius: 10px; background: var(--ab-bg4);
+          border: 1px solid rgba(200,242,60,0.2); display: flex; align-items: center; justify-content: center;
+          cursor: help;
+        }
+        .ab-relic-icon { font-size: 20px; }
         .ab-dmg-float {
           position: absolute; top: -10px; left: 50%; font-family: var(--ab-font-mono);
           font-weight: 700; font-size: 20px; color: var(--ab-blood);
@@ -1055,38 +1129,6 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
           30% { transform: translate(-52%,-10px) scale(1.15); }
           100% { transform: translate(-48%,-48px) scale(0.9); opacity: 0; }
         }
-
-        
-        .ab-player-panel {
-          position: relative; z-index: 20;
-          background: var(--ab-bg3); border: 1px solid var(--ab-border);
-          clip-path: polygon(0 0, 100% 0, 92% 100%, 0% 100%);
-          padding: 10px 30px 10px 14px; min-width: 190px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-        }
-        .ab-player-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
-        .ab-player-portrait {
-          width: 34px; height: 34px; border-radius: 8px; background: var(--ab-bg4);
-          border: 1px solid var(--ab-lime); display: flex; align-items: center; justify-content: center;
-          font-size: 18px; overflow: hidden; position: relative; flex-shrink: 0;
-        }
-        .ab-player-portrait img { width: 100%; height: 100%; object-fit: cover; }
-        .ab-player-name { font-weight: 700; font-size: 12px; }
-        .ab-player-class { font-size: 9px; color: var(--ab-text-dim); text-transform: uppercase; letter-spacing: .08em; }
-        .ab-stat-row { display: flex; align-items: center; gap: 6px; font-family: var(--ab-font-mono); font-size: 10px; margin-top: 5px; }
-        .ab-stat-label { width: 26px; color: var(--ab-text-dim); font-size: 9px; text-transform: uppercase; }
-        .ab-stat-bar-wrap { flex: 1; height: 5px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
-        .ab-stat-bar-fill { height: 100%; transition: width .4s ease; }
-        .ab-stat-num { min-width: 42px; text-align: right; }
-
-        .ab-gold-badge {
-          position: absolute; top: 4px; left: 4%; z-index: 5;
-          background: var(--ab-bg3); border: 1px solid rgba(255,207,77,0.35);
-          clip-path: polygon(8% 0, 100% 0, 100% 100%, 0% 100%);
-          padding: 8px 14px 8px 22px; text-align: right; min-width: 110px;
-        }
-        .ab-gold-label { font-size: 9px; color: var(--ab-text-dim); letter-spacing: .12em; text-transform: uppercase; }
-        .ab-gold-num { font-family: var(--ab-font-mono); font-size: 18px; font-weight: 700; color: var(--ab-gold); }
 
         .ab-log {
           background: #111118; border-radius: 10px; padding: 10px 12px; max-height: 90px;
@@ -1167,10 +1209,14 @@ function CombatScreen({ state, myStats, playingHand, onToggleCard, onDiscard, on
         .ab-boot-ok { color: var(--ab-lime, #c8f23c); font-weight: 700; }
         .ab-boot-warn { color: var(--ab-gold, #ffcf4d); }
 
+        @media (max-width: 900px) {
+          .ab-battle-row { flex-direction: column; }
+          .ab-relics-panel { width: 100%; }
+        }
         @media (max-width: 700px) {
-          .ab-arena { min-height: 460px; }
-          .ab-enemy-zone { top: 4px; right: 50%; transform: translateX(50%); }
-          .ab-player-zone { bottom: 4px; left: 50%; transform: translateX(-50%); }
+          .ab-arena { min-height: 500px; }
+          .ab-enemy-zone { top: 12px; right: 50%; transform: translateX(50%); }
+          .ab-player-zone { bottom: 12px; left: 50%; transform: translateX(-50%); }
           .ab-gold-badge { position: static; margin: 0 auto 8px; }
         }
       `}</style>
