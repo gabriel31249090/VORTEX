@@ -156,7 +156,6 @@ export default function Nav() {
     { icon: '◆', label: 'Planos', path: '/pricing', onClick: () => router.push('/pricing') },
     { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
     { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
-    { icon: '🎮', label: 'Jogos', path: '/games', onClick: () => router.push('/games') },
     { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
     { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
     { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
@@ -168,7 +167,7 @@ export default function Nav() {
   // Itens principais da barra mobile (máx. 6, com Publicar no centro)
   const mobileCoreItems = [
     items.find(i => i.path === '/feed')!,
-    items.find(i => i.path === '/games')!,
+    items.find(i => i.path === '/communities')!,
     items.find(i => i.path === '/post/new')!,
     items.find(i => i.path === '__notif__')!,
     items.find(i => i.path === '/messages')!,
@@ -177,7 +176,6 @@ export default function Nav() {
   // Resto vai pro menu "Mais"
   const mobileMoreItems = [
     items.find(i => i.path === '/pricing')!,
-    items.find(i => i.path === '/communities')!,
     items.find(i => i.path === '/profile')!,
     items.find(i => i.path === '/settings')!,
     ...(isAdmin ? [items.find(i => (i as any).admin)!] : []),
@@ -186,8 +184,7 @@ export default function Nav() {
   function isItemActive(item: any) {
     return item.path !== '__notif__' && (
       pathname === item.path ||
-      (item.path !== '/feed' && item.path !== '/games' && pathname.startsWith(item.path)) ||
-      (item.path === '/games' && pathname.startsWith('/games'))
+      (item.path !== '/feed' && pathname.startsWith(item.path))
     )
   }
 
