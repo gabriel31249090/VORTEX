@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
+import RippleButton from './RippleButton'
 
 type Notification = {
   id: string
@@ -208,9 +209,11 @@ export default function Nav() {
             const isMessages = item.path === '/messages'
             const isAdminItem = (item as any).admin === true
             return (
-              <button
+              <RippleButton
                 key={item.label}
                 onClick={item.onClick}
+                rippleColor={item.accent ? 'rgba(0,0,0,0.25)' : 'rgba(200,242,60,0.25)'}
+                className={item.accent ? 'vtx-btn-glow' : 'vtx-btn'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, position: 'relative',
                   padding: '10px 12px', borderRadius: 12, border: isAdminItem ? '1px solid rgba(200,242,60,0.15)' : 'none',
@@ -222,7 +225,7 @@ export default function Nav() {
                     : 'transparent',
                   color: item.accent ? '#000' : isActive ? '#c8f23c' : isAdminItem ? '#c8f23c' : '#8888aa',
                   fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: item.accent || isActive || isAdminItem ? 700 : 500,
-                  transition: 'all 0.2s', textAlign: 'left',
+                  transition: 'all 0.2s', textAlign: 'left', width: '100%',
                   marginTop: isAdminItem ? 8 : 0,
                   boxShadow: item.accent ? '0 0 12px rgba(200,242,60,0.3)' : isActive ? '0 0 8px rgba(200,242,60,0.1)' : 'none'
                 }}
@@ -245,10 +248,10 @@ export default function Nav() {
                   }
                 }}
               >
-                <span style={{ fontSize: 18, position: 'relative' }}>
+                <span className={isNotif || isMessages ? 'vtx-icon-wiggle' : undefined} style={{ fontSize: 18, position: 'relative' }}>
                   {item.icon}
                   {isNotif && unreadCount > 0 && (
-                    <span style={{
+                    <span className="vtx-badge-pop" style={{
                       position: 'absolute', top: -6, right: -8,
                       background: '#c8f23c', color: '#000',
                       fontSize: 9, fontWeight: 800, borderRadius: 999,
@@ -258,7 +261,7 @@ export default function Nav() {
                     </span>
                   )}
                   {isMessages && dmUnreadCount > 0 && (
-                    <span style={{
+                    <span className="vtx-badge-pop" style={{
                       position: 'absolute', top: -6, right: -8,
                       background: '#c8f23c', color: '#000',
                       fontSize: 9, fontWeight: 800, borderRadius: 999,
@@ -269,14 +272,16 @@ export default function Nav() {
                   )}
                 </span>
                 <span>{item.label}</span>
-              </button>
+              </RippleButton>
             )
           })}
         </nav>
 
         <div style={{ padding: '0 12px' }}>
-          <button
+          <RippleButton
             onClick={handleLogout}
+            className="vtx-btn"
+            rippleColor="rgba(255,68,102,0.25)"
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '10px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -288,7 +293,7 @@ export default function Nav() {
           >
             <span style={{ fontSize: 18 }}>⏻</span>
             <span>Sair</span>
-          </button>
+          </RippleButton>
         </div>
       </aside>
 
@@ -306,9 +311,11 @@ export default function Nav() {
           const isNotif = item.path === '__notif__'
           const isMessages = item.path === '/messages'
           return (
-            <button
+            <RippleButton
               key={item.label}
               onClick={item.onClick}
+              className={item.accent ? 'vtx-btn-glow' : 'vtx-btn'}
+              rippleColor={item.accent ? 'rgba(0,0,0,0.25)' : 'rgba(200,242,60,0.25)'}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                 background: item.accent ? '#c8f23c' : 'transparent',
@@ -320,10 +327,10 @@ export default function Nav() {
                 transition: 'all 0.2s', flexShrink: 0, minWidth: 0,
               }}
             >
-              <span style={{ fontSize: 19, position: 'relative', lineHeight: 1 }}>
+              <span className={isNotif || isMessages ? 'vtx-icon-wiggle' : undefined} style={{ fontSize: 19, position: 'relative', lineHeight: 1 }}>
                 {item.icon}
                 {isNotif && unreadCount > 0 && (
-                  <span style={{
+                  <span className="vtx-badge-pop" style={{
                     position: 'absolute', top: -5, right: -9,
                     background: '#c8f23c', color: '#000',
                     fontSize: 9, fontWeight: 800, borderRadius: 999,
@@ -333,7 +340,7 @@ export default function Nav() {
                   </span>
                 )}
                 {isMessages && dmUnreadCount > 0 && (
-                  <span style={{
+                  <span className="vtx-badge-pop" style={{
                     position: 'absolute', top: -5, right: -9,
                     background: '#c8f23c', color: '#000',
                     fontSize: 9, fontWeight: 800, borderRadius: 999,
@@ -344,13 +351,15 @@ export default function Nav() {
                 )}
               </span>
               {!item.accent && <span style={{ fontSize: 9, fontWeight: 600 }}>{item.label}</span>}
-            </button>
+            </RippleButton>
           )
         })}
 
         {/* Botão "Mais" */}
-        <button
+        <RippleButton
           onClick={() => setMoreOpen(true)}
+          className="vtx-btn"
+          rippleColor="rgba(200,242,60,0.25)"
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
             background: 'transparent', border: 'none', cursor: 'pointer',
@@ -360,7 +369,7 @@ export default function Nav() {
         >
           <span style={{ fontSize: 19, lineHeight: 1 }}>⋯</span>
           <span style={{ fontSize: 9, fontWeight: 600 }}>Mais</span>
-        </button>
+        </RippleButton>
       </nav>
 
       {/* FOLHA "MAIS" — Mobile */}
@@ -381,13 +390,15 @@ export default function Nav() {
             padding: '20px 16px calc(20px + env(safe-area-inset-bottom))',
             fontFamily: "'Syne', sans-serif",
           }}
-          className="nav-more-sheet">
+          className="nav-more-sheet vtx-fade-in">
             <div style={{ width: 36, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 999, margin: '0 auto 16px' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <div className="vtx-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {mobileMoreItems.map(item => (
-                <button
+                <RippleButton
                   key={item.label}
                   onClick={() => { item.onClick(); setMoreOpen(false) }}
+                  className="vtx-btn"
+                  rippleColor="rgba(200,242,60,0.25)"
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                     background: 'rgba(255,255,255,0.04)', border: 'none', borderRadius: 14,
@@ -396,11 +407,13 @@ export default function Nav() {
                 >
                   <span style={{ fontSize: 22 }}>{item.icon}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, textAlign: 'center' }}>{item.label}</span>
-                </button>
+                </RippleButton>
               ))}
             </div>
-            <button
+            <RippleButton
               onClick={() => { handleLogout(); setMoreOpen(false) }}
+              className="vtx-btn"
+              rippleColor="rgba(255,68,102,0.25)"
               style={{
                 width: '100%', marginTop: 16, padding: '12px 0', borderRadius: 12,
                 border: '1px solid rgba(255,68,102,0.2)', background: 'transparent',
@@ -408,7 +421,7 @@ export default function Nav() {
               }}
             >
               ⏻ Sair
-            </button>
+            </RippleButton>
           </div>
         </>
       )}
@@ -444,8 +457,10 @@ export default function Nav() {
                   <p style={{ color: '#333355', fontSize: 12, marginTop: 2 }}>Tudo lido</p>
                 )}
               </div>
-              <button
+              <RippleButton
                 onClick={closeNotifications}
+                className="vtx-btn"
+                rippleColor="rgba(255,255,255,0.25)"
                 style={{
                   background: 'rgba(255,255,255,0.06)', border: 'none', color: '#8888aa',
                   width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
@@ -454,7 +469,7 @@ export default function Nav() {
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f0f0f8' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#8888aa' }}
-              >✕</button>
+              >✕</RippleButton>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
@@ -492,6 +507,7 @@ export default function Nav() {
                       if (notif.type === 'follow') router.push(`/profile/${actor.username}`)
                       else if (post) router.push(`/post/${post.id}`)
                     }}
+                    className="vtx-card"
                     style={{
                       display: 'flex', gap: 12, alignItems: 'flex-start',
                       padding: '12px 20px', cursor: 'pointer',
@@ -548,8 +564,10 @@ export default function Nav() {
 
             {notifications.length > 0 && (
               <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <button
+                <RippleButton
                   onClick={() => { closeNotifications(); router.push('/notifications') }}
+                  className="vtx-btn"
+                  rippleColor="rgba(200,242,60,0.25)"
                   style={{
                     width: '100%', padding: '10px 0', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
                     background: 'transparent', color: '#8888aa', cursor: 'pointer',
@@ -559,7 +577,7 @@ export default function Nav() {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8888aa' }}
                 >
                   Ver todas as notificações →
-                </button>
+                </RippleButton>
               </div>
             )}
           </div>

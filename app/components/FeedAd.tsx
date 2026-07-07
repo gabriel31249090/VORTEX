@@ -18,22 +18,15 @@ export default function FeedAd({ ad }: FeedAdProps) {
       rel="noopener noreferrer"
       style={{ textDecoration: 'none', display: 'block' }}
     >
-      <div style={{
-        background: '#111118',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 16, overflow: 'hidden',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-        cursor: 'pointer',
-        fontFamily: "'Syne', sans-serif",
-        position: 'relative',
-      }}
-        onMouseEnter={e => {
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'
-          e.currentTarget.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)'
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
-          e.currentTarget.style.boxShadow = 'none'
+      <div
+        className="vtx-card"
+        style={{
+          background: '#111118',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 16, overflow: 'hidden',
+          cursor: 'pointer',
+          fontFamily: "'Syne', sans-serif",
+          position: 'relative',
         }}
       >
         {/* Label patrocinado */}

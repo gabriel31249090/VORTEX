@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import FeedAd from '../components/FeedAd'
+import RippleButton from '../components/RippleButton'
 import toast from 'react-hot-toast'
 
 type PlanId = 'free' | 'boost' | 'mega'
@@ -266,14 +267,19 @@ export default function FeedPage() {
           border: '1px solid rgba(255,255,255,0.06)', marginBottom: 20, gap: 4,
         }}>
           {(['geral', 'seguindo'] as FeedTab[]).map(t => (
-            <button key={t} onClick={() => switchTab(t)} style={{
-              flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
-              fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-              background: tab === t ? '#c8f23c' : 'transparent',
-              color: tab === t ? '#000' : '#555577',
-            }}>
+            <RippleButton
+              key={t}
+              onClick={() => switchTab(t)}
+              className={tab === t ? 'vtx-btn-glow' : 'vtx-btn'}
+              rippleColor={tab === t ? 'rgba(0,0,0,0.25)' : 'rgba(200,242,60,0.25)'}
+              style={{
+                flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
+                fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
+                background: tab === t ? '#c8f23c' : 'transparent',
+                color: tab === t ? '#000' : '#555577',
+              }}>
               {t === 'geral' ? '🌐 Geral' : '👥 Seguindo'}
-            </button>
+            </RippleButton>
           ))}
         </div>
 
@@ -316,6 +322,7 @@ export default function FeedPage() {
             return (
               <div key={post.id} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <article
+                  className="vtx-card"
                   style={{
                     background: '#111118',
                     border: planStyle.border,
@@ -404,8 +411,10 @@ export default function FeedPage() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                      <button
+                      <RippleButton
                         onClick={() => handleLike(post.id)}
+                        className="vtx-btn"
+                        rippleColor={`${authorColor}55`}
                         style={{
                           background: isLiked ? `${authorColor}1a` : 'transparent',
                           border: `1px solid ${isLiked ? `${authorColor}66` : 'rgba(255,255,255,0.08)'}`,
@@ -417,10 +426,12 @@ export default function FeedPage() {
                           transform: isLiking ? 'scale(1.2)' : 'scale(1)',
                         }}
                       >
-                        ▲ {post.likes_count}
-                      </button>
-                      <button
+                        <span className="vtx-icon-wiggle">▲</span> {post.likes_count}
+                      </RippleButton>
+                      <RippleButton
                         onClick={() => router.push(`/post/${post.id}`)}
+                        className="vtx-btn"
+                        rippleColor="rgba(200,242,60,0.2)"
                         style={{
                           background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
                           color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
@@ -431,9 +442,11 @@ export default function FeedPage() {
                         onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
                       >
                         💬 {post.comments_count}
-                      </button>
-                      <button
+                      </RippleButton>
+                      <RippleButton
                         onClick={() => handleShare(post.id)}
+                        className="vtx-btn"
+                        rippleColor="rgba(200,242,60,0.2)"
                         style={{
                           background: 'transparent', border: 'none',
                           color: '#555577', cursor: 'pointer',
@@ -444,7 +457,7 @@ export default function FeedPage() {
                         onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
                       >
                         ↗ Compartilhar
-                      </button>
+                      </RippleButton>
                     </div>
                   </div>
                 </article>

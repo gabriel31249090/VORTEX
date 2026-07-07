@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import RippleButton from './RippleButton'
 
 type Ad = {
   id: string
@@ -69,7 +70,7 @@ export default function AdPopup() {
         onClick={handleClose}
         style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 400, backdropFilter: 'blur(4px)', animation: 'fadeIn 0.2s ease' }}
       />
-      <div style={{
+      <div className="vtx-card" style={{
         position: 'fixed', bottom: 24, right: 24,
         width: 320, zIndex: 401,
         background: '#111118',
@@ -83,7 +84,12 @@ export default function AdPopup() {
         {/* Label de anúncio */}
         <div style={{ padding: '8px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ color: '#333355', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>PATROCINADO</span>
-          <button onClick={handleClose} style={{ background: 'none', border: 'none', color: '#555577', cursor: 'pointer', fontSize: 16, padding: '2px 4px', lineHeight: 1 }}>✕</button>
+          <RippleButton
+            onClick={handleClose}
+            className="vtx-btn"
+            rippleColor="rgba(255,255,255,0.25)"
+            style={{ background: 'none', border: 'none', color: '#555577', cursor: 'pointer', fontSize: 16, padding: '2px 4px', lineHeight: 1, borderRadius: 6 }}
+          >✕</RippleButton>
         </div>
 
         {/* Imagem */}
@@ -102,6 +108,7 @@ export default function AdPopup() {
             target="_blank"
             rel="noopener noreferrer"
             onClick={handleClick}
+            className="vtx-btn-ghost"
             style={{
               display: 'block', width: '100%', padding: '10px 0',
               background: 'rgba(200,242,60,0.1)',

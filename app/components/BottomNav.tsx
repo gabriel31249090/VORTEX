@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import RippleButton from './RippleButton'
 
 type NavItem = {
   icon: string
@@ -72,9 +73,11 @@ export default function BottomNav() {
           const isPost = item.href === '/post/new'
 
           return (
-            <button
+            <RippleButton
               key={item.href}
               onClick={() => router.push(getHref(item))}
+              className={isPost ? 'vtx-btn-glow' : 'vtx-btn'}
+              rippleColor={isPost ? 'rgba(0,0,0,0.25)' : 'rgba(200,242,60,0.25)'}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 3, border: 'none', cursor: 'pointer',
@@ -96,7 +99,7 @@ export default function BottomNav() {
                 </div>
               ) : (
                 <>
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative' }} className={item.href === '/notifications' ? 'vtx-icon-wiggle' : undefined}>
                     <span style={{
                       fontSize: item.icon === '⌂' ? 22 : item.icon === '⌕' ? 20 : 18,
                       color: active ? '#c8f23c' : '#333355',
@@ -106,7 +109,7 @@ export default function BottomNav() {
                       {item.icon}
                     </span>
                     {item.href === '/notifications' && unreadCount > 0 && (
-                      <span style={{
+                      <span className="vtx-badge-pop" style={{
                         position: 'absolute', top: -4, right: -8,
                         background: '#c8f23c', color: '#000',
                         fontSize: 9, fontWeight: 800,
@@ -133,7 +136,7 @@ export default function BottomNav() {
                   )}
                 </>
               )}
-            </button>
+            </RippleButton>
           )
         })}
       </div>
