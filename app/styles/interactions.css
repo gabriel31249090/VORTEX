@@ -1,0 +1,124 @@
+/* app/styles/interactions.css
+   Utilitários de animação/interação pro Vortex — importa uma vez no layout raiz
+   e aplica as classes em qualquer botão/card existente sem mexer na lógica.
+*/
+
+/* ============ BOTÕES ============ */
+
+/* Base: qualquer botão/link clicável ganha transição suave e leve elevação no hover */
+.vtx-btn {
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease,
+              filter 0.2s ease;
+  will-change: transform;
+}
+.vtx-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+.vtx-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 0.08s;
+}
+.vtx-btn:disabled {
+  cursor: default;
+}
+
+/* Variante pra botões de destaque (accent lima) — leve glow pulsante contínuo */
+.vtx-btn-glow {
+  animation: vtx-glow-pulse 2.4s ease-in-out infinite;
+}
+.vtx-btn-glow:hover:not(:disabled) {
+  animation-play-state: paused;
+  box-shadow: 0 0 24px rgba(200, 242, 60, 0.55);
+}
+@keyframes vtx-glow-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(200, 242, 60, 0.25); }
+  50% { box-shadow: 0 0 20px rgba(200, 242, 60, 0.45); }
+}
+
+/* Botão "ghost" (borda, sem fundo) — hover preenche suavemente */
+.vtx-btn-ghost {
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+}
+.vtx-btn-ghost::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: -1;
+}
+.vtx-btn-ghost:hover:not(:disabled)::before {
+  opacity: 0.08;
+  transform: scale(1);
+}
+
+/* ============ CARDS ============ */
+
+/* Cards clicáveis (posts, personagens, itens de lista) — elevação + sombra no hover */
+.vtx-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.vtx-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* ============ ÍCONES / BADGES ============ */
+
+/* Ícone que "chacoalha" de leve no hover — bom pra like/coração/notificação */
+.vtx-icon-wiggle:hover {
+  animation: vtx-wiggle 0.4s ease;
+}
+@keyframes vtx-wiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-12deg) scale(1.15); }
+  75% { transform: rotate(12deg) scale(1.15); }
+}
+
+/* Badge de contador (notificações, mensagens) — pulso quando aparece um número novo */
+.vtx-badge-pop {
+  animation: vtx-badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes vtx-badge-pop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* ============ ENTRADA DE CONTEÚDO ============ */
+
+/* Fade + slide sutil pra itens de lista aparecendo (posts do feed, notificações, etc.) */
+.vtx-fade-in {
+  animation: vtx-fade-in 0.35s ease both;
+}
+@keyframes vtx-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Aplica atraso escalonado — usa em conjunto com vtx-fade-in, passando --vtx-delay-i */
+.vtx-stagger {
+  animation-delay: calc(var(--vtx-delay-i, 0) * 40ms);
+}
+
+/* ============ FOCO / ACESSIBILIDADE ============ */
+
+.vtx-btn:focus-visible,
+.vtx-card:focus-visible {
+  outline: 2px solid #c8f23c;
+  outline-offset: 2px;
+}
+
+/* Respeita quem prefere menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  .vtx-btn, .vtx-btn-glow, .vtx-card, .vtx-icon-wiggle, .vtx-badge-pop, .vtx-fade-in {
+    animation: none !important;
+    transition: none !important;
+  }
+}
