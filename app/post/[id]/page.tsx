@@ -357,6 +357,7 @@ export default function PostPage() {
 
   const authorPlan: PlanId = post.profiles?.plan || 'free'
   const hasAccent = authorPlan === 'boost' || authorPlan === 'mega'
+  const isMega = authorPlan === 'mega'
   const accentColor = post.profiles?.accent_color || (authorPlan === 'mega' ? '#a78bfa' : '#c8f23c')
 
   return (
@@ -389,13 +390,26 @@ export default function PostPage() {
       }}>
         {/* Post */}
         <div className="vtx-card" style={{
+          position: 'relative',
           background: '#111118',
           border: hasAccent ? `1px solid ${accentColor}44` : '1px solid rgba(255,255,255,0.08)',
           borderRadius: 16, overflow: 'hidden',
           boxShadow: hasAccent ? `0 0 30px ${accentColor}14` : 'none',
         }}>
           {hasAccent && (
-            <div style={{ height: 3, background: `linear-gradient(90deg, transparent, ${accentColor}88, transparent)` }} />
+            <div className={isMega ? 'mega-strip' : undefined} style={{ height: 3, background: `linear-gradient(90deg, transparent, ${accentColor}88, transparent)` }} />
+          )}
+          {isMega && (
+            <div style={{
+              position: 'absolute', top: 14, right: 14, zIndex: 2,
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px', borderRadius: 50,
+              background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)',
+              border: `1px solid ${accentColor}55`,
+            }}>
+              <span style={{ fontSize: 11 }}>👑</span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: accentColor, textTransform: 'uppercase' }}>Premium</span>
+            </div>
           )}
 
           {post.media_url && (
@@ -444,18 +458,28 @@ export default function PostPage() {
               )}
             </div>
 
-            <h1 style={{
+            <h1 style={isMega ? {
+              fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 700,
+              fontSize: 26, marginBottom: 14, lineHeight: 1.3, letterSpacing: '0.01em',
+              backgroundImage: `linear-gradient(100deg, ${accentColor}, #f0f0f8 55%, ${accentColor})`,
+              backgroundSize: '200% auto',
+              WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+              WebkitTextFillColor: 'transparent',
+              animation: 'megaShine 6s ease infinite',
+            } : {
               color: hasAccent ? accentColor : '#f0f0f8', fontWeight: 800, fontSize: 22, marginBottom: 12, lineHeight: 1.3,
               textShadow: hasAccent ? `0 0 20px ${accentColor}33` : 'none',
             }}>{post.title}</h1>
 
             {post.html_content ? (
               <div
+                data-rich
+                className={isMega ? 'mega-content' : undefined}
                 dangerouslySetInnerHTML={{ __html: post.html_content }}
-                style={{ color: '#8888aa', fontSize: 15, lineHeight: 1.7, marginBottom: 16 }}
+                style={{ color: '#8888aa', fontSize: isMega ? 16 : 15, lineHeight: 1.7, marginBottom: 16, ...(isMega ? { ['--mega-accent' as any]: accentColor } : {}) }}
               />
             ) : post.content ? (
-              <p style={{ color: '#8888aa', fontSize: 15, lineHeight: 1.7, marginBottom: 16 }}>{post.content}</p>
+              <p className={isMega ? 'mega-content' : undefined} style={{ color: '#8888aa', fontSize: isMega ? 16 : 15, lineHeight: 1.7, marginBottom: 16, ...(isMega ? { ['--mega-accent' as any]: accentColor } : {}) }}>{post.content}</p>
             ) : null}
 
             <div style={{ display: 'flex', gap: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -564,8 +588,19 @@ export default function PostPage() {
       </main>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,700&display=swap');
         textarea::placeholder { color: #333355; }
+        @keyframes megaShine { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+        .mega-content::first-letter {
+          font-family: 'Playfair Display', serif;
+          font-style: italic;
+          font-size: 3.4em;
+          font-weight: 700;
+          float: left;
+          line-height: 0.8;
+          padding: 4px 8px 0 0;
+          color: var(--mega-accent, #a78bfa);
+        }
         @media (max-width: 767px) { main, header > div { padding-left: 16px !important; } }
         [data-rich] h2 { font-size: 20px; font-weight: 800; color: #f0f0f8; margin: 16px 0 8px; }
         [data-rich] h3 { font-size: 17px; font-weight: 700; color: #f0f0f8; margin: 14px 0 6px; }

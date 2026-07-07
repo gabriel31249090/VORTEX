@@ -395,10 +395,18 @@ export default function FeedPage() {
                     </div>
 
                     <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                      <h2 style={{
-                        color: isMega ? authorColor : '#f0f0f8',
+                      <h2 style={isMega ? {
+                        fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 700,
+                        fontSize: 18, marginBottom: 8, lineHeight: 1.3,
+                        backgroundImage: `linear-gradient(100deg, ${authorColor}, #f0f0f8 55%, ${authorColor})`,
+                        backgroundSize: '200% auto',
+                        WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+                        WebkitTextFillColor: 'transparent',
+                        animation: 'megaShine 6s ease infinite',
+                        transition: 'color 0.2s',
+                      } : {
+                        color: '#f0f0f8',
                         fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3,
-                        textShadow: isMega ? `0 0 20px ${authorColor}44` : 'none',
                         transition: 'color 0.2s',
                       }}>
                         {post.title}
@@ -488,7 +496,8 @@ export default function FeedPage() {
       </main>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,700&display=swap');
+        @keyframes megaShine { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
