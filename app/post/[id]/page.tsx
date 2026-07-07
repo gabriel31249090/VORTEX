@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
+import RippleButton from '../../components/RippleButton'
 
 type PlanId = 'free' | 'boost' | 'mega'
 
@@ -266,6 +267,7 @@ export default function PostPage() {
     return (
       <div style={{ marginLeft: depth > 0 ? 28 : 0 }}>
         <div
+          className="vtx-card"
           style={{
             background: '#111118',
             border: `1px solid ${depth > 0 ? 'rgba(200,242,60,0.08)' : 'rgba(255,255,255,0.06)'}`,
@@ -301,28 +303,32 @@ export default function PostPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {depth < 2 && (
-                <button
+                <RippleButton
                   onClick={() => {
                     setReplyTo({ id: comment.id, username: comment.profiles?.username || '' })
                     setNewComment(`@${comment.profiles?.username} `)
                     textareaRef.current?.focus()
                   }}
-                  style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'color 0.2s' }}
+                  className="vtx-btn"
+                  rippleColor="rgba(200,242,60,0.25)"
+                  style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'color 0.2s', borderRadius: 6, padding: '2px 6px' }}
                   onMouseEnter={e => (e.currentTarget.style.color = '#c8f23c')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#444466')}
                 >
                   ↩ Responder
-                </button>
+                </RippleButton>
               )}
               {userId === comment.author_id && (
-                <button
+                <RippleButton
                   onClick={() => handleDeleteComment(comment.id)}
-                  style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'color 0.2s' }}
+                  className="vtx-btn"
+                  rippleColor="rgba(255,68,102,0.25)"
+                  style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'color 0.2s', borderRadius: 6, padding: '2px 6px' }}
                   onMouseEnter={e => (e.currentTarget.style.color = '#ff4466')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#444466')}
                 >
                   ✕
-                </button>
+                </RippleButton>
               )}
             </div>
           </div>
@@ -363,9 +369,14 @@ export default function PostPage() {
         borderBottom: `1px solid ${hasAccent ? `${accentColor}33` : 'rgba(200,242,60,0.2)'}`,
       }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 'max(16px, calc(220px + 32px))' }}>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>
+          <RippleButton
+            onClick={() => router.back()}
+            className="vtx-btn"
+            rippleColor="rgba(200,242,60,0.2)"
+            style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif", borderRadius: 8, padding: '4px 8px' }}
+          >
             ← Voltar
-          </button>
+          </RippleButton>
           <span style={{ color: '#f0f0f8', fontWeight: 700 }}>Post</span>
         </div>
       </header>
@@ -377,7 +388,7 @@ export default function PostPage() {
         display: 'flex', flexDirection: 'column', gap: 16
       }}>
         {/* Post */}
-        <div style={{
+        <div className="vtx-card" style={{
           background: '#111118',
           border: hasAccent ? `1px solid ${accentColor}44` : '1px solid rgba(255,255,255,0.08)',
           borderRadius: 16, overflow: 'hidden',
@@ -422,10 +433,14 @@ export default function PostPage() {
                 </div>
               </div>
               {userId === post.author_id && (
-                <button onClick={handleDeletePost} style={{ background: 'transparent', border: '1px solid rgba(255,50,50,0.3)', color: '#ff4466', padding: '5px 12px', borderRadius: 50, cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
+                <RippleButton
+                  onClick={handleDeletePost}
+                  className="vtx-btn"
+                  rippleColor="rgba(255,68,102,0.25)"
+                  style={{ background: 'transparent', border: '1px solid rgba(255,50,50,0.3)', color: '#ff4466', padding: '5px 12px', borderRadius: 50, cursor: 'pointer', fontSize: 12, fontFamily: "'Syne', sans-serif", transition: 'all 0.2s' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,50,50,0.1)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >Deletar</button>
+                >Deletar</RippleButton>
               )}
             </div>
 
@@ -455,7 +470,12 @@ export default function PostPage() {
           <p style={{ color: '#8888aa', fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
             {replyTo ? `↩ Respondendo @${replyTo.username}` : 'Comentários'}
             {replyTo && (
-              <button onClick={() => { setReplyTo(null); setNewComment('') }} style={{ marginLeft: 10, background: 'none', border: 'none', color: '#ff4466', cursor: 'pointer', fontSize: 11 }}>cancelar</button>
+              <RippleButton
+                onClick={() => { setReplyTo(null); setNewComment('') }}
+                className="vtx-btn"
+                rippleColor="rgba(255,68,102,0.25)"
+                style={{ marginLeft: 10, background: 'none', border: 'none', color: '#ff4466', cursor: 'pointer', fontSize: 11, borderRadius: 6, padding: '2px 6px' }}
+              >cancelar</RippleButton>
             )}
           </p>
 
@@ -512,9 +532,11 @@ export default function PostPage() {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
             <span style={{ color: '#333355', fontSize: 12 }}>Ctrl+Enter para enviar</span>
-            <button
+            <RippleButton
               onClick={handleComment}
               disabled={submitting || !newComment.trim()}
+              className="vtx-btn-glow"
+              rippleColor="rgba(0,0,0,0.25)"
               style={{
                 background: '#c8f23c', color: '#000', fontWeight: 700,
                 padding: '8px 20px', borderRadius: 50, border: 'none',
@@ -526,7 +548,7 @@ export default function PostPage() {
               }}
             >
               {submitting ? 'Enviando...' : 'Comentar'}
-            </button>
+            </RippleButton>
           </div>
         </div>
 
