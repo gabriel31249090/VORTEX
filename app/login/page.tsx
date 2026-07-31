@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+
+const BlackHoleBackground = dynamic(() => import('../components/BlackHoleBackground'), { ssr: false })
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -29,17 +32,20 @@ export default function LoginPage() {
     <div style={{
       minHeight: '100vh', background: '#0a0a0f',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '0 16px', fontFamily: "'Syne', sans-serif"
+      padding: '0 16px', fontFamily: "'Syne', sans-serif",
+      position: 'relative', overflow: 'hidden'
     }}>
+      <BlackHoleBackground intensity={0.7} particleCount={2500} />
+
       {/* Background glow */}
       <div style={{
         position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)',
         width: 400, height: 400, borderRadius: '50%',
         background: 'radial-gradient(circle, rgba(200,242,60,0.06) 0%, transparent 70%)',
-        pointerEvents: 'none'
+        pointerEvents: 'none', zIndex: 1
       }} />
 
-      <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
+      <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 2 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={{

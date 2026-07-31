@@ -7,6 +7,9 @@ import Nav from '../components/Nav'
 import FeedAd from '../components/FeedAd'
 import RippleButton from '../components/RippleButton'
 import toast from 'react-hot-toast'
+import dynamic from 'next/dynamic'
+
+const BlackHoleBackground = dynamic(() => import('../components/BlackHoleBackground'), { ssr: false })
 
 type PlanId = 'free' | 'boost' | 'mega'
 
@@ -256,244 +259,248 @@ export default function FeedPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif" }}>
-      <Nav />
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'Syne', sans-serif", position: 'relative', overflow: 'hidden' }}>
+      <BlackHoleBackground intensity={0.35} particleCount={2200} />
 
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Nav />
 
-        {/* Tabs */}
-        <div style={{
-          display: 'flex', background: '#111118', borderRadius: 12, padding: 4,
-          border: '1px solid rgba(255,255,255,0.06)', marginBottom: 20, gap: 4,
-        }}>
-          {(['geral', 'seguindo'] as FeedTab[]).map(t => (
-            <RippleButton
-              key={t}
-              onClick={() => switchTab(t)}
-              className={tab === t ? 'vtx-btn-glow' : 'vtx-btn'}
-              rippleColor={tab === t ? 'rgba(0,0,0,0.25)' : 'rgba(200,242,60,0.25)'}
-              style={{
-                flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
-                fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
-                background: tab === t ? '#c8f23c' : 'transparent',
-                color: tab === t ? '#000' : '#555577',
-              }}>
-              {t === 'geral' ? '🌐 Geral' : '👥 Seguindo'}
-            </RippleButton>
-          ))}
-        </div>
+        <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
 
-        {loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+          {/* Tabs */}
+          <div style={{
+            display: 'flex', background: '#111118', borderRadius: 12, padding: 4,
+            border: '1px solid rgba(255,255,255,0.06)', marginBottom: 20, gap: 4,
+          }}>
+            {(['geral', 'seguindo'] as FeedTab[]).map(t => (
+              <RippleButton
+                key={t}
+                onClick={() => switchTab(t)}
+                className={tab === t ? 'vtx-btn-glow' : 'vtx-btn'}
+                rippleColor={tab === t ? 'rgba(0,0,0,0.25)' : 'rgba(200,242,60,0.25)'}
+                style={{
+                  flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, transition: 'all 0.2s',
+                  background: tab === t ? '#c8f23c' : 'transparent',
+                  color: tab === t ? '#000' : '#555577',
+                }}>
+                {t === 'geral' ? '🌐 Geral' : '👥 Seguindo'}
+              </RippleButton>
+            ))}
           </div>
-        )}
 
-        {!loading && tab === 'seguindo' && posts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
-            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>👥</div>
-            <p style={{ fontSize: 15, marginBottom: 8 }}>Você ainda não segue ninguém.</p>
-            <p style={{ fontSize: 13, color: '#333355' }}>Siga pessoas para ver os posts delas aqui.</p>
-          </div>
-        )}
-
-        {!loading && tab === 'geral' && posts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🌀</div>
-            <p style={{ fontSize: 15 }}>Nenhum post ainda. Seja o primeiro!</p>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {posts.map((post, i) => {
-            const isLiked = likedPosts.has(post.id)
-            const isLiking = likingPost === post.id
-            const authorPlan: PlanId = post.profiles?.plan || 'free'
-            const authorAccent = post.profiles?.accent_color || null
-            const planStyle = getPlanStyle(authorPlan, authorAccent)
-            const authorColor = getAuthorColor(authorPlan, authorAccent)
-            const isMega = authorPlan === 'mega'
-
-            // Posição real no feed (1-indexed) — insere anúncio a cada 40 posts, só pra Free
-            const position = i + 1
-            const showAd = userPlan === 'free' && position % AD_INTERVAL === 0 && feedAds.length > 0
-            const adToShow = showAd ? feedAds[Math.floor(position / AD_INTERVAL - 1) % feedAds.length] : null
-
-            return (
-              <div key={post.id} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <article
-                  className="vtx-card"
-                  style={{
-                    background: '#111118',
-                    border: planStyle.border,
-                    borderRadius: 16, overflow: 'hidden',
-                    boxShadow: planStyle.shadow,
-                    animation: `fadeUp 0.4s ease ${Math.min(i, 5) * 0.05}s both`,
-                    transition: 'border-color 0.2s, box-shadow 0.2s',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = planStyle.hoverBorder
-                    e.currentTarget.style.boxShadow = planStyle.hoverShadow
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = planStyle.border.replace('1px solid ', '')
-                    e.currentTarget.style.boxShadow = planStyle.shadow
-                  }}
-                >
-                  {authorPlan !== 'free' && planStyle.stripColor && (
-                    <div style={{
-                      height: 2,
-                      background: `linear-gradient(90deg, transparent, ${planStyle.stripColor}99, transparent)`,
-                    }} />
-                  )}
-
-                  {post.media_url && (
-                    isVideo(post.media_url) ? (
-                      <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
-                    ) : (
-                      <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                        <img src={post.media_url} alt={post.title} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} />
-                      </div>
-                    )
-                  )}
-
-                  <div style={{ padding: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: '50%',
-                        background: post.profiles?.avatar_url ? 'none'
-                          : `linear-gradient(135deg, ${authorColor}, ${authorColor}99)`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-                        boxShadow: planStyle.avatarShadow, overflow: 'hidden',
-                      }}>
-                        {post.profiles?.avatar_url
-                          ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : getInitial(post.profiles?.username || '?')
-                        }
-                      </div>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span
-                          style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                          onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
-                          onMouseEnter={e => (e.currentTarget.style.color = authorColor)}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-                        >
-                          @{post.profiles?.username || 'usuário'}
-                        </span>
-                        {planStyle.badgeEl}
-                        {post.communities && (
-                          <span
-                            style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
-                            onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
-                          >
-                            em v/{post.communities.name}
-                          </span>
-                        )}
-                        <span style={{ color: '#444466', fontSize: 13 }}>· {timeAgo(post.created_at)}</span>
-                      </div>
-                    </div>
-
-                    <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                      <h2 style={isMega ? {
-                        fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 700,
-                        fontSize: 18, marginBottom: 8, lineHeight: 1.3,
-                        backgroundImage: `linear-gradient(100deg, ${authorColor}, #f0f0f8 55%, ${authorColor})`,
-                        backgroundSize: '200% auto',
-                        WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-                        WebkitTextFillColor: 'transparent',
-                        animation: 'megaShine 6s ease infinite',
-                        transition: 'color 0.2s',
-                      } : {
-                        color: '#f0f0f8',
-                        fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3,
-                        transition: 'color 0.2s',
-                      }}>
-                        {post.title}
-                      </h2>
-                      {post.content && (
-                        <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
-                          {post.content}
-                        </p>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                      <RippleButton
-                        onClick={() => handleLike(post.id)}
-                        className="vtx-btn"
-                        rippleColor={`${authorColor}55`}
-                        style={{
-                          background: isLiked ? `${authorColor}1a` : 'transparent',
-                          border: `1px solid ${isLiked ? `${authorColor}66` : 'rgba(255,255,255,0.08)'}`,
-                          color: isLiked ? authorColor : '#555577',
-                          padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                          fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                          display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-                          boxShadow: isLiked ? `0 0 10px ${authorColor}33` : 'none',
-                          transform: isLiking ? 'scale(1.2)' : 'scale(1)',
-                        }}
-                      >
-                        <span className="vtx-icon-wiggle">▲</span> {post.likes_count}
-                      </RippleButton>
-                      <RippleButton
-                        onClick={() => router.push(`/post/${post.id}`)}
-                        className="vtx-btn"
-                        rippleColor="rgba(200,242,60,0.2)"
-                        style={{
-                          background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                          color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                          fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                          display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                      >
-                        💬 {post.comments_count}
-                      </RippleButton>
-                      <RippleButton
-                        onClick={() => handleShare(post.id)}
-                        className="vtx-btn"
-                        rippleColor="rgba(200,242,60,0.2)"
-                        style={{
-                          background: 'transparent', border: 'none',
-                          color: '#555577', cursor: 'pointer',
-                          fontSize: 13, fontFamily: "'Syne', sans-serif",
-                          marginLeft: 'auto', transition: 'color 0.2s'
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                      >
-                        ↗ Compartilhar
-                      </RippleButton>
-                    </div>
-                  </div>
-                </article>
-
-                {/* Anúncio a cada 40 posts — só pra usuários Free */}
-                {showAd && adToShow && <FeedAd key={`ad-${position}`} ad={adToShow} />}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Infinite scroll loader */}
-        <div ref={loaderRef} style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
-          {loadingMore && (
-            <div style={{ display: 'flex', gap: 6 }}>
-              {[0, 1, 2].map(i => (
-                <div key={i} style={{
-                  width: 6, height: 6, borderRadius: '50%', background: '#c8f23c',
-                  animation: `bounce 0.8s ease ${i * 0.15}s infinite`,
-                }} />
-              ))}
+          {loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
             </div>
           )}
-          {!hasMore && posts.length > 0 && (
-            <p style={{ color: '#222240', fontSize: 13 }}>Você chegou ao fim ✦</p>
+
+          {!loading && tab === 'seguindo' && posts.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
+              <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>👥</div>
+              <p style={{ fontSize: 15, marginBottom: 8 }}>Você ainda não segue ninguém.</p>
+              <p style={{ fontSize: 13, color: '#333355' }}>Siga pessoas para ver os posts delas aqui.</p>
+            </div>
           )}
-        </div>
-      </main>
+
+          {!loading && tab === 'geral' && posts.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>🌀</div>
+              <p style={{ fontSize: 15 }}>Nenhum post ainda. Seja o primeiro!</p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {posts.map((post, i) => {
+              const isLiked = likedPosts.has(post.id)
+              const isLiking = likingPost === post.id
+              const authorPlan: PlanId = post.profiles?.plan || 'free'
+              const authorAccent = post.profiles?.accent_color || null
+              const planStyle = getPlanStyle(authorPlan, authorAccent)
+              const authorColor = getAuthorColor(authorPlan, authorAccent)
+              const isMega = authorPlan === 'mega'
+
+              // Posição real no feed (1-indexed) — insere anúncio a cada 40 posts, só pra Free
+              const position = i + 1
+              const showAd = userPlan === 'free' && position % AD_INTERVAL === 0 && feedAds.length > 0
+              const adToShow = showAd ? feedAds[Math.floor(position / AD_INTERVAL - 1) % feedAds.length] : null
+
+              return (
+                <div key={post.id} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <article
+                    className="vtx-card"
+                    style={{
+                      background: '#111118',
+                      border: planStyle.border,
+                      borderRadius: 16, overflow: 'hidden',
+                      boxShadow: planStyle.shadow,
+                      animation: `fadeUp 0.4s ease ${Math.min(i, 5) * 0.05}s both`,
+                      transition: 'border-color 0.2s, box-shadow 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = planStyle.hoverBorder
+                      e.currentTarget.style.boxShadow = planStyle.hoverShadow
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = planStyle.border.replace('1px solid ', '')
+                      e.currentTarget.style.boxShadow = planStyle.shadow
+                    }}
+                  >
+                    {authorPlan !== 'free' && planStyle.stripColor && (
+                      <div style={{
+                        height: 2,
+                        background: `linear-gradient(90deg, transparent, ${planStyle.stripColor}99, transparent)`,
+                      }} />
+                    )}
+
+                    {post.media_url && (
+                      isVideo(post.media_url) ? (
+                        <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
+                      ) : (
+                        <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                          <img src={post.media_url} alt={post.title} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} />
+                        </div>
+                      )
+                    )}
+
+                    <div style={{ padding: 20 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: '50%',
+                          background: post.profiles?.avatar_url ? 'none'
+                            : `linear-gradient(135deg, ${authorColor}, ${authorColor}99)`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
+                          boxShadow: planStyle.avatarShadow, overflow: 'hidden',
+                        }}>
+                          {post.profiles?.avatar_url
+                            ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : getInitial(post.profiles?.username || '?')
+                          }
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span
+                            style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                            onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
+                            onMouseEnter={e => (e.currentTarget.style.color = authorColor)}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
+                          >
+                            @{post.profiles?.username || 'usuário'}
+                          </span>
+                          {planStyle.badgeEl}
+                          {post.communities && (
+                            <span
+                              style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
+                              onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
+                            >
+                              em v/{post.communities.name}
+                            </span>
+                          )}
+                          <span style={{ color: '#444466', fontSize: 13 }}>· {timeAgo(post.created_at)}</span>
+                        </div>
+                      </div>
+
+                      <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
+                        <h2 style={isMega ? {
+                          fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 700,
+                          fontSize: 18, marginBottom: 8, lineHeight: 1.3,
+                          backgroundImage: `linear-gradient(100deg, ${authorColor}, #f0f0f8 55%, ${authorColor})`,
+                          backgroundSize: '200% auto',
+                          WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+                          WebkitTextFillColor: 'transparent',
+                          animation: 'megaShine 6s ease infinite',
+                          transition: 'color 0.2s',
+                        } : {
+                          color: '#f0f0f8',
+                          fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3,
+                          transition: 'color 0.2s',
+                        }}>
+                          {post.title}
+                        </h2>
+                        {post.content && (
+                          <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                            {post.content}
+                          </p>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <RippleButton
+                          onClick={() => handleLike(post.id)}
+                          className="vtx-btn"
+                          rippleColor={`${authorColor}55`}
+                          style={{
+                            background: isLiked ? `${authorColor}1a` : 'transparent',
+                            border: `1px solid ${isLiked ? `${authorColor}66` : 'rgba(255,255,255,0.08)'}`,
+                            color: isLiked ? authorColor : '#555577',
+                            padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                            fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                            boxShadow: isLiked ? `0 0 10px ${authorColor}33` : 'none',
+                            transform: isLiking ? 'scale(1.2)' : 'scale(1)',
+                          }}
+                        >
+                          <span className="vtx-icon-wiggle">▲</span> {post.likes_count}
+                        </RippleButton>
+                        <RippleButton
+                          onClick={() => router.push(`/post/${post.id}`)}
+                          className="vtx-btn"
+                          rippleColor="rgba(200,242,60,0.2)"
+                          style={{
+                            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                            color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
+                            fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                        >
+                          💬 {post.comments_count}
+                        </RippleButton>
+                        <RippleButton
+                          onClick={() => handleShare(post.id)}
+                          className="vtx-btn"
+                          rippleColor="rgba(200,242,60,0.2)"
+                          style={{
+                            background: 'transparent', border: 'none',
+                            color: '#555577', cursor: 'pointer',
+                            fontSize: 13, fontFamily: "'Syne', sans-serif",
+                            marginLeft: 'auto', transition: 'color 0.2s'
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
+                        >
+                          ↗ Compartilhar
+                        </RippleButton>
+                      </div>
+                    </div>
+                  </article>
+
+                  {/* Anúncio a cada 40 posts — só pra usuários Free */}
+                  {showAd && adToShow && <FeedAd key={`ad-${position}`} ad={adToShow} />}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Infinite scroll loader */}
+          <div ref={loaderRef} style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
+            {loadingMore && (
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{
+                    width: 6, height: 6, borderRadius: '50%', background: '#c8f23c',
+                    animation: `bounce 0.8s ease ${i * 0.15}s infinite`,
+                  }} />
+                ))}
+              </div>
+            )}
+            {!hasMore && posts.length > 0 && (
+              <p style={{ color: '#222240', fontSize: 13 }}>Você chegou ao fim ✦</p>
+            )}
+          </div>
+        </main>
+      </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,700&display=swap');
