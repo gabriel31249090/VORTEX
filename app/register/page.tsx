@@ -1,9 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+import { fadeInUp, shakeError } from '@/lib/animations'
+
+const ScrambleText = dynamic(() => import('../components/ScrambleText'), { ssr: false })
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -14,6 +18,20 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const cardRef = useRef<HTMLDivElement>(null)
+  const successRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (cardRef.current) fadeInUp(cardRef.current, { duration: 500 })
+  }, [])
+
+  useEffect(() => {
+    if (error && cardRef.current) shakeError(cardRef.current)
+  }, [error])
+
+  useEffect(() => {
+    if (success && successRef.current) fadeInUp(successRef.current, { duration: 500 })
+  }, [success])
 
   async function handleRegister() {
     setLoading(true)
@@ -68,7 +86,7 @@ export default function RegisterPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontFamily: "'Syne', sans-serif"
       }}>
-        <div style={{ textAlign: 'center' }}>
+        <div ref={successRef} style={{ textAlign: 'center', opacity: 0 }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
           <h2 style={{ color: '#f0f0f8', fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Conta criada!</h2>
           <p style={{ color: '#8888aa', marginBottom: 24 }}>Verifique seu email para confirmar a conta.</p>
@@ -96,18 +114,23 @@ export default function RegisterPage() {
 
       <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{
-            fontSize: 36, fontWeight: 800, color: '#c8f23c', letterSpacing: '-1px',
-            textShadow: '0 0 30px rgba(200,242,60,0.6), 0 0 60px rgba(200,242,60,0.3)'
-          }}>
-            ◈ VORTEX
+          <div style={{ filter: 'drop-shadow(0 0 20px rgba(200,242,60,0.6))' }}>
+            <ScrambleText
+              text="◈ VORTEX"
+              as="div"
+              trigger="inView"
+              duration={1.2}
+              color="#c8f23c"
+              glitchColor="#f0f0f8"
+              className="vtx-register-logo"
+            />
           </div>
           <p style={{ color: '#555577', marginTop: 8, fontSize: 14 }}>Crie sua conta</p>
         </div>
 
-        <div style={{
+        <div ref={cardRef} style={{
           background: '#111118', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 20, padding: 32
+          borderRadius: 20, padding: 32, opacity: 0
         }}>
           {[
             { label: 'Username', value: username, type: 'text', placeholder: 'seunome', onChange: (v: string) => setUsername(v.toLowerCase().replace(/\s/g, '')) },
@@ -166,6 +189,12 @@ export default function RegisterPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
         input::placeholder { color: #333355; }
+        .vtx-register-logo {
+          font-family: 'Syne', sans-serif;
+          font-size: 36px;
+          font-weight: 800;
+          letter-spacing: -1px;
+        }
       `}</style>
     </div>
   )

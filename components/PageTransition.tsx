@@ -23,13 +23,13 @@ export default function PageTransition({ children }: { children: React.ReactNode
       return
     }
 
-    // Saida: fade + leve movimento pra cima
+    // Saída: fade + leve movimento pra cima
     animate(el, {
       opacity: [1, 0],
       translateY: [0, -12],
       duration: 220,
       easing: "easeInQuad",
-      complete: () => {
+      onComplete: () => {
         setDisplayChildren(children)
         prevPathname.current = pathname
 

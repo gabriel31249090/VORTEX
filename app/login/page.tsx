@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { fadeInUp, shakeError } from '@/lib/animations'
 
 const BlackHoleBackground = dynamic(() => import('../components/BlackHoleBackground'), { ssr: false })
+const ScrambleText = dynamic(() => import('../components/ScrambleText'), { ssr: false })
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -15,6 +17,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (cardRef.current) fadeInUp(cardRef.current, { duration: 500 })
+  }, [])
+
+  useEffect(() => {
+    if (error && cardRef.current) shakeError(cardRef.current)
+  }, [error])
 
   async function handleLogin() {
     setLoading(true)
@@ -48,19 +59,24 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 2 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{
-            fontSize: 36, fontWeight: 800, color: '#c8f23c', letterSpacing: '-1px',
-            textShadow: '0 0 30px rgba(200,242,60,0.6), 0 0 60px rgba(200,242,60,0.3)'
-          }}>
-            ◈ VORTEX
+          <div style={{ filter: 'drop-shadow(0 0 20px rgba(200,242,60,0.6))' }}>
+            <ScrambleText
+              text="◈ VORTEX"
+              as="div"
+              trigger="mount"
+              duration={1.2}
+              color="#c8f23c"
+              glitchColor="#f0f0f8"
+              className="vtx-login-logo"
+            />
           </div>
           <p style={{ color: '#555577', marginTop: 8, fontSize: 14 }}>Bem-vindo de volta</p>
         </div>
 
         {/* Card */}
-        <div style={{
+        <div ref={cardRef} style={{
           background: '#111118', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 20, padding: 32
+          borderRadius: 20, padding: 32, opacity: 0
         }}>
           <div style={{ marginBottom: 20 }}>
             <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 8 }}>Email</label>
@@ -131,6 +147,12 @@ export default function LoginPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
         input::placeholder { color: #333355; }
+        .vtx-login-logo {
+          font-family: 'Syne', sans-serif;
+          font-size: 36px;
+          font-weight: 800;
+          letter-spacing: -1px;
+        }
       `}</style>
     </div>
   )

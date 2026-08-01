@@ -4,12 +4,20 @@ import type { NextRequest } from 'next/server'
 
 const PUBLIC_ROUTES = ['/login', '/register']
 
+function withNoStore(response: NextResponse) {
+  // Impede que qualquer CDN/edge/proxy intermediário guarde essa resposta
+  // (e o Set-Cookie de sessão junto dela) em cache e sirva pra outro visitante.
+  response.headers.set('Cache-Control', 'private, no-cache, no-store, must-revalidate')
+  response.headers.set('Pragma', 'no-cache')
+  response.headers.set('Expires', '0')
+  return response
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Rotas públicas — deixa passar
   if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-    return NextResponse.next()
+    return withNoStore(NextResponse.next())
   }
 
   const response = NextResponse.next()
@@ -32,10 +40,10 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return withNoStore(NextResponse.redirect(new URL('/login', request.url)))
   }
 
-  return response
+  return withNoStore(response)
 }
 
 export const config = {

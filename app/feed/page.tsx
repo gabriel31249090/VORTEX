@@ -4,14 +4,17 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
-import FeedAd from '../components/FeedAd'
 import RippleButton from '../components/RippleButton'
+import PostCard from '../components/PostCard'
+import StoriesBar from '../components/StoriesBar'
+import type { ReportReason } from '../components/ReportModal'
 import toast from 'react-hot-toast'
 import dynamic from 'next/dynamic'
 
 const BlackHoleBackground = dynamic(() => import('../components/BlackHoleBackground'), { ssr: false })
 
 type PlanId = 'free' | 'boost' | 'mega'
+type VoteType = 'up' | 'down'
 
 type Post = {
   id: string
@@ -21,20 +24,23 @@ type Post = {
   media_url: string | null
   likes_count: number
   comments_count: number
+  reposts_count: number
   created_at: string
   author_id: string
   profiles: { username: string; avatar_url: string | null; plan: PlanId; accent_color: string | null } | null
   communities: { name: string; slug: string } | null
 }
 
+type FeedItem = Post & {
+  activityId: string
+  isRepost: boolean
+  repostedByUsername: string | null
+}
+
 type FeedTab = 'geral' | 'seguindo'
 
 const PAGE_SIZE = 15
 const AD_INTERVAL = 40
-
-function isVideo(url: string) {
-  return /\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(url)
-}
 
 function SkeletonCard() {
   return (
@@ -58,55 +64,17 @@ function SkeletonCard() {
   )
 }
 
-function getAuthorColor(plan: PlanId, accentColor: string | null): string {
-  if (plan === 'mega' && accentColor) return accentColor
-  if (plan === 'mega') return '#a78bfa'
-  if (plan === 'boost' && accentColor) return accentColor
-  if (plan === 'boost') return '#c8f23c'
-  return '#c8f23c'
-}
-
-function getPlanStyle(plan: PlanId, accentColor: string | null) {
-  const color = getAuthorColor(plan, accentColor)
-
-  if (plan === 'mega') return {
-    border: `1px solid ${color}44`,
-    shadow: `0 0 20px ${color}12`,
-    avatarShadow: `0 0 10px ${color}88`,
-    hoverBorder: `${color}88`,
-    hoverShadow: `0 0 24px ${color}1a`,
-    badgeEl: <span style={{ fontSize: 12, lineHeight: 1 }}>👑</span>,
-    stripColor: color,
-  }
-  if (plan === 'boost') return {
-    border: `1px solid ${color}40`,
-    shadow: `0 0 16px ${color}10`,
-    avatarShadow: `0 0 10px ${color}66`,
-    hoverBorder: `${color}66`,
-    hoverShadow: `0 0 20px ${color}14`,
-    badgeEl: <span style={{ fontSize: 12, lineHeight: 1 }}>⚡</span>,
-    stripColor: color,
-  }
-  return {
-    border: '1px solid rgba(255,255,255,0.06)',
-    shadow: 'none',
-    avatarShadow: '0 0 8px rgba(200,242,60,0.2)',
-    hoverBorder: 'rgba(200,242,60,0.35)',
-    hoverShadow: '0 0 20px rgba(200,242,60,0.08)',
-    badgeEl: null,
-    stripColor: null,
-  }
-}
-
 export default function FeedPage() {
-  const [posts, setPosts] = useState<Post[]>([])
+  const [posts, setPosts] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set())
-  const [likingPost, setLikingPost] = useState<string | null>(null)
+  const [votes, setVotes] = useState<Map<string, VoteType>>(new Map())
+  const [votingPost, setVotingPost] = useState<string | null>(null)
+  const [repostedIds, setRepostedIds] = useState<Set<string>>(new Set())
   const [userId, setUserId] = useState<string | null>(null)
   const [userPlan, setUserPlan] = useState<PlanId>('free')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [tab, setTab] = useState<FeedTab>('geral')
   const [followingIds, setFollowingIds] = useState<string[]>([])
   const [page, setPage] = useState(0)
@@ -122,11 +90,11 @@ export default function FeedPage() {
       setUserId(user.id)
 
       const { data: profile } = await supabase
-        .from('profiles').select('plan').eq('id', user.id).single()
+        .from('profiles').select('plan, is_admin').eq('id', user.id).single()
       const plan = (profile?.plan as PlanId) || 'free'
       setUserPlan(plan)
+      setIsAdmin(!!profile?.is_admin)
 
-      // Busca anúncios de feed ativos só se o usuário for Free
       if (plan === 'free') {
         const { data: ads } = await supabase
           .from('ads')
@@ -137,8 +105,14 @@ export default function FeedPage() {
       }
 
       const { data: likes } = await supabase
-        .from('likes').select('post_id').eq('user_id', user.id)
-      if (likes) setLikedPosts(new Set(likes.map((l: any) => l.post_id)))
+        .from('likes').select('post_id, vote_type').eq('user_id', user.id)
+      if (likes) {
+        setVotes(new Map(likes.map((l: any) => [l.post_id, (l.vote_type as VoteType) || 'up'])))
+      }
+
+      const { data: myReposts } = await supabase
+        .from('reposts').select('post_id').eq('user_id', user.id)
+      if (myReposts) setRepostedIds(new Set(myReposts.map((r: any) => r.post_id)))
 
       const { data: follows } = await supabase
         .from('follows').select('following_id').eq('follower_id', user.id)
@@ -150,17 +124,23 @@ export default function FeedPage() {
     init()
   }, [])
 
-  // Realtime
   useEffect(() => {
     const channel = supabase
       .channel('feed-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, async (payload) => {
         const { data: newPost } = await supabase
           .from('posts')
-          .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url, plan, accent_color), communities(name, slug)')
+          .select('id, title, content, type, media_url, likes_count, comments_count, reposts_count, created_at, author_id, profiles(username, avatar_url, plan, accent_color), communities(name, slug)')
           .eq('id', payload.new.id)
           .single()
-        if (newPost) setPosts(prev => [newPost as any, ...prev])
+        if (newPost) {
+          setPosts(prev => [{
+            ...(newPost as any),
+            activityId: (newPost as any).id,
+            isRepost: false,
+            repostedByUsername: null,
+          }, ...prev])
+        }
       })
       .subscribe()
 
@@ -171,15 +151,7 @@ export default function FeedPage() {
     if (pageNum === 0) setLoading(true)
     else setLoadingMore(true)
 
-    let query = supabase
-      .from('posts')
-      .select('id, title, content, type, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url, plan, accent_color), communities(name, slug)')
-      .order('created_at', { ascending: false })
-      .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1)
-
-    if (feedTab === 'seguindo' && followIds.length > 0) {
-      query = query.in('author_id', followIds)
-    } else if (feedTab === 'seguindo' && followIds.length === 0) {
+    if (feedTab === 'seguindo' && followIds.length === 0) {
       setPosts([])
       setLoading(false)
       setLoadingMore(false)
@@ -187,19 +159,59 @@ export default function FeedPage() {
       return
     }
 
-    const { data, error } = await query
-    if (error) console.error(error)
+    let activityQuery = supabase
+      .from('feed_activity')
+      .select('post_id, author_id, activity_at, is_repost, reposter_id, reposter_username')
+      .order('activity_at', { ascending: false })
+      .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1)
 
-    const newPosts = (data as any) || []
-    if (pageNum === 0) setPosts(newPosts)
-    else setPosts(prev => [...prev, ...newPosts])
+    if (feedTab === 'seguindo') {
+      const idList = followIds.join(',')
+      activityQuery = activityQuery.or(`author_id.in.(${idList}),reposter_id.in.(${idList})`)
+    }
 
-    setHasMore(newPosts.length === PAGE_SIZE)
+    const { data: activity, error: activityError } = await activityQuery
+    if (activityError) console.error(activityError)
+
+    const rows = activity || []
+    if (rows.length === 0) {
+      if (pageNum === 0) setPosts([])
+      setHasMore(false)
+      setLoading(false)
+      setLoadingMore(false)
+      return
+    }
+
+    const postIds = [...new Set(rows.map((r: any) => r.post_id))]
+    const { data: postsData, error: postsError } = await supabase
+      .from('posts')
+      .select('id, title, content, type, media_url, likes_count, comments_count, reposts_count, created_at, author_id, profiles(username, avatar_url, plan, accent_color), communities(name, slug)')
+      .in('id', postIds)
+    if (postsError) console.error(postsError)
+
+    const postMap = new Map((postsData || []).map((p: any) => [p.id, p]))
+
+    const newItems: FeedItem[] = rows
+      .map((r: any) => {
+        const base = postMap.get(r.post_id)
+        if (!base) return null
+        return {
+          ...base,
+          activityId: r.is_repost ? `${r.post_id}-r-${r.reposter_id}` : r.post_id,
+          isRepost: r.is_repost,
+          repostedByUsername: r.is_repost ? r.reposter_username : null,
+        }
+      })
+      .filter(Boolean)
+
+    if (pageNum === 0) setPosts(newItems)
+    else setPosts(prev => [...prev, ...newItems])
+
+    setHasMore(rows.length === PAGE_SIZE)
     setLoading(false)
     setLoadingMore(false)
   }
 
-  // Infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
@@ -221,23 +233,70 @@ export default function FeedPage() {
     if (userId) loadPosts(userId, newTab, followingIds, 0)
   }
 
-  async function handleLike(postId: string) {
-    if (!userId || likingPost) return
-    setLikingPost(postId)
-    const isLiked = likedPosts.has(postId)
+  async function handleVote(postId: string, type: VoteType) {
+    if (!userId || votingPost) return
+    setVotingPost(postId)
 
-    if (isLiked) {
-      await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', userId)
-      await supabase.from('posts').update({ likes_count: posts.find(p => p.id === postId)!.likes_count - 1 }).eq('id', postId)
-      setLikedPosts(prev => { const next = new Set(prev); next.delete(postId); return next })
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: p.likes_count - 1 } : p))
+    const current = votes.get(postId) ?? null
+    let delta = 0
+    let nextVote: VoteType | null = type
+
+    if (current === null) {
+      delta = type === 'up' ? 1 : -1
+    } else if (current === type) {
+      delta = type === 'up' ? -1 : 1
+      nextVote = null
     } else {
-      await supabase.from('likes').insert({ post_id: postId, user_id: userId })
-      await supabase.from('posts').update({ likes_count: posts.find(p => p.id === postId)!.likes_count + 1 }).eq('id', postId)
-      setLikedPosts(prev => new Set(prev).add(postId))
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: p.likes_count + 1 } : p))
+      delta = type === 'up' ? 2 : -2
     }
-    setTimeout(() => setLikingPost(null), 300)
+
+    const post = posts.find(p => p.id === postId)
+    if (!post) { setVotingPost(null); return }
+
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: p.likes_count + delta } : p))
+    setVotes(prev => {
+      const next = new Map(prev)
+      if (nextVote === null) next.delete(postId)
+      else next.set(postId, nextVote)
+      return next
+    })
+
+    if (nextVote === null) {
+      await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', userId)
+    } else if (current === null) {
+      await supabase.from('likes').insert({ post_id: postId, user_id: userId, vote_type: nextVote })
+    } else {
+      await supabase.from('likes').update({ vote_type: nextVote }).eq('post_id', postId).eq('user_id', userId)
+    }
+    await supabase.from('posts').update({ likes_count: post.likes_count + delta }).eq('id', postId)
+
+    setTimeout(() => setVotingPost(null), 300)
+  }
+
+  async function handleRepost(postId: string) {
+    if (!userId) return
+    const isReposted = repostedIds.has(postId)
+    const post = posts.find(p => p.id === postId)
+    if (!post) return
+
+    const delta = isReposted ? -1 : 1
+
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, reposts_count: (p.reposts_count ?? 0) + delta } : p))
+    setRepostedIds(prev => {
+      const next = new Set(prev)
+      if (isReposted) next.delete(postId)
+      else next.add(postId)
+      return next
+    })
+
+    if (isReposted) {
+      await supabase.from('reposts').delete().eq('post_id', postId).eq('user_id', userId)
+    } else {
+      await supabase.from('reposts').insert({ post_id: postId, user_id: userId })
+    }
+    await supabase.from('posts').update({ reposts_count: (post.reposts_count ?? 0) + delta }).eq('id', postId)
+
+    toast.success(isReposted ? 'Republicação desfeita' : 'Republicado!')
   }
 
   async function handleShare(postId: string) {
@@ -246,16 +305,30 @@ export default function FeedPage() {
     toast.success('Link copiado!')
   }
 
-  function getInitial(username: string) {
-    return username?.charAt(0).toUpperCase() || '?'
+  async function handleReportPost(postId: string, reason: ReportReason, details: string) {
+    if (!userId) return
+    const { error } = await supabase.from('post_reports').insert({
+      post_id: postId,
+      reporter_id: userId,
+      reason,
+      details: details || null,
+    })
+    if (error) {
+      if (error.code === '23505') toast.error('Você já denunciou este post.')
+      else toast.error('Erro ao enviar denúncia.')
+      return
+    }
+    toast.success('Denúncia enviada. Obrigado por ajudar a manter o VORTEX seguro.')
   }
 
-  function timeAgo(date: string) {
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-    if (diff < 60) return `${diff}s`
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`
-    return `${Math.floor(diff / 86400)}d`
+  async function handleAdminDelete(postId: string) {
+    const { error } = await supabase.from('posts').delete().eq('id', postId)
+    if (error) {
+      toast.error('Erro ao excluir post.')
+      return
+    }
+    setPosts(prev => prev.filter(p => p.id !== postId))
+    toast.success('Post excluído.')
   }
 
   return (
@@ -266,6 +339,8 @@ export default function FeedPage() {
         <Nav />
 
         <main style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 80px', paddingLeft: 'max(16px, calc(220px + 32px))' }}>
+
+          {userId && <StoriesBar currentUserId={userId} />}
 
           {/* Tabs */}
           <div style={{
@@ -311,174 +386,30 @@ export default function FeedPage() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {posts.map((post, i) => {
-              const isLiked = likedPosts.has(post.id)
-              const isLiking = likingPost === post.id
-              const authorPlan: PlanId = post.profiles?.plan || 'free'
-              const authorAccent = post.profiles?.accent_color || null
-              const planStyle = getPlanStyle(authorPlan, authorAccent)
-              const authorColor = getAuthorColor(authorPlan, authorAccent)
-              const isMega = authorPlan === 'mega'
-
-              // Posição real no feed (1-indexed) — insere anúncio a cada 40 posts, só pra Free
+            {posts.map((item, i) => {
               const position = i + 1
               const showAd = userPlan === 'free' && position % AD_INTERVAL === 0 && feedAds.length > 0
               const adToShow = showAd ? feedAds[Math.floor(position / AD_INTERVAL - 1) % feedAds.length] : null
 
               return (
-                <div key={post.id} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <article
-                    className="vtx-card"
-                    style={{
-                      background: '#111118',
-                      border: planStyle.border,
-                      borderRadius: 16, overflow: 'hidden',
-                      boxShadow: planStyle.shadow,
-                      animation: `fadeUp 0.4s ease ${Math.min(i, 5) * 0.05}s both`,
-                      transition: 'border-color 0.2s, box-shadow 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = planStyle.hoverBorder
-                      e.currentTarget.style.boxShadow = planStyle.hoverShadow
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = planStyle.border.replace('1px solid ', '')
-                      e.currentTarget.style.boxShadow = planStyle.shadow
-                    }}
-                  >
-                    {authorPlan !== 'free' && planStyle.stripColor && (
-                      <div style={{
-                        height: 2,
-                        background: `linear-gradient(90deg, transparent, ${planStyle.stripColor}99, transparent)`,
-                      }} />
-                    )}
-
-                    {post.media_url && (
-                      isVideo(post.media_url) ? (
-                        <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
-                      ) : (
-                        <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                          <img src={post.media_url} alt={post.title} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} />
-                        </div>
-                      )
-                    )}
-
-                    <div style={{ padding: 20 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                        <div style={{
-                          width: 32, height: 32, borderRadius: '50%',
-                          background: post.profiles?.avatar_url ? 'none'
-                            : `linear-gradient(135deg, ${authorColor}, ${authorColor}99)`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-                          boxShadow: planStyle.avatarShadow, overflow: 'hidden',
-                        }}>
-                          {post.profiles?.avatar_url
-                            ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : getInitial(post.profiles?.username || '?')
-                          }
-                        </div>
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span
-                            style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                            onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
-                            onMouseEnter={e => (e.currentTarget.style.color = authorColor)}
-                            onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-                          >
-                            @{post.profiles?.username || 'usuário'}
-                          </span>
-                          {planStyle.badgeEl}
-                          {post.communities && (
-                            <span
-                              style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
-                              onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
-                            >
-                              em v/{post.communities.name}
-                            </span>
-                          )}
-                          <span style={{ color: '#444466', fontSize: 13 }}>· {timeAgo(post.created_at)}</span>
-                        </div>
-                      </div>
-
-                      <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-                        <h2 style={isMega ? {
-                          fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 700,
-                          fontSize: 18, marginBottom: 8, lineHeight: 1.3,
-                          backgroundImage: `linear-gradient(100deg, ${authorColor}, #f0f0f8 55%, ${authorColor})`,
-                          backgroundSize: '200% auto',
-                          WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-                          WebkitTextFillColor: 'transparent',
-                          animation: 'megaShine 6s ease infinite',
-                          transition: 'color 0.2s',
-                        } : {
-                          color: '#f0f0f8',
-                          fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3,
-                          transition: 'color 0.2s',
-                        }}>
-                          {post.title}
-                        </h2>
-                        {post.content && (
-                          <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
-                            {post.content}
-                          </p>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        <RippleButton
-                          onClick={() => handleLike(post.id)}
-                          className="vtx-btn"
-                          rippleColor={`${authorColor}55`}
-                          style={{
-                            background: isLiked ? `${authorColor}1a` : 'transparent',
-                            border: `1px solid ${isLiked ? `${authorColor}66` : 'rgba(255,255,255,0.08)'}`,
-                            color: isLiked ? authorColor : '#555577',
-                            padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                            fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
-                            boxShadow: isLiked ? `0 0 10px ${authorColor}33` : 'none',
-                            transform: isLiking ? 'scale(1.2)' : 'scale(1)',
-                          }}
-                        >
-                          <span className="vtx-icon-wiggle">▲</span> {post.likes_count}
-                        </RippleButton>
-                        <RippleButton
-                          onClick={() => router.push(`/post/${post.id}`)}
-                          className="vtx-btn"
-                          rippleColor="rgba(200,242,60,0.2)"
-                          style={{
-                            background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                            color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                            fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                        >
-                          💬 {post.comments_count}
-                        </RippleButton>
-                        <RippleButton
-                          onClick={() => handleShare(post.id)}
-                          className="vtx-btn"
-                          rippleColor="rgba(200,242,60,0.2)"
-                          style={{
-                            background: 'transparent', border: 'none',
-                            color: '#555577', cursor: 'pointer',
-                            fontSize: 13, fontFamily: "'Syne', sans-serif",
-                            marginLeft: 'auto', transition: 'color 0.2s'
-                          }}
-                          onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-                          onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-                        >
-                          ↗ Compartilhar
-                        </RippleButton>
-                      </div>
-                    </div>
-                  </article>
-
-                  {/* Anúncio a cada 40 posts — só pra usuários Free */}
-                  {showAd && adToShow && <FeedAd key={`ad-${position}`} ad={adToShow} />}
-                </div>
+                <PostCard
+                  key={item.activityId}
+                  post={item}
+                  index={i}
+                  voteType={votes.get(item.id) ?? null}
+                  onVote={handleVote}
+                  onShare={handleShare}
+                  onRepost={handleRepost}
+                  isReposted={repostedIds.has(item.id)}
+                  isRepostFeedItem={item.isRepost}
+                  repostedByUsername={item.repostedByUsername}
+                  showAd={showAd}
+                  adToShow={adToShow}
+                  adPosition={position}
+                  isAdmin={isAdmin}
+                  onReport={handleReportPost}
+                  onAdminDelete={handleAdminDelete}
+                />
               )
             })}
           </div>
