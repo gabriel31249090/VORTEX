@@ -303,6 +303,16 @@ export default function SettingsPage() {
               <p style={{ color: '#555577', fontSize: 13 }}>{user?.email}</p>
             </div>
           </div>
+          <div
+            onClick={() => router.push('/settings/blocked')}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <div>
+              <p style={{ color: '#f0f0f8', fontSize: 14, fontWeight: 600 }}>🚫 Usuários bloqueados</p>
+              <p style={{ color: '#555577', fontSize: 13 }}>Gerencie quem você bloqueou</p>
+            </div>
+            <span style={{ color: '#555577', fontSize: 16 }}>→</span>
+          </div>
         </div>
 
         {section('Zona de perigo')}

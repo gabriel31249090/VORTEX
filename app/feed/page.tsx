@@ -10,6 +10,7 @@ import StoriesBar from '../components/StoriesBar'
 import type { ReportReason } from '../components/ReportModal'
 import toast from 'react-hot-toast'
 import dynamic from 'next/dynamic'
+import { getBlockedIds } from '@/lib/blocks'
 
 const BlackHoleBackground = dynamic(() => import('../components/BlackHoleBackground'), { ssr: false })
 
@@ -77,6 +78,7 @@ export default function FeedPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [tab, setTab] = useState<FeedTab>('geral')
   const [followingIds, setFollowingIds] = useState<string[]>([])
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(0)
   const [feedAds, setFeedAds] = useState<{ id: string; title: string; description: string | null; image_url: string | null; link_url: string }[]>([])
   const loaderRef = useRef<HTMLDivElement>(null)
@@ -119,7 +121,10 @@ export default function FeedPage() {
       const ids = follows?.map((f: any) => f.following_id) || []
       setFollowingIds(ids)
 
-      await loadPosts(user.id, 'geral', ids, 0)
+      const blocked = await getBlockedIds(user.id)
+      setBlockedIds(blocked)
+
+      await loadPosts(user.id, 'geral', ids, 0, blocked)
     }
     init()
   }, [])
@@ -147,7 +152,8 @@ export default function FeedPage() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  async function loadPosts(uid: string, feedTab: FeedTab, followIds: string[], pageNum: number) {
+  async function loadPosts(uid: string, feedTab: FeedTab, followIds: string[], pageNum: number, blocked?: Set<string>) {
+    const blockedSet = blocked ?? blockedIds
     if (pageNum === 0) setLoading(true)
     else setLoadingMore(true)
 
@@ -195,6 +201,10 @@ export default function FeedPage() {
       .map((r: any) => {
         const base = postMap.get(r.post_id)
         if (!base) return null
+        // Esconde post de quem foi bloqueado (ou de quem bloqueou você),
+        // incluindo repost feito por alguém bloqueado
+        if (blockedSet.has(base.author_id)) return null
+        if (r.is_repost && blockedSet.has(r.reposter_id)) return null
         return {
           ...base,
           activityId: r.is_repost ? `${r.post_id}-r-${r.reposter_id}` : r.post_id,
@@ -217,20 +227,20 @@ export default function FeedPage() {
       if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
         const nextPage = page + 1
         setPage(nextPage)
-        loadPosts(userId!, tab, followingIds, nextPage)
+        loadPosts(userId!, tab, followingIds, nextPage, blockedIds)
       }
     }, { threshold: 0.1 })
 
     if (loaderRef.current) observer.observe(loaderRef.current)
     return () => observer.disconnect()
-  }, [hasMore, loadingMore, loading, page, userId, tab, followingIds])
+  }, [hasMore, loadingMore, loading, page, userId, tab, followingIds, blockedIds])
 
   function switchTab(newTab: FeedTab) {
     setTab(newTab)
     setPage(0)
     setHasMore(true)
     setPosts([])
-    if (userId) loadPosts(userId, newTab, followingIds, 0)
+    if (userId) loadPosts(userId, newTab, followingIds, 0, blockedIds)
   }
 
   async function handleVote(postId: string, type: VoteType) {

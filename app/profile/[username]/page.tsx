@@ -297,6 +297,12 @@ export default function ProfilePage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [messageLoading, setMessageLoading] = useState(false)
 
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [blockedByThem, setBlockedByThem] = useState(false)
+  const [blockLoading, setBlockLoading] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
+
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null)
@@ -349,6 +355,14 @@ export default function ProfilePage() {
           .from('follows').select('follower_id')
           .eq('follower_id', user.id).eq('following_id', profileData.id).single()
         setIsFollowing(!!followData)
+
+        const { data: blockRows } = await supabase
+          .from('blocked_users')
+          .select('blocker_id, blocked_id')
+          .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${profileData.id}),and(blocker_id.eq.${profileData.id},blocked_id.eq.${user.id})`)
+        const rows = blockRows || []
+        setIsBlocked(rows.some((r: any) => r.blocker_id === user.id))
+        setBlockedByThem(rows.some((r: any) => r.blocker_id === profileData.id))
       }
 
       const { data: postsData } = await supabase
@@ -383,10 +397,53 @@ export default function ProfilePage() {
     setFollowLoading(false)
   }
 
+  async function handleBlock() {
+    if (!currentUserId || !profile) return
+    setBlockLoading(true)
+    if (isBlocked) {
+      await supabase.from('blocked_users').delete()
+        .eq('blocker_id', currentUserId).eq('blocked_id', profile.id)
+      setIsBlocked(false)
+      toast('Você desbloqueou @' + profile.username)
+    } else {
+      const { error } = await supabase.from('blocked_users')
+        .insert({ blocker_id: currentUserId, blocked_id: profile.id })
+      if (error) {
+        toast.error('Não foi possível bloquear esse usuário.')
+        setBlockLoading(false)
+        return
+      }
+      // Bloquear desfaz o "seguir" nos dois sentidos, pra não sobrar rastro
+      await supabase.from('follows').delete()
+        .or(`and(follower_id.eq.${currentUserId},following_id.eq.${profile.id}),and(follower_id.eq.${profile.id},following_id.eq.${currentUserId})`)
+      setIsFollowing(false)
+      setIsBlocked(true)
+      toast.success('Você bloqueou @' + profile.username)
+    }
+    setShowMoreMenu(false)
+    setBlockLoading(false)
+  }
+
+  // Fecha o menu "···" ao clicar fora dele
+  useEffect(() => {
+    if (!showMoreMenu) return
+    function onClickOutside(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [showMoreMenu])
+
   // Busca conversa 1:1 existente com esse usuário, ou cria uma nova, e navega até ela
   async function handleMessage() {
     if (!currentUserId) { router.push('/login'); return }
     if (!profile) return
+    if (isBlocked || blockedByThem) {
+      toast.error('Você não pode enviar mensagem pra esse usuário.')
+      return
+    }
     setMessageLoading(true)
 
     try {
@@ -696,8 +753,21 @@ export default function ProfilePage() {
                   </button>
                 </div>
               )}
-              {!isOwner && (
-                <div style={{ display: 'flex', gap: 8 }}>
+              {!isOwner && blockedByThem && (
+                <div style={{ padding: '7px 16px', borderRadius: 50, border: '1px solid rgba(255,255,255,0.08)', color: '#555577', fontSize: 13, fontFamily: "'Syne', sans-serif" }}>
+                  Indisponível
+                </div>
+              )}
+
+              {!isOwner && !blockedByThem && isBlocked && (
+                <button onClick={handleBlock} disabled={blockLoading}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,60,60,0.35)', color: '#ff6060', padding: '7px 16px', borderRadius: 50, cursor: blockLoading ? 'wait' : 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Syne', sans-serif", opacity: blockLoading ? 0.6 : 1 }}>
+                  {blockLoading ? '...' : '🚫 Desbloquear'}
+                </button>
+              )}
+
+              {!isOwner && !blockedByThem && !isBlocked && (
+                <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
                   <button
                     onClick={handleMessage}
                     disabled={messageLoading}
@@ -718,6 +788,24 @@ export default function ProfilePage() {
                     onMouseLeave={e => { if (isFollowing) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' } }}>
                     {followLoading ? '...' : isFollowing ? 'Seguindo ✓' : 'Seguir'}
                   </button>
+                  <div ref={moreMenuRef} style={{ position: 'relative' }}>
+                    <button onClick={() => setShowMoreMenu(v => !v)}
+                      style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: '#8888aa', width: 34, height: 34, borderRadius: '50%', cursor: 'pointer', fontSize: 16, fontFamily: "'Syne', sans-serif", lineHeight: '1' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.color = activeColor }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#8888aa' }}>
+                      ⋯
+                    </button>
+                    {showMoreMenu && (
+                      <div style={{ position: 'absolute', top: '120%', right: 0, background: '#18181f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 6, minWidth: 170, zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                        <button onClick={handleBlock} disabled={blockLoading}
+                          style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 'none', color: '#ff6060', padding: '8px 10px', borderRadius: 8, cursor: blockLoading ? 'wait' : 'pointer', fontSize: 13, fontFamily: "'Syne', sans-serif" }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,60,60,0.1)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          {blockLoading ? '...' : `🚫 Bloquear @${profile.username}`}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
