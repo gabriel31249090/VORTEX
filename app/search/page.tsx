@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 
 type SearchTab = 'posts' | 'users' | 'communities'
 
@@ -268,13 +269,13 @@ export default function SearchPage() {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <div style={{
-                      width: 22, height: 22, borderRadius: '50%', overflow: 'hidden',
+                      width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', position: 'relative',
                       background: 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 10, fontWeight: 800, color: '#000', flexShrink: 0,
                     }}>
                       {author?.avatar_url
-                        ? <img src={author.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <Image src={author.avatar_url} alt="" fill sizes="22px" style={{ objectFit: 'cover' }} />
                         : author?.username?.charAt(0).toUpperCase()}
                     </div>
                     <span style={{ color: '#555577', fontSize: 12 }}>@{author?.username}</span>
@@ -321,14 +322,14 @@ export default function SearchPage() {
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}
               >
                 <div style={{
-                  width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                  width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', position: 'relative',
                   background: user.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 20, fontWeight: 800, color: '#000',
                   boxShadow: '0 0 14px rgba(200,242,60,0.2)',
                 }}>
                   {user.avatar_url
-                    ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <Image src={user.avatar_url} alt="" fill sizes="48px" style={{ objectFit: 'cover' }} />
                     : user.username.charAt(0).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

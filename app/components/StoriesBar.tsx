@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import StoryViewer, { type StoryGroup } from './StoryViewer'
+import Image from 'next/image'
 
 type StoryProfile = { id: string; username: string; avatar_url: string | null }
 type Story = { id: string; user_id: string; media_url: string; media_type: 'image' | 'video'; created_at: string; profiles: StoryProfile }
@@ -94,7 +95,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
           }}
         >
           {myStories.length > 0 ? (
-            <img src={myStories[myStories.length - 1].media_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <Image src={myStories[myStories.length - 1].media_url} alt="" fill sizes="58px" style={{ objectFit: 'cover' }} />
           ) : uploading ? (
             <span style={{ fontSize: 11, color: '#c8f23c' }}>...</span>
           ) : (
@@ -123,9 +124,9 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
             onClick={() => setViewerGroup(g)}
             style={{ width: 58, height: 58, borderRadius: '50%', cursor: 'pointer', border: '2px solid #c8f23c', padding: 2 }}
           >
-            <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: '#1a1a28' }}>
+            <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: '#1a1a28', position: 'relative' }}>
               {g.user.avatar_url ? (
-                <img src={g.user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <Image src={g.user.avatar_url} alt="" fill sizes="58px" style={{ objectFit: 'cover' }} />
               ) : (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8f23c', fontWeight: 800 }}>
                   {g.user.username?.charAt(0).toUpperCase()}

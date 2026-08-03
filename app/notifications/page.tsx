@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
+import Image from 'next/image'
 
 type PlanId = 'free' | 'boost' | 'mega'
 
@@ -214,13 +215,13 @@ export default function NotificationsPage() {
                     </div>
                   ) : (
                     <div style={{
-                      width: 40, height: 40, borderRadius: '50%', overflow: 'hidden',
+                      width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', position: 'relative',
                       background: n.actor?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 16, fontWeight: 800, color: '#000',
                     }}>
                       {n.actor?.avatar_url
-                        ? <img src={n.actor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <Image src={n.actor.avatar_url} alt="" fill sizes="40px" style={{ objectFit: 'cover' }} />
                         : n.actor?.username?.charAt(0).toUpperCase() || '?'
                       }
                     </div>

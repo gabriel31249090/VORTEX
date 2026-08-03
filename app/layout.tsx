@@ -3,9 +3,27 @@ import { Toaster } from "react-hot-toast";
 import AdPopup from "./components/AdPopup";
 import PageTransition from "@/components/PageTransition";
 
+const SITE_URL = "https://vortex.app"; // TODO: trocar pelo domínio real quando definido
+
 export const metadata: Metadata = {
-  title: "VORTEX",
-  description: "A rede social sem limites",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "VORTEX — A rede social sem limites",
+    template: "%s · VORTEX",
+  },
+  description: "Rede social moderna combinando o melhor do Reddit e Instagram. Comunidades, feed, posts, comentários e curtidas.",
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    siteName: "VORTEX",
+    title: "VORTEX — A rede social sem limites",
+    description: "Rede social moderna combinando o melhor do Reddit e Instagram. Comunidades, feed, posts, comentários e curtidas.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "VORTEX — A rede social sem limites",
+    description: "Rede social moderna combinando o melhor do Reddit e Instagram.",
+  },
 };
 
 export default function RootLayout({

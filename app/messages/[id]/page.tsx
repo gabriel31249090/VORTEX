@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
+import Image from 'next/image'
 
 type Message = {
   id: string
@@ -215,11 +216,11 @@ export default function ChatPage() {
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 16px', height: 64, display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 'max(16px, calc(220px + 32px))' }}>
           <button onClick={() => router.push('/messages')} style={{ background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, fontFamily: "'Syne', sans-serif" }}>← </button>
           <div style={{
-            width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+            width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
             background: headerAvatar ? 'none' : isGroup ? 'linear-gradient(135deg, #60a5fa, #3b82f6)' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 14,
           }}>
-            {headerAvatar ? <img src={headerAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : isGroup ? '👥' : getInitial(headerTitle)}
+            {headerAvatar ? <Image src={headerAvatar} alt="" fill sizes="36px" style={{ objectFit: 'cover' }} /> : isGroup ? '👥' : getInitial(headerTitle)}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, margin: 0 }}>{headerTitle}</p>
@@ -249,11 +250,11 @@ export default function ChatPage() {
             <div key={msg.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
               {showAvatar && !prevSameSender && (
                 <div style={{
-                  width: 26, height: 26, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                  width: 26, height: 26, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
                   background: msg.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 10,
                 }}>
-                  {msg.profiles?.avatar_url ? <img src={msg.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(msg.profiles?.username || '?')}
+                  {msg.profiles?.avatar_url ? <Image src={msg.profiles.avatar_url} alt="" fill sizes="26px" style={{ objectFit: 'cover' }} /> : getInitial(msg.profiles?.username || '?')}
                 </div>
               )}
               {showAvatar && prevSameSender && <div style={{ width: 26, flexShrink: 0 }} />}

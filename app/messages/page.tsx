@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
+import Image from 'next/image'
 
 type ConversationRow = {
   id: string
@@ -338,13 +339,13 @@ export default function MessagesPage() {
               onMouseLeave={e => (e.currentTarget.style.borderColor = conv.unread ? 'rgba(200,242,60,0.15)' : 'rgba(255,255,255,0.06)')}
             >
               <div style={{
-                width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
                 background: conv.avatarUrl ? 'none' : conv.isGroup ? 'linear-gradient(135deg, #60a5fa, #3b82f6)' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#000', fontWeight: 800, fontSize: 16,
               }}>
                 {conv.avatarUrl
-                  ? <img src={conv.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <Image src={conv.avatarUrl} alt="" fill sizes="44px" style={{ objectFit: 'cover' }} />
                   : conv.isGroup ? '👥' : getInitial(conv.title)
                 }
               </div>
@@ -408,11 +409,11 @@ export default function MessagesPage() {
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   <div style={{
-                    width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                    width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
                     background: u.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 13,
                   }}>
-                    {u.avatar_url ? <img src={u.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(u.username)}
+                    {u.avatar_url ? <Image src={u.avatar_url} alt="" fill sizes="34px" style={{ objectFit: 'cover' }} /> : getInitial(u.username)}
                   </div>
                   <div>
                     <p style={{ color: '#f0f0f8', fontSize: 13, fontWeight: 600, margin: 0 }}>{u.display_name || u.username}</p>
@@ -486,11 +487,11 @@ export default function MessagesPage() {
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   <div style={{
-                    width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                    width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
                     background: u.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 800, fontSize: 12,
                   }}>
-                    {u.avatar_url ? <img src={u.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitial(u.username)}
+                    {u.avatar_url ? <Image src={u.avatar_url} alt="" fill sizes="30px" style={{ objectFit: 'cover' }} /> : getInitial(u.username)}
                   </div>
                   <p style={{ color: '#f0f0f8', fontSize: 13, margin: 0 }}>@{u.username}</p>
                 </div>

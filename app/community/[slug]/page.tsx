@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
+import Image from 'next/image'
 
 type Community = {
   id: string
@@ -407,14 +408,14 @@ export default function CommunityPage() {
                       <div
                         onClick={() => router.push(`/profile/${post.profiles?.username}`)}
                         style={{
-                          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                          width: 30, height: 30, borderRadius: '50%', flexShrink: 0, position: 'relative',
                           background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: '#000', fontWeight: 800, fontSize: 12, cursor: 'pointer', overflow: 'hidden',
                         }}
                       >
                         {post.profiles?.avatar_url
-                          ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ? <Image src={post.profiles.avatar_url} alt="" fill sizes="30px" style={{ objectFit: 'cover' }} />
                           : getInitial(post.profiles?.username || '?')
                         }
                       </div>
@@ -598,14 +599,14 @@ export default function CommunityPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <div style={{
-                      width: 34, height: 34, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                      width: 34, height: 34, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', position: 'relative',
                       background: profile.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: '#000', fontWeight: 800, fontSize: 13,
                       boxShadow: isOwnerMember ? '0 0 0 2px #c8f23c' : 'none',
                     }}>
                       {profile.avatar_url
-                        ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <Image src={profile.avatar_url} alt="" fill sizes="34px" style={{ objectFit: 'cover' }} />
                         : getInitial(profile.username)
                       }
                     </div>
@@ -669,14 +670,14 @@ export default function CommunityPage() {
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(200,242,60,0.1)')}
             >
               <div style={{
-                width: 40, height: 40, borderRadius: '50%', overflow: 'hidden',
+                width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', position: 'relative',
                 background: (ownerMember.profiles as any).avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#000', fontWeight: 800, fontSize: 16, flexShrink: 0,
                 boxShadow: '0 0 0 2px #c8f23c, 0 0 10px rgba(200,242,60,0.2)',
               }}>
                 {(ownerMember.profiles as any).avatar_url
-                  ? <img src={(ownerMember.profiles as any).avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <Image src={(ownerMember.profiles as any).avatar_url} alt="" fill sizes="40px" style={{ objectFit: 'cover' }} />
                   : getInitial((ownerMember.profiles as any).username)
                 }
               </div>

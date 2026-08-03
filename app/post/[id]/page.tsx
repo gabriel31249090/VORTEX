@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import RippleButton from '../../components/RippleButton'
+import Image from 'next/image'
 
 type PlanId = 'free' | 'boost' | 'mega'
 
@@ -281,13 +282,13 @@ export default function PostPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
-                width: 26, height: 26, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                width: 26, height: 26, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
                 background: comment.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 800, color: '#000',
               }}>
                 {comment.profiles?.avatar_url
-                  ? <img src={comment.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <Image src={comment.profiles.avatar_url} alt="" fill sizes="26px" style={{ objectFit: 'cover' }} />
                   : getInitial(comment.profiles?.username || '?')
                 }
               </div>
@@ -423,14 +424,14 @@ export default function PostPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                  width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
                   background: post.profiles?.avatar_url ? 'none' : hasAccent ? `linear-gradient(135deg, ${accentColor}, ${accentColor}99)` : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#000', fontWeight: 800, fontSize: 14,
                   boxShadow: hasAccent ? `0 0 12px ${accentColor}66` : '0 0 10px rgba(200,242,60,0.2)'
                 }}>
                   {post.profiles?.avatar_url
-                    ? <img src={post.profiles.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <Image src={post.profiles.avatar_url} alt="avatar" fill sizes="36px" style={{ objectFit: 'cover' }} />
                     : getInitial(post.profiles?.username || '?')
                   }
                 </div>
@@ -540,12 +541,12 @@ export default function PostPage() {
                     }}
                   >
                     <div style={{
-                      width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+                      width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, position: 'relative',
                       background: u.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 12, fontWeight: 800, color: '#000',
                     }}>
-                      {u.avatar_url ? <img src={u.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : u.username.charAt(0).toUpperCase()}
+                      {u.avatar_url ? <Image src={u.avatar_url} alt="" fill sizes="28px" style={{ objectFit: 'cover' }} /> : u.username.charAt(0).toUpperCase()}
                     </div>
                     <span style={{ color: i === mentionIndex ? '#c8f23c' : '#f0f0f8', fontSize: 14, fontWeight: 600 }}>@{u.username}</span>
                   </div>

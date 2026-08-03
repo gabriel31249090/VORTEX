@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import RippleButton from './RippleButton'
+import Image from 'next/image'
 
 type Notification = {
   id: string
@@ -521,13 +522,13 @@ export default function Nav() {
                   >
                     <div style={{ position: 'relative', flexShrink: 0 }}>
                       <div style={{
-                        width: 42, height: 42, borderRadius: '50%', overflow: 'hidden',
+                        width: 42, height: 42, borderRadius: '50%', overflow: 'hidden', position: 'relative',
                         background: actor?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: '#000', fontWeight: 800, fontSize: 16,
                       }}>
                         {actor?.avatar_url
-                          ? <img src={actor.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ? <Image src={actor.avatar_url} alt="" fill sizes="42px" style={{ objectFit: 'cover' }} />
                           : actor?.username?.charAt(0).toUpperCase()
                         }
                       </div>

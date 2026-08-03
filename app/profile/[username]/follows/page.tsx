@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Nav from '../../../components/Nav'
+import Image from 'next/image'
 
 type Profile = {
   id: string
@@ -175,7 +176,7 @@ export default function FollowsPage() {
                 <div
                   onClick={() => router.push(`/profile/${user.username}`)}
                   style={{
-                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0, position: 'relative',
                     background: user.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#000', fontWeight: 800, fontSize: 18,
@@ -184,7 +185,7 @@ export default function FollowsPage() {
                   }}
                 >
                   {user.avatar_url
-                    ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <Image src={user.avatar_url} alt="" fill sizes="48px" style={{ objectFit: 'cover' }} />
                     : getInitial(user.username)
                   }
                 </div>

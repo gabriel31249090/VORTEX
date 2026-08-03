@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 
 type StoryProfile = { id: string; username: string; avatar_url: string | null }
 type Story = { id: string; user_id: string; media_url: string; media_type: 'image' | 'video'; created_at: string }
@@ -63,9 +64,9 @@ export default function StoryViewer({ group, onClose }: { group: StoryGroup; onC
         </div>
 
         <div style={{ position: 'absolute', top: 24, left: 14, right: 14, display: 'flex', alignItems: 'center', gap: 8, zIndex: 3 }}>
-          <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: '#1a1a28', flexShrink: 0 }}>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: '#1a1a28', flexShrink: 0, position: 'relative' }}>
             {group.user.avatar_url && (
-              <img src={group.user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image src={group.user.avatar_url} alt="" fill sizes="30px" style={{ objectFit: 'cover' }} />
             )}
           </div>
           <span style={{ color: '#fff', fontWeight: 600, fontSize: 14, fontFamily: "'Syne', sans-serif" }}>
@@ -88,11 +89,13 @@ export default function StoryViewer({ group, onClose }: { group: StoryGroup; onC
             onEnded={goNext}
           />
         ) : (
-          <img
+          <Image
             key={current.id}
             src={current.media_url}
             alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }}
+            fill
+            sizes="420px"
+            style={{ objectFit: 'contain', background: '#000' }}
           />
         )}
 

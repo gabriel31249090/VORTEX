@@ -5,6 +5,7 @@ import { createClient } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import toast from 'react-hot-toast'
+import Image from 'next/image'
 
 // ============ TIPOS ============
 type ClassId = 'gambler' | 'trickster' | 'knight' | 'necromancer' | 'dealer'
@@ -318,9 +319,9 @@ export default function CharactersPage() {
                   className="rounded-xl border border-purple-900/40 bg-[#12101c] p-4 hover:border-purple-600/60 transition group relative"
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-14 h-14 rounded-lg bg-[#1a1726] border border-purple-800/50 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0">
+                    <div className="w-14 h-14 rounded-lg bg-[#1a1726] border border-purple-800/50 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0 relative">
                       {c.avatar_url ? (
-                        <img src={c.avatar_url} alt={c.name} className="w-full h-full object-cover" />
+                        <Image src={c.avatar_url} alt={c.name} fill sizes="56px" className="object-cover" />
                       ) : (
                         cls?.icon || '🎭'
                       )}

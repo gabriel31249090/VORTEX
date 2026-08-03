@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import toast from 'react-hot-toast'
+import Image from 'next/image'
 
 type Post = {
   id: string
@@ -102,13 +103,13 @@ export default function SavedPage() {
                 <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => router.push(`/post/${post.id}`)}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <div style={{
-                      width: 26, height: 26, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                      width: 26, height: 26, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', position: 'relative',
                       background: post.profiles?.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: '#000', fontWeight: 800, fontSize: 10,
                     }}>
                       {post.profiles?.avatar_url
-                        ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <Image src={post.profiles.avatar_url} alt="" fill sizes="26px" style={{ objectFit: 'cover' }} />
                         : post.profiles?.username?.charAt(0).toUpperCase()
                       }
                     </div>

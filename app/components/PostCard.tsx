@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import RippleButton from './RippleButton'
 import FeedAd from './FeedAd'
 import ReportModal, { type ReportReason } from './ReportModal'
@@ -178,7 +179,7 @@ export default function PostCard({
         <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <div style={{
-              width: 32, height: 32, borderRadius: '50%',
+              width: 32, height: 32, borderRadius: '50%', position: 'relative',
               background: post.profiles?.avatar_url ? 'none'
                 : `linear-gradient(135deg, ${authorColor}, ${authorColor}99)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -186,7 +187,7 @@ export default function PostCard({
               boxShadow: planStyle.avatarShadow, overflow: 'hidden',
             }}>
               {post.profiles?.avatar_url
-                ? <img src={post.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ? <Image src={post.profiles.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} />
                 : getInitial(post.profiles?.username || '?')
               }
             </div>

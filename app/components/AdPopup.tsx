@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import RippleButton from './RippleButton'
+import Image from 'next/image'
 
 type Ad = {
   id: string
@@ -94,8 +95,8 @@ export default function AdPopup() {
 
         {/* Imagem */}
         {ad.image_url && (
-          <a href={ad.link_url} target="_blank" rel="noopener noreferrer" onClick={handleClick}>
-            <img src={ad.image_url} alt={ad.title} style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', cursor: 'pointer' }} />
+          <a href={ad.link_url} target="_blank" rel="noopener noreferrer" onClick={handleClick} style={{ display: 'block', position: 'relative', width: '100%', height: 160, cursor: 'pointer' }}>
+            <Image src={ad.image_url} alt={ad.title} fill sizes="420px" style={{ objectFit: 'cover' }} />
           </a>
         )}
 

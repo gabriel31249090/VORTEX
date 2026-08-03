@@ -1,5 +1,7 @@
 'use client'
 
+import Image from 'next/image'
+
 type FeedAdProps = {
   ad: {
     id: string
@@ -36,7 +38,9 @@ export default function FeedAd({ ad }: FeedAdProps) {
 
         {/* Imagem */}
         {ad.image_url && (
-          <img src={ad.image_url} alt={ad.title} style={{ width: '100%', maxHeight: 200, objectFit: 'cover', display: 'block' }} />
+          <div style={{ width: '100%', height: 200, position: 'relative' }}>
+            <Image src={ad.image_url} alt={ad.title} fill sizes="420px" style={{ objectFit: 'cover' }} />
+          </div>
         )}
 
         <div style={{ padding: '14px 18px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>

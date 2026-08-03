@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Nav from '@/app/components/Nav'
 import toast from 'react-hot-toast'
+import Image from 'next/image'
 
 type PlanId = 'free' | 'boost' | 'mega'
 type AdType = 'popup' | 'feed'
@@ -295,9 +296,9 @@ export default function AdminPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {requests.map(req => (
                   <div key={req.id} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#1a1a28', border: '2px solid rgba(255,255,255,0.08)', overflow: 'hidden', flexShrink: 0 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#1a1a28', border: '2px solid rgba(255,255,255,0.08)', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
                       {req.profiles?.avatar_url
-                        ? <img src={req.profiles.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ? <Image src={req.profiles.avatar_url} alt="" fill sizes="44px" style={{ objectFit: 'cover' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555577', fontSize: 18 }}>{req.profiles?.username?.[0]?.toUpperCase() || '?'}</div>
                       }
                     </div>
@@ -337,8 +338,8 @@ export default function AdminPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {filteredUsers.map(user => (
                 <div key={user.id} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#1a1a28', border: '2px solid rgba(255,255,255,0.08)', overflow: 'hidden', flexShrink: 0 }}>
-                    {user.avatar_url ? <img src={user.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555577', fontSize: 16 }}>{user.username?.[0]?.toUpperCase() || '?'}</div>}
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#1a1a28', border: '2px solid rgba(255,255,255,0.08)', overflow: 'hidden', flexShrink: 0, position: 'relative' }}>
+                    {user.avatar_url ? <Image src={user.avatar_url} alt="" fill sizes="40px" style={{ objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555577', fontSize: 16 }}>{user.username?.[0]?.toUpperCase() || '?'}</div>}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -435,7 +436,9 @@ export default function AdminPage() {
                       </button>
                       {adForm.image_url && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <img src={adForm.image_url} style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)' }} />
+                          <div style={{ width: 48, height: 32, position: 'relative', borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <Image src={adForm.image_url} alt="" fill sizes="48px" style={{ objectFit: 'cover' }} />
+                          </div>
                           <button onClick={() => setAdForm(f => ({ ...f, image_url: '' }))} style={{ background: 'none', border: 'none', color: '#555577', cursor: 'pointer', fontSize: 14 }}>✕</button>
                         </div>
                       )}
@@ -472,7 +475,9 @@ export default function AdminPage() {
 
                     {/* Imagem preview */}
                     {ad.image_url ? (
-                      <img src={ad.image_url} style={{ width: 64, height: 44, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)' }} />
+                      <div style={{ width: 64, height: 44, position: 'relative', borderRadius: 8, overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <Image src={ad.image_url} alt="" fill sizes="64px" style={{ objectFit: 'cover' }} />
+                      </div>
                     ) : (
                       <div style={{ width: 64, height: 44, borderRadius: 8, background: '#1a1a28', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
                         {ad.type === 'popup' ? '💬' : '📰'}
