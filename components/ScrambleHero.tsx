@@ -16,28 +16,24 @@ export default function ScrambleHero({
   fontSize?: number
 }) {
   return (
-    <div style={{ width: "100%", height: fontSize * 1.4 }}>
+    <div
+      style={{
+        width: "100%",
+        height: fontSize * 1.4,
+        fontFamily: "Syne",
+        fontSize,
+        fontWeight: 700,
+        textAlign: "left",
+        lineHeight: "1em",
+        letterSpacing: "0.02em",
+      }}
+    >
       <ScrambleText
-        words={text}
+        text={text}
         color="#c8f23c"
-        font={{
-          fontFamily: "Syne",
-          fontSize,
-          fontWeight: 700,
-          textAlign: "left",
-          lineHeight: "1em",
-          letterSpacing: "0.02em",
-        }}
-        enterAnimation={{
-          mode: "oneLine",
-          restState: "solid",
-          replay: false,
-          position: "above",
-          scrambleIntensity: 80,
-          ease: { type: "tween", duration: 1.4, ease: "easeOut" },
-          flickerEnabled: false,
-        }}
-        hoverAnimation={{ type: "none" }}
+        glitchColor="#c8f23c"
+        duration={1.4}
+        trigger="inView"
       />
     </div>
   )
