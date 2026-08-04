@@ -16,7 +16,7 @@ export default function LandingShowcase() {
     if (!el) return
     const obs = new IntersectionObserver(
       ([e]) => e.isIntersecting && setVisible(true),
-      { threshold: 0.2 }
+      { threshold: 0.15 }
     )
     obs.observe(el)
     return () => obs.disconnect()
@@ -24,97 +24,99 @@ export default function LandingShowcase() {
 
   return (
     <section
-      style={{
-        position: 'relative',
-        padding: '100px 32px 60px',
-        maxWidth: 1200,
-        margin: '0 auto',
-      }}
+      id="showcase"
+      ref={ref}
+      className="container-vtx"
+      style={{ padding: 'clamp(60px, 10vw, 120px) 24px' }}
     >
-      <div style={{ textAlign: 'center', marginBottom: 64 }}>
+      <div style={{ maxWidth: 720, marginBottom: 56 }}>
         <div
           style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 11,
-            color: 'var(--green)',
-            letterSpacing: '0.25em',
-            marginBottom: 18,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 14px',
+            borderRadius: 999,
+            border: '1px solid var(--border-2)',
+            background: 'rgba(139, 92, 246, 0.07)',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--purple)',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            fontFamily: "'JetBrains Mono', monospace",
+            marginBottom: 24,
           }}
         >
-          COMO FUNCIONA
+          ◇ Como funciona
         </div>
+
         <h2
           style={{
-            fontSize: 'clamp(36px, 5.2vw, 60px)',
+            fontSize: 'clamp(36px, 6vw, 60px)',
             fontWeight: 800,
+            color: 'var(--text)',
+            lineHeight: 1.05,
             letterSpacing: '-0.025em',
-            lineHeight: 1.02,
-            margin: 0,
+            marginBottom: 20,
+            textWrap: 'balance',
           }}
         >
-          Um feed que <span style={{ color: 'var(--green)' }}>você controla.</span>
+          Um feed que <span style={{ color: 'var(--green)' }}>você</span> controla.
         </h2>
+
         <p
           style={{
-            color: 'var(--text2)',
-            marginTop: 16,
-            fontSize: 16,
-            maxWidth: 540,
-            marginLeft: 'auto',
-            marginRight: 'auto',
-            lineHeight: 1.6,
+            fontSize: 'clamp(15px, 2vw, 18px)',
+            color: 'var(--text-2)',
+            lineHeight: 1.55,
+            textWrap: 'pretty',
           }}
         >
-          Cronológico por padrão. Sem "para você" misterioso. Você escolhe
-          o que aparece, sem deixar a IA decidir o que te faz ficar.
+          Cronológico por padrão. Sem &ldquo;para você&rdquo; misterioso.
+          Você escolhe o que aparece, sem deixar a IA decidir o que te faz
+          ficar.
         </p>
       </div>
 
       <div
-        ref={ref}
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 16,
-          maxWidth: 980,
-          margin: '0 auto',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
+          gap: 20,
         }}
       >
         <MockCard
           delay={0}
           visible={visible}
           variant="text"
-          author="cosmos.luna"
-          community="r/astronomia"
+          author="marina.codes"
+          community="r/programação"
           time="2h"
-          title="Vi o buraco negro da M87 em 4K pelo telescópio novo. Não tô bem."
-          likes={847}
-          comments={62}
+          title="Passei 6 meses migrando um monolito pra serverless. Aqui está o que eu queria saber no dia 1."
         />
         <MockCard
-          delay={100}
+          delay={120}
           visible={visible}
           variant="image"
-          author="void.arquitecto"
-          community="r/design"
+          author="leo.shoots"
+          community="r/fotografia"
           time="4h"
-          title="WIP do meu projeto pessoal. Critiquem sem dó."
-          image="linear-gradient(135deg, #c8f23c 0%, #8b5cf6 100%)"
-          likes={1240}
-          comments={128}
+          title="Aurora boreal na Islândia, sem filtro. ISO 6400, 15s."
         />
         <MockCard
-          delay={200}
+          delay={240}
           visible={visible}
           variant="poll"
-          author="dev.carioca"
-          community="r/devbr"
-          time="6h"
-          title="Qual stack vocês usariam pra um SaaS em 2026?"
+          author="vortex.team"
+          community="anúncios"
+          time="1d"
+          title="Qual feature você quer ver no VORTEX primeiro?"
           options={[
-            { label: 'Next + Supabase', pct: 62 },
-            { label: 'Svelte + Convex', pct: 24 },
-            { label: 'Remix + Postgres', pct: 14 },
+            { label: 'Reações customizadas', pct: 48 },
+            { label: 'Voice notes em DM', pct: 27 },
+            { label: 'Posts agendados', pct: 18 },
+            { label: 'Live rooms', pct: 7 },
           ]}
         />
       </div>
@@ -145,40 +147,46 @@ function MockCard({
   time,
   title,
   image,
-  likes,
-  comments,
+  likes = 124,
+  comments = 18,
   options,
 }: MockCardProps) {
   return (
-    <div
+    <article
+      className="surface"
       style={{
+        borderRadius: 'var(--radius-lg)',
         padding: 20,
-        borderRadius: 18,
-        background: 'rgba(17,17,24,0.6)',
-        border: '1px solid var(--border)',
-        backdropFilter: 'blur(20px)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(24px)',
-        transition: `all 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
+        transition: `opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
+        cursor: 'default',
       }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
         <div
+          aria-hidden="true"
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 999,
-            background: 'linear-gradient(135deg, var(--green), var(--green-dim))',
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            background:
+              'linear-gradient(135deg, var(--green) 0%, var(--purple) 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 13,
             fontWeight: 700,
             color: '#000',
+            fontSize: 14,
+            fontFamily: "'Syne', sans-serif",
           }}
         >
           {author[0].toUpperCase()}
@@ -186,18 +194,19 @@ function MockCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
-              fontSize: 13,
               fontWeight: 600,
+              fontSize: 14,
               color: 'var(--text)',
+              fontFamily: "'Syne', sans-serif",
             }}
           >
-            {author}
+            @{author}
           </div>
           <div
             style={{
-              fontSize: 11,
-              color: 'var(--text3)',
-              fontFamily: 'var(--mono)',
+              fontSize: 12,
+              color: 'var(--text-3)',
+              fontFamily: "'JetBrains Mono', monospace",
             }}
           >
             {community} · {time}
@@ -206,108 +215,112 @@ function MockCard({
       </div>
 
       {/* Body */}
-      <div>
+      <h3
+        style={{
+          fontSize: 16,
+          fontWeight: 600,
+          color: 'var(--text)',
+          lineHeight: 1.35,
+          marginBottom: variant === 'image' ? 14 : 16,
+          textWrap: 'balance',
+        }}
+      >
+        {title}
+      </h3>
+
+      {variant === 'image' && (
         <div
+          aria-hidden="true"
           style={{
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: 'var(--text)',
-            fontWeight: 500,
+            height: 180,
+            borderRadius: 'var(--radius)',
+            background:
+              'linear-gradient(135deg, rgba(200,242,60,0.4) 0%, rgba(139,92,246,0.4) 50%, rgba(200,242,60,0.2) 100%)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          {title}
-        </div>
-
-        {variant === 'image' && (
           <div
             style={{
-              marginTop: 12,
-              height: 140,
-              borderRadius: 12,
-              background: image,
-              position: 'relative',
-              overflow: 'hidden',
+              position: 'absolute',
+              inset: 0,
+              background:
+                'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 50%)',
             }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background:
-                  'repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(0,0,0,0.04) 12px, rgba(0,0,0,0.04) 24px)',
-              }}
-            />
-          </div>
-        )}
-
-        {variant === 'poll' && options && (
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {options.map((opt, i) => (
-              <div
-                key={i}
-                style={{
-                  position: 'relative',
-                  height: 32,
-                  borderRadius: 8,
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid var(--border)',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: `${opt.pct}%`,
-                    background:
-                      i === 0
-                        ? 'rgba(200,242,60,0.18)'
-                        : 'rgba(139,92,246,0.15)',
-                    transition: 'width 1s ease',
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'relative',
-                    padding: '0 12px',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: 'var(--text)',
-                  }}
-                >
-                  <span>{opt.label}</span>
-                  <span style={{ fontFamily: 'var(--mono)', color: 'var(--text2)' }}>
-                    {opt.pct}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      {(likes !== undefined || comments !== undefined) && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 18,
-            paddingTop: 12,
-            borderTop: '1px solid var(--border)',
-            fontSize: 12,
-            color: 'var(--text2)',
-            fontFamily: 'var(--mono)',
-          }}
-        >
-          {likes !== undefined && <span>♥ {likes.toLocaleString('pt-BR')}</span>}
-          {comments !== undefined && <span>💬 {comments}</span>}
-          <span style={{ marginLeft: 'auto' }}>↗</span>
+          />
         </div>
       )}
-    </div>
+
+      {variant === 'poll' && options && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {options.map((opt, i) => (
+            <div
+              key={i}
+              style={{
+                position: 'relative',
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid var(--border)',
+                overflow: 'hidden',
+                fontSize: 13,
+                fontFamily: "'Inter', sans-serif",
+                color: 'var(--text)',
+              }}
+            >
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    i === 0
+                      ? 'linear-gradient(90deg, rgba(200,242,60,0.18), transparent)'
+                      : 'rgba(255,255,255,0.02)',
+                  width: `${opt.pct}%`,
+                  transition: 'width 1s ease 0.4s',
+                }}
+              />
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>{opt.label}</span>
+                <span
+                  style={{
+                    color: 'var(--text-2)',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 12,
+                  }}
+                >
+                  {opt.pct}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 18,
+          marginTop: 16,
+          paddingTop: 14,
+          borderTop: '1px solid var(--border)',
+          color: 'var(--text-2)',
+          fontSize: 13,
+          fontFamily: "'JetBrains Mono', monospace",
+        }}
+      >
+        <span>♥ {likes.toLocaleString('pt-BR')}</span>
+        <span>💬 {comments}</span>
+        <span style={{ marginLeft: 'auto', color: 'var(--text-3)' }}>↗</span>
+      </div>
+    </article>
   )
 }

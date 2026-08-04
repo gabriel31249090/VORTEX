@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import MobileMenu from './MobileMenu'
 
 export default function LandingNav() {
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -13,64 +15,167 @@ export default function LandingNav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  return (
-    <nav
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        padding: scrolled ? '12px 24px' : '20px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backdropFilter: scrolled ? 'blur(24px)' : 'blur(0px)',
-        background: scrolled ? 'rgba(10,10,15,0.7)' : 'transparent',
-        borderBottom: scrolled ? '1px solid var(--border)' : '1px solid transparent',
-        transition: 'all 0.3s ease',
-      }}
-    >
-      <Link href="/" style={{ textDecoration: 'none' }}>
-        <div
-          style={{
-            fontFamily: 'var(--font)',
-            fontSize: 22,
-            fontWeight: 800,
-            letterSpacing: '0.04em',
-            color: 'var(--text)',
-          }}
-        >
-          VORTEX<span style={{ color: 'var(--green)' }}>.</span>
-        </div>
-      </Link>
+  const links = [
+    { label: 'Recursos', href: '#features' },
+    { label: 'Como funciona', href: '#showcase' },
+    { label: 'Preços', href: '/pricing' },
+  ]
 
-      <div
+  return (
+    <>
+      <header
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 28,
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          width: '100%',
+          transition: 'all 0.25s ease',
+          background: scrolled
+            ? 'rgba(10, 10, 15, 0.78)'
+            : 'transparent',
+          backdropFilter: scrolled ? 'blur(20px) saturate(150%)' : 'none',
+          WebkitBackdropFilter: scrolled ? 'blur(20px) saturate(150%)' : 'none',
+          borderBottom: scrolled
+            ? '1px solid var(--border-2)'
+            : '1px solid transparent',
         }}
       >
-        <NavLink href="#features">Recursos</NavLink>
-        <NavLink href="/pricing">Preços</NavLink>
-        <NavLink href="/login">Entrar</NavLink>
-        <Link
-          href="/register"
-          className="neon-btn"
+        <div
+          className="container-vtx"
           style={{
-            padding: '9px 18px',
-            borderRadius: 10,
-            textDecoration: 'none',
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: '0.02em',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            height: 68,
           }}
         >
-          Criar conta
-        </Link>
-      </div>
-    </nav>
+          {/* Logo */}
+          <Link
+            href="/"
+            style={{
+              fontFamily: "'Syne', sans-serif",
+              fontWeight: 800,
+              fontSize: 22,
+              letterSpacing: '-0.02em',
+              color: 'var(--text)',
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'var(--green)',
+                boxShadow: '0 0 12px var(--green)',
+              }}
+            />
+            VORTEX<span style={{ color: 'var(--green)' }}>.</span>
+          </Link>
+
+          {/* Desktop nav */}
+          <nav
+            className="vtx-nav-desktop"
+            style={{ display: 'flex', alignItems: 'center', gap: 32 }}
+          >
+            {links.map((link) => (
+              <NavLink key={link.href} href={link.href}>
+                {link.label}
+              </NavLink>
+            ))}
+
+            <div style={{ display: 'flex', gap: 10, marginLeft: 12 }}>
+              <Link
+                href="/login"
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border-2)',
+                  color: 'var(--text)',
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 600,
+                  fontSize: 14,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--green)'
+                  e.currentTarget.style.color = 'var(--green)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-2)'
+                  e.currentTarget.style.color = 'var(--text)'
+                }}
+              >
+                Entrar
+              </Link>
+              <Link
+                href="/register"
+                className="neon-btn"
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: 10,
+                  fontSize: 14,
+                  textDecoration: 'none',
+                }}
+              >
+                Criar conta
+              </Link>
+            </div>
+          </nav>
+
+          {/* Mobile hamburger */}
+          <button
+            className="vtx-nav-mobile tap-highlight"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Abrir menu"
+            aria-expanded={menuOpen}
+            style={{
+              display: 'none',
+              width: 44,
+              height: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid var(--border-2)',
+              borderRadius: 10,
+              cursor: 'pointer',
+              color: 'var(--text)',
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <path
+                d="M3 6h16M3 11h16M3 16h16"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <MobileMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        links={[...links, { label: 'Entrar', href: '/login' }, { label: 'Criar conta', href: '/register' }]}
+      />
+
+      <style jsx>{`
+        @media (max-width: 768px) {
+          :global(.vtx-nav-desktop) {
+            display: none !important;
+          }
+          :global(.vtx-nav-mobile) {
+            display: flex !important;
+          }
+        }
+      `}</style>
+    </>
   )
 }
 
@@ -79,14 +184,15 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
     <Link
       href={href}
       style={{
-        color: 'var(--text2)',
-        textDecoration: 'none',
-        fontSize: 13,
+        color: 'var(--text-2)',
+        fontFamily: "'Syne', sans-serif",
         fontWeight: 500,
+        fontSize: 14,
+        textDecoration: 'none',
         transition: 'color 0.2s',
       }}
       onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text)')}
-      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text2)')}
+      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-2)')}
     >
       {children}
     </Link>

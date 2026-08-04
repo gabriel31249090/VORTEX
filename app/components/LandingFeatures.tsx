@@ -1,8 +1,7 @@
 import FeatureCard from './FeatureCard'
 
 export default function LandingFeatures() {
-  // Bento grid: 6 colunas, 4 rows
-  // Cada card ocupa um pedaço diferente pra dar layout assimétrico
+  // Bento grid: 6 colunas desktop / 1 coluna mobile (via .vtx-bento no globals.css)
   const features: Array<{
     col: string
     row: string
@@ -72,50 +71,69 @@ export default function LandingFeatures() {
   return (
     <section
       id="features"
-      style={{
-        position: 'relative',
-        padding: '120px 32px',
-        maxWidth: 1200,
-        margin: '0 auto',
-      }}
+      className="container-vtx"
+      style={{ padding: 'clamp(60px, 10vw, 120px) 24px' }}
     >
-      <div style={{ marginBottom: 72, textAlign: 'center' }}>
+      <div style={{ maxWidth: 720, marginBottom: 56 }}>
         <div
           style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 11,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 14px',
+            borderRadius: 999,
+            border: '1px solid var(--border-2)',
+            background: 'rgba(200, 242, 60, 0.05)',
+            fontSize: 12,
+            fontWeight: 600,
             color: 'var(--green)',
-            letterSpacing: '0.25em',
-            marginBottom: 18,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            fontFamily: "'JetBrains Mono', monospace",
+            marginBottom: 24,
           }}
         >
-          RECURSOS
+          ◉ Recursos
         </div>
+
         <h2
           style={{
-            fontSize: 'clamp(36px, 5.2vw, 60px)',
+            fontSize: 'clamp(36px, 6vw, 60px)',
             fontWeight: 800,
+            color: 'var(--text)',
+            lineHeight: 1.05,
             letterSpacing: '-0.025em',
-            lineHeight: 1.02,
-            margin: 0,
+            marginBottom: 20,
+            textWrap: 'balance',
           }}
         >
-          Tudo que você precisa.
-          <br />
-          <span style={{ color: 'var(--text2)' }}>Nada que você não precisa.</span>
+          Tudo que você precisa. <span style={{ color: 'var(--text-3)' }}>Nada que você não precisa.</span>
         </h2>
+
+        <p
+          style={{
+            fontSize: 'clamp(15px, 2vw, 18px)',
+            color: 'var(--text-2)',
+            lineHeight: 1.55,
+            textWrap: 'pretty',
+          }}
+        >
+          Cada feature existe por um motivo. Sem métricas vaidosas, sem dark
+          patterns, sem upsell escondido atrás do botão de postar.
+        </p>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(6, 1fr)',
-          gridAutoRows: '160px',
-          gap: 14,
-        }}
-      >
+      <div className="vtx-bento">
         {features.map((f, i) => (
-          <FeatureCard key={i} {...f} />
+          <FeatureCard
+            key={f.title}
+            title={f.title}
+            desc={f.desc}
+            icon={f.icon}
+            accent={f.accent}
+            col={f.col}
+            row={f.row}
+          />
         ))}
       </div>
     </section>

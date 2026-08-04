@@ -1,80 +1,340 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* ============================================
+   VORTEX · Design Tokens
+   ============================================ */
 :root {
   --bg: #0a0a0f;
+  --bg-2: #07070b;
   --surface: #111118;
-  --surface2: #18181f;
-  --surface3: #222230;
-  --border: rgba(255,255,255,0.06);
-  --border2: rgba(255,255,255,0.12);
+  --surface-2: #18181f;
+  --surface-3: #222230;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-2: rgba(255, 255, 255, 0.12);
   --text: #f0f0f8;
-  --text2: #8888aa;
-  --text3: #444466;
+  --text-2: #8888aa;
+  --text-3: #444466;
   --green: #c8f23c;
-  --green-dim: rgba(200,242,60,0.15);
-  --green-glow: 0 0 20px rgba(200,242,60,0.4), 0 0 40px rgba(200,242,60,0.2);
-  --green-glow-sm: 0 0 10px rgba(200,242,60,0.3);
+  --green-dim: rgba(200, 242, 60, 0.15);
+  --green-glow: 0 0 20px rgba(200, 242, 60, 0.4), 0 0 40px rgba(200, 242, 60, 0.2);
+  --green-glow-sm: 0 0 10px rgba(200, 242, 60, 0.3);
+  --purple: #8b5cf6;
+  --purple-dim: rgba(139, 92, 246, 0.15);
   --font: 'Syne', sans-serif;
+  --body-font: 'Inter', 'Syne', sans-serif;
   --mono: 'JetBrains Mono', monospace;
+
+  /* Layout */
+  --container: 1200px;
+  --container-narrow: 900px;
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* ============================================
+   Reset + Base
+   ============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--green);
+  color: #000;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font);
+  font-family: var(--body-font);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+/* ============================================
+   Page Background — layered, subtle, no flat #0a0a0f
+   ============================================ */
+body {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(200, 242, 60, 0.06), transparent 60%),
+    radial-gradient(ellipse 70% 60% at 100% 100%, rgba(139, 92, 246, 0.07), transparent 60%),
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.02), transparent 50%),
+    var(--bg);
+  background-attachment: fixed;
+}
 
-/* Neon glow utilities */
+/* SVG noise overlay — mata o "render limpo de IA" */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.4 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+}
+
+/* Vignette suave nas bordas — não fica chapado */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+/* Conteúdo fica acima do overlay */
+#__next, main, body > div {
+  position: relative;
+  z-index: 2;
+}
+
+/* ============================================
+   Scrollbar — slim e discreto
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 242, 60, 0.3);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
+}
+
+/* ============================================
+   Tipografia
+   ============================================ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font);
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  font-weight: 700;
+}
+
+.font-display { font-family: var(--font); }
+.font-body { font-family: var(--body-font); }
+.font-mono { font-family: var(--mono); }
+
+.text-balance { text-wrap: balance; }
+.text-pretty { text-wrap: pretty; }
+
+/* ============================================
+   Focus ring — acessibilidade
+   ============================================ */
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ============================================
+   Utilities — Neon
+   ============================================ */
 .neon-text {
   color: var(--green);
   text-shadow: var(--green-glow-sm);
 }
-
 .neon-border {
   border-color: var(--green) !important;
   box-shadow: var(--green-glow-sm);
 }
-
 .neon-btn {
   background: var(--green);
   color: #000;
   font-weight: 700;
   font-family: var(--font);
   box-shadow: var(--green-glow-sm);
-  transition: all 0.2s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-
 .neon-btn:hover {
   box-shadow: var(--green-glow);
   transform: translateY(-1px);
 }
-
-/* Glass card */
-.glass {
-  background: rgba(17,17,24,0.8);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border2);
+.neon-btn:active {
+  transform: translateY(0);
 }
 
-/* Animations */
+/* ============================================
+   Glass / Card
+   ============================================ */
+.glass {
+  background: rgba(17, 17, 24, 0.7);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--border-2);
+}
+
+.surface {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--border);
+}
+
+/* ============================================
+   Container
+   ============================================ */
+.container-vtx {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+@media (max-width: 640px) {
+  .container-vtx { padding: 0 16px; }
+}
+
+/* ============================================
+   Bento grid — colapsa pra 1 coluna no mobile
+   ============================================ */
+.vtx-bento {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: minmax(140px, auto);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .vtx-bento {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  .vtx-bento > * {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    min-height: 180px;
+  }
+}
+
+/* ============================================
+   Reveal on scroll (sem JS)
+   ============================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================
+   Reduce motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   Mobile menu helpers
+   ============================================ */
+.vtx-mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(7, 7, 11, 0.92);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  display: flex;
+  flex-direction: column;
+  padding: 80px 24px 32px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.vtx-mobile-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.vtx-mobile-menu a {
+  padding: 18px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+}
+
+/* ============================================
+   Keyframes
+   ============================================ */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes neonPulse {
-  0%, 100% { text-shadow: 0 0 10px rgba(200,242,60,0.4); }
-  50% { text-shadow: 0 0 20px rgba(200,242,60,0.8), 0 0 40px rgba(200,242,60,0.4); }
+  0%, 100% { text-shadow: 0 0 10px rgba(200, 242, 60, 0.4); }
+  50%      { text-shadow: 0 0 20px rgba(200, 242, 60, 0.8), 0 0 40px rgba(200, 242, 60, 0.4); }
+}
+@keyframes slowSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(2%, -2%); }
 }
 
 .fade-up { animation: fadeUp 0.4s ease forwards; }
 .neon-pulse { animation: neonPulse 2s ease infinite; }
+
+/* ============================================
+   Misc helpers
+   ============================================ */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-2), transparent);
+}
+
+.tap-highlight {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* Imagens/vídeos responsivos por padrão */
+img, video, canvas, svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
