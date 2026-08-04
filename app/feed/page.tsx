@@ -486,20 +486,12 @@ export default function FeedPage() {
       <BackgroundGradient variant="feed" />
 
       <div style={{ position: 'relative', zIndex: 2 }}>
-        {userId && (
-          <div
-            className="container-vtx"
-            style={{ maxWidth: 720, paddingLeft: 'max(16px, calc(220px + 32px))' }}
-          >
-            <StoriesBar currentUserId={userId} />
-          </div>
-        )}
+        <div className="vtx-shell">
+          <div style={{ width: '100%', maxWidth: 720 }}>
+            {userId && <StoriesBar currentUserId={userId} />}
 
-        <div
-          className="container-vtx"
-          style={{ paddingTop: 16, paddingBottom: 64, maxWidth: 720, paddingLeft: 'max(16px, calc(220px + 32px))' }}
-        >
-          <Nav />
+            <div style={{ paddingTop: 16, paddingBottom: 64 }}>
+              <Nav />
 
           {/* Tabs */}
           <div
@@ -617,6 +609,8 @@ export default function FeedPage() {
               Você chegou ao fim ✦
             </div>
           )}
+        </div>
+          </div>
         </div>
       </div>
     </main>

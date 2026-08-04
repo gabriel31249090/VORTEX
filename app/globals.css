@@ -215,6 +215,24 @@ h1, h2, h3, h4, h5, h6 {
   .container-vtx { padding: 0 16px; }
 }
 
+/* Shell que centraliza o conteúdo no espaço livre à direita da sidebar fixa
+   (220px) em telas desktop, em vez de centralizar na janela inteira. */
+.vtx-shell {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+}
+@media (max-width: 640px) {
+  .vtx-shell { padding: 0 16px; }
+}
+@media (min-width: 768px) {
+  .vtx-shell {
+    margin-left: 220px;
+    width: calc(100% - 220px);
+  }
+}
+
 /* ============================================
    Bento grid — colapsa pra 1 coluna no mobile
    ============================================ */
