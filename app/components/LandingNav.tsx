@@ -30,9 +30,7 @@ export default function LandingNav() {
           zIndex: 50,
           width: '100%',
           transition: 'all 0.25s ease',
-          background: scrolled
-            ? 'rgba(10, 10, 15, 0.78)'
-            : 'transparent',
+          background: scrolled ? 'rgba(10, 10, 15, 0.78)' : 'transparent',
           backdropFilter: scrolled ? 'blur(20px) saturate(150%)' : 'none',
           WebkitBackdropFilter: scrolled ? 'blur(20px) saturate(150%)' : 'none',
           borderBottom: scrolled
@@ -49,7 +47,6 @@ export default function LandingNav() {
             height: 68,
           }}
         >
-          {/* Logo */}
           <Link
             href="/"
             style={{
@@ -77,7 +74,6 @@ export default function LandingNav() {
             VORTEX<span style={{ color: 'var(--green)' }}>.</span>
           </Link>
 
-          {/* Desktop nav */}
           <nav
             className="vtx-nav-desktop"
             style={{ display: 'flex', alignItems: 'center', gap: 32 }}
@@ -128,7 +124,6 @@ export default function LandingNav() {
             </div>
           </nav>
 
-          {/* Mobile hamburger */}
           <button
             className="vtx-nav-mobile tap-highlight"
             onClick={() => setMenuOpen(true)}

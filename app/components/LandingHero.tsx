@@ -21,10 +21,8 @@ export default function LandingHero() {
         paddingBottom: 60,
       }}
     >
-      {/* BH de fundo — só nessa página (login/register também) */}
       <BlackHoleBackground intensity={0.55} />
 
-      {/* Vignette por cima do BH pra texto ler bem */}
       <div
         aria-hidden="true"
         style={{
@@ -48,7 +46,6 @@ export default function LandingHero() {
           alignItems: 'center',
         }}
       >
-        {/* Texto */}
         <div>
           <div
             style={{
@@ -165,7 +162,6 @@ export default function LandingHero() {
             </Link>
           </div>
 
-          {/* Stats */}
           <div
             style={{
               display: 'flex',
@@ -180,7 +176,6 @@ export default function LandingHero() {
           </div>
         </div>
 
-        {/* Spacer pra dar respiro em desktop, some em mobile */}
         <div aria-hidden="true" className="vtx-hero-spacer" />
       </div>
 
