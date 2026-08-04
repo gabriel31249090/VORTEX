@@ -234,10 +234,14 @@ export default function FeedPage() {
             .eq('id', payload.new.id)
             .single()
           if (newPost) {
+            const raw = newPost as any
+            const profiles = Array.isArray(raw.profiles) ? raw.profiles[0] ?? null : raw.profiles
+            const communities = Array.isArray(raw.communities) ? raw.communities[0] ?? null : raw.communities
+            const post: Post = { ...raw, profiles, communities }
             setPosts((prev) => [
               {
-                ...(newPost as unknown as Post),
-                activityId: (newPost as unknown as Post).id,
+                ...post,
+                activityId: post.id,
                 isRepost: false,
                 repostedByUsername: null,
               },
@@ -308,7 +312,12 @@ export default function FeedPage() {
     if (postsError) console.error(postsError)
 
     const postMap = new Map(
-      (postsData || []).map((p: { id: string } & Post) => [p.id, p])
+      (postsData || []).map((p: any) => {
+        const profiles = Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles
+        const communities = Array.isArray(p.communities) ? p.communities[0] ?? null : p.communities
+        const post: Post = { ...p, profiles, communities }
+        return [post.id, post]
+      })
     )
 
     const newItems: FeedItem[] = rows
@@ -477,7 +486,7 @@ export default function FeedPage() {
       <BackgroundGradient variant="feed" />
 
       <div style={{ position: 'relative', zIndex: 2 }}>
-        {userId && <StoriesBar userId={userId} />}
+        {userId && <StoriesBar currentUserId={userId} />}
 
         <div
           className="container-vtx"
@@ -559,61 +568,21 @@ export default function FeedPage() {
               <div key={item.activityId}>
                 <PostCard
                   post={item}
-                  vote={votes.get(item.id) ?? null}
+                  index={i}
+                  voteType={votes.get(item.id) ?? null}
                   isReposted={repostedIds.has(item.id)}
+                  isRepostFeedItem={item.isRepost}
+                  repostedByUsername={item.repostedByUsername}
+                  showAd={!!showAd}
+                  adToShow={adToShow}
+                  adPosition={position}
                   isAdmin={isAdmin}
-                  onVote={(type) => handleVote(item.id, type)}
-                  onRepost={() => handleRepost(item.id)}
-                  onShare={() => handleShare(item.id)}
-                  onReport={(reason, details) => handleReportPost(item.id, reason, details)}
-                  onAdminDelete={() => handleAdminDelete(item.id)}
-                  isVoting={votingPost === item.id}
+                  onVote={handleVote}
+                  onRepost={handleRepost}
+                  onShare={handleShare}
+                  onReport={handleReportPost}
+                  onAdminDelete={handleAdminDelete}
                 />
-                {adToShow && (
-                  <a
-                    href={adToShow.link_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="surface"
-                    style={{
-                      display: 'block',
-                      borderRadius: 'var(--radius-lg)',
-                      padding: 16,
-                      marginBottom: 16,
-                      textDecoration: 'none',
-                      color: 'inherit',
-                      border: '1px dashed var(--border-2)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: 'var(--text-3)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.1em',
-                        marginBottom: 8,
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}
-                    >
-                      Patrocinado
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 600,
-                        color: 'var(--text)',
-                        marginBottom: 4,
-                      }}
-                    >
-                      {adToShow.title}
-                    </div>
-                    {adToShow.description && (
-                      <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-                        {adToShow.description}
-                      </div>
-                    )}
-                  </a>
-                )}
               </div>
             )
           })}
