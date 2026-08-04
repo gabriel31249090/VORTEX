@@ -486,11 +486,18 @@ export default function FeedPage() {
       <BackgroundGradient variant="feed" />
 
       <div style={{ position: 'relative', zIndex: 2 }}>
-        {userId && <StoriesBar currentUserId={userId} />}
+        {userId && (
+          <div
+            className="container-vtx"
+            style={{ maxWidth: 720, paddingLeft: 'max(16px, calc(220px + 32px))' }}
+          >
+            <StoriesBar currentUserId={userId} />
+          </div>
+        )}
 
         <div
           className="container-vtx"
-          style={{ paddingTop: 16, paddingBottom: 64, maxWidth: 720 }}
+          style={{ paddingTop: 16, paddingBottom: 64, maxWidth: 720, paddingLeft: 'max(16px, calc(220px + 32px))' }}
         >
           <Nav />
 
