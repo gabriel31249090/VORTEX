@@ -1,3 +1,5 @@
+'use client'
+
 type FeatureCardProps = {
   title: string
   desc: string
