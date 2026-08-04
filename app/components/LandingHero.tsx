@@ -41,12 +41,12 @@ export default function LandingHero() {
           position: 'relative',
           zIndex: 2,
           display: 'grid',
-          gridTemplateColumns: '1.2fr 1fr',
+          gridTemplateColumns: 'minmax(0, 560px) 1fr',
           gap: 48,
           alignItems: 'center',
         }}
       >
-        <div>
+        <div style={{ maxWidth: 560 }}>
           <div
             style={{
               display: 'inline-flex',
