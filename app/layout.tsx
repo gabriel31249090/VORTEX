@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import AdPopup from "./components/AdPopup";
 import PageTransition from "@/components/PageTransition";
+import "./globals.css";
+import "./styles/interactions.css";
 
 const SITE_URL = "https://vortex.app"; // TODO: trocar pelo domínio real quando definido
 
