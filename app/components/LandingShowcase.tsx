@@ -47,27 +47,27 @@ export default function LandingShowcase() {
           delay={0}
           visible={visible}
           variant="text"
-          author="usuário"
-          community="comunidade"
-          time="agora"
+          author=""
+          community=""
+          time=""
           title="Compartilhe ideias, dúvidas e descobertas no seu ritmo."
         />
         <MockCard
           delay={120}
           visible={visible}
           variant="image"
-          author="usuário"
-          community="comunidade"
-          time="agora"
+          author=""
+          community=""
+          time=""
           title="Mostre seu melhor visual, sem filtros automáticos."
         />
         <MockCard
           delay={240}
           visible={visible}
           variant="poll"
-          author="VORTEX"
-          community="recursos"
-          time="agora"
+          author=""
+          community=""
+          time=""
           title="Qual recurso você quer ver primeiro?"
           options={[
             { label: 'Reações customizadas', pct: 48 },
@@ -108,21 +108,27 @@ function MockCard({
   comments = 0,
   options,
 }: MockCardProps) {
+  const showMeta = Boolean((community || time).trim())
+  const showFooter = likes > 0 || comments > 0
+
+  const showHeader = Boolean(author?.trim())
+
   return (
     <article
       className={`surface showcase-card ${visible ? 'showcase-card--visible' : ''}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
-      {/* Header */}
-      <div className="showcase-card__header">
-        <div aria-hidden="true" className="showcase-card__avatar">
-          {author[0].toUpperCase()}
+      {showHeader && (
+        <div className="showcase-card__header">
+          <div aria-hidden="true" className="showcase-card__avatar">
+            {author?.charAt(0).toUpperCase() || 'P'}
+          </div>
+          <div className="showcase-card__author-group">
+            <div className="showcase-card__author">{author}</div>
+            {showMeta && <div className="showcase-card__meta">{community}{community && time ? ' · ' : ''}{time}</div>}
+          </div>
         </div>
-        <div className="showcase-card__author-group">
-          <div className="showcase-card__author">@{author}</div>
-          <div className="showcase-card__meta">{community} · {time}</div>
-        </div>
-      </div>
+      )}
 
       {/* Body */}
       <h3 className={`showcase-card__title ${variant === 'image' ? 'showcase-card__title--image' : ''}`}>
@@ -155,11 +161,13 @@ function MockCard({
       )}
 
       {/* Footer */}
-      <div className="showcase-card__footer">
-        <span>♥ {likes.toLocaleString('pt-BR')}</span>
-        <span>💬 {comments}</span>
-        <span className="showcase-card__footer-icon">↗</span>
-      </div>
+      {showFooter && (
+        <div className="showcase-card__footer">
+          {likes > 0 && <span>♥ {likes.toLocaleString('pt-BR')}</span>}
+          {comments > 0 && <span>💬 {comments}</span>}
+          <span className="showcase-card__footer-icon">↗</span>
+        </div>
+      )}
     </article>
   )
 }
