@@ -159,6 +159,7 @@ export default function Nav() {
     { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
     { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
     { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
+    { icon: '❓', label: 'Ajuda', path: '/faq', onClick: () => router.push('/faq') },
     { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
     { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
     { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
@@ -178,6 +179,7 @@ export default function Nav() {
   // Resto vai pro menu "Mais"
   const mobileMoreItems = [
     items.find(i => i.path === '/pricing')!,
+    items.find(i => i.path === '/faq')!,
     items.find(i => i.path === '/profile')!,
     items.find(i => i.path === '/settings')!,
     ...(isAdmin ? [items.find(i => (i as any).admin)!] : []),

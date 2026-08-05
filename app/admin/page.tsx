@@ -30,6 +30,27 @@ type Profile = {
   created_at: string
 }
 
+type ModerationPost = {
+  id: string
+  title: string
+  content: string
+  author_id: string
+  moderation_reason: string | null
+  moderation_details: Record<string, any> | null
+  created_at: string
+  profiles: { username: string; display_name: string; avatar_url: string | null }[] | null
+}
+
+type FeedbackMessage = {
+  id: number
+  user_id: string | null
+  category: string
+  subject: string | null
+  message: string
+  status: string
+  created_at: string
+}
+
 type Ad = {
   id: string
   title: string
@@ -51,7 +72,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminId, setAdminId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'ads'>('requests')
+  const [activeTab, setActiveTab] = useState<'requests' | 'moderation' | 'users' | 'ads' | 'feedback'>('requests')
 
   // Plan requests
   const [requests, setRequests] = useState<PlanRequest[]>([])
@@ -62,6 +83,13 @@ export default function AdminPage() {
   const [users, setUsers] = useState<Profile[]>([])
   const [userSearch, setUserSearch] = useState('')
   const [updatingUser, setUpdatingUser] = useState<string | null>(null)
+
+  // Moderation
+  const [moderationPosts, setModerationPosts] = useState<ModerationPost[]>([])
+  const [moderationLoadingId, setModerationLoadingId] = useState<string | null>(null)
+  const [feedbackMessages, setFeedbackMessages] = useState<FeedbackMessage[]>([])
+  const [feedbackLoadingId, setFeedbackLoadingId] = useState<number | null>(null)
+  const [feedbackFilter, setFeedbackFilter] = useState<'new' | 'resolved'>('new')
 
   // Ads
   const [ads, setAds] = useState<Ad[]>([])
@@ -78,9 +106,68 @@ export default function AdminPage() {
   useEffect(() => {
     if (!isAdmin) return
     if (activeTab === 'requests') fetchRequests()
+    else if (activeTab === 'moderation') fetchModerationPosts()
     else if (activeTab === 'users') fetchUsers()
     else if (activeTab === 'ads') fetchAds()
-  }, [isAdmin, activeTab, requestsFilter])
+    else if (activeTab === 'feedback') fetchFeedback()
+  }, [isAdmin, activeTab, requestsFilter, feedbackFilter])
+
+  async function fetchModerationPosts() {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('posts')
+      .select('id, title, content, author_id, moderation_reason, moderation_details, created_at, profiles(username, display_name, avatar_url)')
+      .eq('moderation_status', 'review')
+      .order('created_at', { ascending: false })
+
+    if (!error && data) setModerationPosts(data as ModerationPost[])
+  }
+
+  async function fetchFeedback() {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('feedback')
+      .select('id, user_id, category, subject, message, status, created_at')
+      .eq('status', feedbackFilter)
+      .order('created_at', { ascending: false })
+
+    if (!error && data) setFeedbackMessages(data as FeedbackMessage[])
+  }
+
+  async function handleFeedbackAction(feedbackId: number, action: 'resolved') {
+    setFeedbackLoadingId(feedbackId)
+    const supabase = createClient()
+    const { error } = await supabase.from('feedback').update({ status: action }).eq('id', feedbackId)
+
+    if (error) {
+      toast.error('Erro ao atualizar o feedback.')
+      setFeedbackLoadingId(null)
+      return
+    }
+
+    await fetchFeedback()
+    setFeedbackLoadingId(null)
+    toast.success('Feedback marcado como resolvido.')
+  }
+
+  async function handleModerationAction(postId: string, action: 'approved' | 'rejected') {
+    setModerationLoadingId(postId)
+    const supabase = createClient()
+    const { error } = await supabase.from('posts').update({
+      moderation_status: action,
+      moderation_reason: action === 'approved' ? 'Aprovado manualmente' : 'Rejeitado manualmente',
+    }).eq('id', postId)
+
+    if (error) {
+      toast.error('Erro ao atualizar status de moderação.')
+      setModerationLoadingId(null)
+      return
+    }
+
+    await fetchModerationPosts()
+    setModerationLoadingId(null)
+    toast.success(action === 'approved' ? 'Post aprovado.' : 'Post rejeitado.')
+  }
 
   async function checkAdmin() {
     const supabase = createClient()
@@ -258,7 +345,7 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 4, background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: 4, marginBottom: 32, width: 'fit-content' }}>
-          {(['requests', 'users', 'ads'] as const).map(tab => (
+          {(['requests', 'moderation', 'users', 'ads', 'feedback'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               padding: '9px 22px', borderRadius: 10, border: 'none',
               background: activeTab === tab ? 'rgba(200,242,60,0.12)' : 'transparent',
@@ -266,7 +353,15 @@ export default function AdminPage() {
               fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13,
               cursor: 'pointer', transition: 'all 0.15s',
             }}>
-              {tab === 'requests' ? '📋 Pedidos de Plano' : tab === 'users' ? '👥 Usuários' : '📢 Anúncios'}
+              {tab === 'requests'
+                ? '📋 Pedidos de Plano'
+                : tab === 'moderation'
+                ? '🛡️ Revisar Moderação'
+                : tab === 'users'
+                ? '👥 Usuários'
+                : tab === 'feedback'
+                ? '📝 SAC / Feedback'
+                : '📢 Anúncios'}
             </button>
           ))}
         </div>
@@ -321,6 +416,103 @@ export default function AdminPage() {
                         <button onClick={() => handleRequest(req.id, req.user_id, req.plan, 'approved')} disabled={processingId === req.id} style={{ padding: '8px 18px', borderRadius: 50, border: 'none', background: '#c8f23c', color: '#000', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: processingId === req.id ? 0.5 : 1, boxShadow: '0 0 16px rgba(200,242,60,0.3)' }}>{processingId === req.id ? '...' : '✓ Aprovar'}</button>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ABA MODERAÇÃO ── */}
+        {activeTab === 'moderation' && (
+          <div>
+            <div style={{ marginBottom: 24, color: '#8888aa', fontSize: 13 }}>
+              Aqui você vê posts em estado <strong>review</strong>. Aprove ou rejeite manualmente para liberar ou ocultar o conteúdo.
+            </div>
+
+            {moderationPosts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#333355', fontSize: 14 }}>
+                Nenhum post aguardando revisão.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {moderationPosts.map(post => {
+                  const authorProfile = post.profiles?.[0] || null
+                  return (
+                    <div key={post.id} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <div>
+                          <h3 style={{ margin: 0, color: '#f0f0f8', fontSize: 16 }}>{post.title || 'Sem título'}</h3>
+                          <div style={{ color: '#555577', fontSize: 12, marginTop: 4 }}>
+                            {authorProfile ? `@${authorProfile.username}` : 'Usuário desconhecido'} · {new Date(post.created_at).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <button onClick={() => handleModerationAction(post.id, 'rejected')} disabled={moderationLoadingId === post.id} style={{ padding: '9px 18px', borderRadius: 50, border: '1px solid rgba(255,68,68,0.3)', background: 'rgba(255,68,68,0.06)', color: '#ff4444', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: moderationLoadingId === post.id ? 0.5 : 1 }}>✕ Rejeitar</button>
+                          <button onClick={() => handleModerationAction(post.id, 'approved')} disabled={moderationLoadingId === post.id} style={{ padding: '9px 18px', borderRadius: 50, border: 'none', background: '#c8f23c', color: '#000', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: moderationLoadingId === post.id ? 0.5 : 1, boxShadow: '0 0 16px rgba(200,242,60,0.3)' }}>✓ Aprovar</button>
+                        </div>
+                      </div>
+                      <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{post.content || 'Sem conteúdo.'}</p>
+                      {post.moderation_reason && (
+                        <div style={{ color: '#555577', fontSize: 12, background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '10px' }}>
+                          <strong>Motivo automático:</strong> {post.moderation_reason}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ABA FEEDBACK ── */}
+        {activeTab === 'feedback' && (
+          <div>
+            <div style={{ marginBottom: 24, color: '#8888aa', fontSize: 13, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div>Visualize e resolva mensagens enviadas pelo SAC / Feedback.</div>
+              <div style={{ display: 'inline-flex', gap: 8 }}>
+                {(['new', 'resolved'] as const).map(status => (
+                  <button key={status} onClick={() => setFeedbackFilter(status)} style={{
+                    padding: '7px 18px', borderRadius: 50, border: '1px solid',
+                    borderColor: feedbackFilter === status ? status === 'new' ? 'rgba(255,200,0,0.4)' : 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.06)',
+                    background: feedbackFilter === status ? status === 'new' ? 'rgba(255,200,0,0.08)' : 'rgba(200,242,60,0.08)' : 'transparent',
+                    color: feedbackFilter === status ? status === 'new' ? '#ffc800' : '#c8f23c' : '#555577',
+                    fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
+                  }}>
+                    {status === 'new' ? '🆕 Novos' : '✓ Resolvidos'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {feedbackMessages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#333355', fontSize: 14 }}>
+                Nenhuma mensagem {feedbackFilter === 'new' ? 'nova' : 'resolvida'}.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {feedbackMessages.map(item => (
+                  <div key={item.id} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <span style={{ color: '#f0f0f8', fontSize: 15, fontWeight: 700 }}>{item.subject || 'Sem assunto'}</span>
+                          <span style={{ color: '#555577', fontSize: 12, fontWeight: 600 }}>{item.category}</span>
+                        </div>
+                        <div style={{ color: '#555577', fontSize: 12, marginTop: 4 }}>ID do usuário: {item.user_id || 'Anônimo'}</div>
+                      </div>
+                      <span style={{ color: item.status === 'new' ? '#ffc800' : '#c8f23c', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>{item.status}</span>
+                    </div>
+                    <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{item.message}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                      <span style={{ color: '#555577', fontSize: 11 }}>{new Date(item.created_at).toLocaleString('pt-BR')}</span>
+                      {item.status === 'new' && (
+                        <button onClick={() => handleFeedbackAction(item.id, 'resolved')} disabled={feedbackLoadingId === item.id} style={{ padding: '9px 18px', borderRadius: 50, border: 'none', background: '#c8f23c', color: '#000', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: feedbackLoadingId === item.id ? 0.5 : 1, boxShadow: '0 0 16px rgba(200,242,60,0.3)' }}>
+                          {feedbackLoadingId === item.id ? '...' : 'Marcar como resolvido'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
