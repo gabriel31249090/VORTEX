@@ -68,6 +68,7 @@ export default function SearchPage() {
         .from('posts')
         .select('id, title, content, likes_count, comments_count, created_at, author:author_id(username, display_name, avatar_url)')
         .or(`title.ilike.%${term}%,content.ilike.%${term}%`)
+        .eq('moderation_status', 'approved')
         .order('likes_count', { ascending: false })
         .limit(20),
 

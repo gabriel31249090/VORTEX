@@ -234,6 +234,21 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
       setUploading(false)
     }
 
+    const moderateResponse = await fetch('/api/moderate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title.trim(), content: textContent }),
+    })
+    const moderation = await moderateResponse.json()
+
+    if (moderation.action === 'reject') {
+      setError(moderation.reason || 'Conteúdo rejeitado pela moderação.')
+      setLoading(false)
+      return
+    }
+
+    const moderationStatus = moderation.action === 'review' ? 'review' : 'approved'
+
     if (isEditing) {
       const { error: updateError } = await supabase.from('posts').update({
         title: title.trim(),
@@ -241,6 +256,9 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
         html_content: htmlContent,
         type: mediaUrl ? postType : 'text',
         media_url: mediaUrl,
+        moderation_status: moderationStatus,
+        moderation_reason: moderation.reason,
+        moderation_details: moderation.labels || null,
       }).eq('id', postId)
 
       if (updateError) { setError(updateError.message); setLoading(false); return }
@@ -256,6 +274,9 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
       community_id: communityId || null,
       type: postType,
       media_url: mediaUrl,
+      moderation_status: moderationStatus,
+      moderation_reason: moderation.reason,
+      moderation_details: moderation.labels || null,
     })
 
     if (postError) {
@@ -266,6 +287,9 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
         community_id: communityId || null,
         type: postType,
         media_url: mediaUrl,
+        moderation_status: moderationStatus,
+        moderation_reason: moderation.reason,
+        moderation_details: moderation.labels || null,
       })
       if (fallbackError) { setError(fallbackError.message); setLoading(false); return }
     }

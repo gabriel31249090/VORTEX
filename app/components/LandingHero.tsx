@@ -47,7 +47,23 @@ export default function LandingHero() {
           </div>
         </div>
 
-        <div aria-hidden="true" className="vtx-hero-spacer" />
+        <aside aria-hidden="true" className="landing-hero-visual">
+          <div className="landing-hero-visual-card surface glass">
+            <span className="landing-hero-visual-pill">Preview do feed</span>
+            <h2 className="landing-hero-visual-title">Cronológico, leve e focado em você.</h2>
+            <p className="landing-hero-visual-copy">
+              Visual clean com comunidades, stories ativos e mensagens diretas sem algoritmos invasivos.
+            </p>
+            <div className="landing-hero-visual-meta">
+              <span>Comunidades reais</span>
+              <span>Stories 24h</span>
+              <span>DMs sem ruído</span>
+            </div>
+          </div>
+          <div className="landing-hero-visual-badge">
+            Sem anúncios invasivos • Sem rastreamento
+          </div>
+        </aside>
       </div>
     </section>
   )

@@ -71,6 +71,7 @@ export default function CommunityPage() {
         .from('posts')
         .select('id, title, content, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url)')
         .eq('community_id', communityData.id)
+        .eq('moderation_status', 'approved')
         .order('created_at', { ascending: false })
 
       setPosts((postsData as any) || [])

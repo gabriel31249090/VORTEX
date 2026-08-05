@@ -309,6 +309,7 @@ export default function FeedPage() {
         'id, title, content, type, media_url, likes_count, comments_count, reposts_count, created_at, author_id, profiles(username, avatar_url, plan, accent_color), communities(name, slug)'
       )
       .in('id', postIds)
+      .eq('moderation_status', 'approved')
     if (postsError) console.error(postsError)
 
     const postMap = new Map(

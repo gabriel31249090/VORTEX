@@ -367,7 +367,9 @@ export default function ProfilePage() {
 
       const { data: postsData } = await supabase
         .from('posts').select('id, title, content, likes_count, comments_count, created_at')
-        .eq('author_id', profileData.id).order('created_at', { ascending: false })
+        .eq('author_id', profileData.id)
+        .eq('moderation_status', 'approved')
+        .order('created_at', { ascending: false })
       setPosts(postsData || [])
 
       const { data: memberData } = await supabase

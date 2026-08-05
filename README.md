@@ -127,6 +127,7 @@ Abra em `http://localhost:3000`.
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave anônima pública do Supabase |
+| `OPENAI_API_KEY` | Chave da API OpenAI para moderação automática (opcional) |
 
 > Caso o projeto use mais variáveis internas, configure-as conforme necessário no `.env.local`.
 
