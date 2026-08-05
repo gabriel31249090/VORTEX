@@ -47,33 +47,33 @@ export default function LandingShowcase() {
           delay={0}
           visible={visible}
           variant="text"
-          author="marina.codes"
-          community="r/programação"
-          time="2h"
-          title="Passei 6 meses migrando um monolito pra serverless. Aqui está o que eu queria saber no dia 1."
+          author="usuário"
+          community="comunidade"
+          time="agora"
+          title="Compartilhe ideias, dúvidas e descobertas no seu ritmo."
         />
         <MockCard
           delay={120}
           visible={visible}
           variant="image"
-          author="leo.shoots"
-          community="r/fotografia"
-          time="4h"
-          title="Aurora boreal na Islândia, sem filtro. ISO 6400, 15s."
+          author="usuário"
+          community="comunidade"
+          time="agora"
+          title="Mostre seu melhor visual, sem filtros automáticos."
         />
         <MockCard
           delay={240}
           visible={visible}
           variant="poll"
-          author="vortex.team"
-          community="anúncios"
-          time="1d"
-          title="Qual feature você quer ver no VORTEX primeiro?"
+          author="VORTEX"
+          community="recursos"
+          time="agora"
+          title="Qual recurso você quer ver primeiro?"
           options={[
             { label: 'Reações customizadas', pct: 48 },
-            { label: 'Voice notes em DM', pct: 27 },
+            { label: 'Notas de voz em DM', pct: 27 },
             { label: 'Posts agendados', pct: 18 },
-            { label: 'Live rooms', pct: 7 },
+            { label: 'Salas ao vivo', pct: 7 },
           ]}
         />
       </div>
@@ -104,8 +104,8 @@ function MockCard({
   time,
   title,
   image,
-  likes = 124,
-  comments = 18,
+  likes = 0,
+  comments = 0,
   options,
 }: MockCardProps) {
   return (
