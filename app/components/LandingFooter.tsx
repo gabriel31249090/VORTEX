@@ -12,8 +12,8 @@ export default function LandingFooter() {
               VORTEX<span className="landing-footer-brand-accent">.</span>
             </Link>
             <p className="landing-footer-copy">
-              A rede social sem limites. Open source, sem rastreamento, sem
-              algorítmo te vendendo como produto.
+              Rede social open source com foco em privacidade, controle do usuário
+              e fluxo cronológico de conteúdo.
             </p>
             <a
               href="https://github.com/gabriel31249090/VORTEX"

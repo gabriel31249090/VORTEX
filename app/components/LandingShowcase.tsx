@@ -36,9 +36,8 @@ export default function LandingShowcase() {
         </h2>
 
         <p className="landing-showcase-copy">
-          Cronológico por padrão. Sem “para você” misterioso.
-          Você escolhe o que aparece, sem deixar a IA decidir o que te faz
-          ficar.
+          Feed cronológico por padrão. Sem recomendações automatizadas que decidam o conteúdo.
+          Você escolhe o que aparece e o que fica no seu fluxo.
         </p>
       </div>
 

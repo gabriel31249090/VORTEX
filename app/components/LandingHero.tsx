@@ -18,16 +18,16 @@ export default function LandingHero() {
           </div>
 
           <h1 className="landing-hero-title">
-            A rede social<br />
+            VORTEX é uma rede social<br />
             <span className="landing-hero-title-accent">
-              sem limites.
+              open source e centrada em privacidade.
             </span>
           </h1>
 
           <p className="landing-hero-copytext">
-            VORTEX junta o melhor do Reddit e do Instagram num só lugar.
-            Comunidades por interesse, feed visual, stories que somem em 24h,
-            DMs sem algorítmo — e nenhum rastreamento te vendendo como produto.
+            Uma plataforma para comunidades, stories e mensagens em ordem cronológica.
+            Cada comunidade tem seu próprio feed e os stories expiram em 24h.
+            DMs não são impulsionadas por recomendações algorítmicas.
           </p>
 
           <div className="landing-hero-actions">
@@ -43,18 +43,18 @@ export default function LandingHero() {
         <aside aria-hidden="true" className="landing-hero-visual">
           <div className="landing-hero-visual-card surface glass">
             <span className="landing-hero-visual-pill">Preview do feed</span>
-            <h2 className="landing-hero-visual-title">Cronológico, leve e focado em você.</h2>
+            <h2 className="landing-hero-visual-title">Feed cronológico com foco em contexto.</h2>
             <p className="landing-hero-visual-copy">
-              Visual clean com comunidades, stories ativos e mensagens diretas sem algoritmos invasivos.
+              Mostra comunidades, stories e mensagens sem impulsionar conteúdo por algoritmos de recomendação.
             </p>
             <div className="landing-hero-visual-meta">
-              <span>Comunidades reais</span>
+              <span>Comunidades</span>
               <span>Stories 24h</span>
-              <span>DMs sem ruído</span>
+              <span>Mensagens cronológicas</span>
             </div>
           </div>
           <div className="landing-hero-visual-badge">
-            Sem anúncios invasivos • Sem rastreamento
+            Open source • Privacidade em foco
           </div>
         </aside>
       </div>
