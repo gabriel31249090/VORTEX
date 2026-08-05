@@ -1,12 +1,7 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
-
-const BlackHoleBackground = dynamic(
-  () => import('./BlackHoleBackground'),
-  { ssr: false }
-)
+import BlackHoleBackground from './BlackHoleBackground'
 
 export default function LandingHero() {
   return (
