@@ -33,3 +33,5 @@ create policy "Admins can update feedback" on public.feedback
 
 -- Conceder permissões necessárias para o role authenticated.
 grant select, insert, update on public.feedback to authenticated;
+
+grant usage, select on sequence public.feedback_id_seq to authenticated;
