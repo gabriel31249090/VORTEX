@@ -69,55 +69,15 @@ export default function LandingFeatures() {
   ]
 
   return (
-    <section
-      id="features"
-      className="container-vtx"
-      style={{ padding: 'clamp(60px, 10vw, 120px) 24px' }}
-    >
-      <div style={{ maxWidth: 720, marginBottom: 56 }}>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 14px',
-            borderRadius: 999,
-            border: '1px solid var(--border-2)',
-            background: 'rgba(200, 242, 60, 0.05)',
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--green)',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            fontFamily: "'JetBrains Mono', monospace",
-            marginBottom: 24,
-          }}
-        >
-          ◉ Recursos
-        </div>
+    <section id="features" className="landing-features container-vtx">
+      <div className="landing-features-header">
+        <div className="landing-features-pill">◉ Recursos</div>
 
-        <h2
-          style={{
-            fontSize: 'clamp(36px, 6vw, 60px)',
-            fontWeight: 800,
-            color: 'var(--text)',
-            lineHeight: 1.05,
-            letterSpacing: '-0.025em',
-            marginBottom: 20,
-            textWrap: 'balance',
-          }}
-        >
-          Tudo que você precisa. <span style={{ color: 'var(--text-3)' }}>Nada que você não precisa.</span>
+        <h2 className="landing-features-title">
+          Tudo que você precisa. <span className="landing-features-title-muted">Nada que você não precisa.</span>
         </h2>
 
-        <p
-          style={{
-            fontSize: 'clamp(15px, 2vw, 18px)',
-            color: 'var(--text-2)',
-            lineHeight: 1.55,
-            textWrap: 'pretty',
-          }}
-        >
+        <p className="landing-features-copy">
           Cada feature existe por um motivo. Sem métricas vaidosas, sem dark
           patterns, sem upsell escondido atrás do botão de postar.
         </p>

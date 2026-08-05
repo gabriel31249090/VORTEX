@@ -26,66 +26,23 @@ export default function LandingShowcase() {
     <section
       id="showcase"
       ref={ref}
-      className="container-vtx"
-      style={{ padding: 'clamp(60px, 10vw, 120px) 24px' }}
+      className="landing-showcase container-vtx"
     >
-      <div style={{ maxWidth: 720, marginBottom: 56 }}>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 14px',
-            borderRadius: 999,
-            border: '1px solid var(--border-2)',
-            background: 'rgba(139, 92, 246, 0.07)',
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--purple)',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            fontFamily: "'JetBrains Mono', monospace",
-            marginBottom: 24,
-          }}
-        >
-          ◇ Como funciona
-        </div>
+      <div className="landing-showcase-header">
+        <div className="landing-tag">◇ Como funciona</div>
 
-        <h2
-          style={{
-            fontSize: 'clamp(36px, 6vw, 60px)',
-            fontWeight: 800,
-            color: 'var(--text)',
-            lineHeight: 1.05,
-            letterSpacing: '-0.025em',
-            marginBottom: 20,
-            textWrap: 'balance',
-          }}
-        >
-          Um feed que <span style={{ color: 'var(--green)' }}>você</span> controla.
+        <h2 className="landing-showcase-title">
+          Um feed que <span className="landing-showcase-highlight">você</span> controla.
         </h2>
 
-        <p
-          style={{
-            fontSize: 'clamp(15px, 2vw, 18px)',
-            color: 'var(--text-2)',
-            lineHeight: 1.55,
-            textWrap: 'pretty',
-          }}
-        >
-          Cronológico por padrão. Sem &ldquo;para você&rdquo; misterioso.
+        <p className="landing-showcase-copy">
+          Cronológico por padrão. Sem “para você” misterioso.
           Você escolhe o que aparece, sem deixar a IA decidir o que te faz
           ficar.
         </p>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
-          gap: 20,
-        }}
-      >
+      <div className="landing-showcase-grid">
         <MockCard
           delay={0}
           visible={visible}
@@ -153,151 +110,44 @@ function MockCard({
 }: MockCardProps) {
   return (
     <article
-      className="surface"
-      style={{
-        borderRadius: 'var(--radius-lg)',
-        padding: 20,
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(24px)',
-        transition: `opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
-        cursor: 'default',
-      }}
+      className={`surface showcase-card ${visible ? 'showcase-card--visible' : ''}`}
+      style={{ transitionDelay: `${delay}ms` }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          marginBottom: 14,
-        }}
-      >
-        <div
-          aria-hidden="true"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            background:
-              'linear-gradient(135deg, var(--green) 0%, var(--purple) 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            color: '#000',
-            fontSize: 14,
-            fontFamily: "'Syne', sans-serif",
-          }}
-        >
+      <div className="showcase-card__header">
+        <div aria-hidden="true" className="showcase-card__avatar">
           {author[0].toUpperCase()}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontWeight: 600,
-              fontSize: 14,
-              color: 'var(--text)',
-              fontFamily: "'Syne', sans-serif",
-            }}
-          >
-            @{author}
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--text-3)',
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
-            {community} · {time}
-          </div>
+        <div className="showcase-card__author-group">
+          <div className="showcase-card__author">@{author}</div>
+          <div className="showcase-card__meta">{community} · {time}</div>
         </div>
       </div>
 
       {/* Body */}
-      <h3
-        style={{
-          fontSize: 16,
-          fontWeight: 600,
-          color: 'var(--text)',
-          lineHeight: 1.35,
-          marginBottom: variant === 'image' ? 14 : 16,
-          textWrap: 'balance',
-        }}
-      >
+      <h3 className={`showcase-card__title ${variant === 'image' ? 'showcase-card__title--image' : ''}`}>
         {title}
       </h3>
 
       {variant === 'image' && (
-        <div
-          aria-hidden="true"
-          style={{
-            height: 180,
-            borderRadius: 'var(--radius)',
-            background:
-              'linear-gradient(135deg, rgba(200,242,60,0.4) 0%, rgba(139,92,246,0.4) 50%, rgba(200,242,60,0.2) 100%)',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background:
-                'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 50%)',
-            }}
-          />
-        </div>
+        <div aria-hidden="true" className="showcase-card__image" />
       )}
 
       {variant === 'poll' && options && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="showcase-card__poll">
           {options.map((opt, i) => (
             <div
               key={i}
-              style={{
-                position: 'relative',
-                padding: '10px 14px',
-                borderRadius: 10,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--border)',
-                overflow: 'hidden',
-                fontSize: 13,
-                fontFamily: "'Inter', sans-serif",
-                color: 'var(--text)',
-              }}
+              className={`showcase-card__poll-option ${i === 0 ? 'showcase-card__poll-option--highlight' : ''}`}
             >
               <div
                 aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background:
-                    i === 0
-                      ? 'linear-gradient(90deg, rgba(200,242,60,0.18), transparent)'
-                      : 'rgba(255,255,255,0.02)',
-                  width: `${opt.pct}%`,
-                  transition: 'width 1s ease 0.4s',
-                }}
+                className="showcase-card__poll-progress"
+                style={{ width: `${opt.pct}%` }}
               />
-              <div
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                }}
-              >
+              <div className="showcase-card__poll-content">
                 <span>{opt.label}</span>
-                <span
-                  style={{
-                    color: 'var(--text-2)',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 12,
-                  }}
-                >
-                  {opt.pct}%
-                </span>
+                <span className="showcase-card__poll-percent">{opt.pct}%</span>
               </div>
             </div>
           ))}
@@ -305,21 +155,10 @@ function MockCard({
       )}
 
       {/* Footer */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 18,
-          marginTop: 16,
-          paddingTop: 14,
-          borderTop: '1px solid var(--border)',
-          color: 'var(--text-2)',
-          fontSize: 13,
-          fontFamily: "'JetBrains Mono', monospace",
-        }}
-      >
+      <div className="showcase-card__footer">
         <span>♥ {likes.toLocaleString('pt-BR')}</span>
         <span>💬 {comments}</span>
-        <span style={{ marginLeft: 'auto', color: 'var(--text-3)' }}>↗</span>
+        <span className="showcase-card__footer-icon">↗</span>
       </div>
     </article>
   )
