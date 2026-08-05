@@ -173,4 +173,10 @@ O projeto é compatível com deploy na Vercel.
 
 Este projeto foi construído com foco em experiência de usuário, estética escura/neon e integração com Supabase para backend e dados em tempo real.
 
+## Contribuição e segurança
+
+Para contribuir com o VORTEX, use pull requests para `main`, mantenha o branch atualizado e siga as orientações em [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+Se você encontrar vulnerabilidades ou problemas de segurança, consulte [`SECURITY.md`](./.github/SECURITY.md) para o fluxo de reporte e resposta.
+
 Se quiser alterações específicas no README (por exemplo, detalhar API, diagramas ou contribuições), posso ajustar este texto para você.

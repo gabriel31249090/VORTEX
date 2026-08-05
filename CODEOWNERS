@@ -1,0 +1,15 @@
+# CODEOWNERS define responsabilidades de revisão para alterações em pastas específicas.
+
+# Todos os arquivos de documentação e processos
+/docs/ @your-github-username
+README.md @your-github-username
+CONTRIBUTING.md @your-github-username
+.github/SECURITY.md @your-github-username
+
+# Código de front-end e landing
+app/components/ @your-github-username
+app/page.tsx @your-github-username
+
+# Backend e Supabase
+lib/ @your-github-username
+supabase/ @your-github-username
