@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Se você encontrar uma vulnerabilidade de segurança, envie um e-mail para `security@vortex.app` ou abra uma issue marcada com `security` no repositório público.
+Se você encontrar uma vulnerabilidade de segurança, envie um e-mail para `gabriel31249090@gmail.com` ou abra uma issue marcada com `security` no repositório público.
 
 ## Resposta
 
