@@ -38,13 +38,6 @@ export default function LandingHero() {
               Ir para o feed
             </Link>
           </div>
-
-          <div className="landing-hero-stats">
-            <Stat n="12k+" l="usuários" />
-            <Stat n="47k" l="posts" />
-            <Stat n="98%" l="uptime" />
-            <Stat n="0" l="ads invasivos" />
-          </div>
         </div>
 
         <aside aria-hidden="true" className="landing-hero-visual">
