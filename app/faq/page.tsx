@@ -67,8 +67,10 @@ export default function FAQPage() {
     })
 
     if (error) {
+      const errorText = error.message || JSON.stringify(error, null, 2)
       console.error('Feedback insert error', error)
-      toast.error(error.message || 'Erro ao enviar o feedback. Tente novamente.')
+      console.error('Feedback insert error details', errorText)
+      toast.error(errorText || 'Erro ao enviar o feedback. Tente novamente.')
       setIsSubmitting(false)
       return
     }
