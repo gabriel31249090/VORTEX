@@ -48,8 +48,15 @@ export default function FAQPage() {
 
     setIsSubmitting(true)
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id || null
+    const { data, error: userError } = await supabase.auth.getUser()
+    const userId = data?.user?.id || null
+
+    if (userError) {
+      console.error('Supabase auth error', userError)
+      toast.error('Erro ao verificar usuário. Tente novamente.')
+      setIsSubmitting(false)
+      return
+    }
 
     const { error } = await supabase.from('feedback').insert({
       user_id: userId,
@@ -60,8 +67,8 @@ export default function FAQPage() {
     })
 
     if (error) {
-      console.error(error)
-      toast.error('Erro ao enviar o feedback. Tente novamente.')
+      console.error('Feedback insert error', error)
+      toast.error(error.message || 'Erro ao enviar o feedback. Tente novamente.')
       setIsSubmitting(false)
       return
     }
