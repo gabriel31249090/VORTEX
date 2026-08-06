@@ -59,7 +59,7 @@ export default function CommunitiesPage() {
         .select('community_id')
         .eq('user_id', user.id)
 
-      if (memberData) setMyCommunities(new Set(memberData.map((m: any) => m.community_id)))
+      if (memberData) setMyCommunities(new Set(memberData.map((m: { community_id: string }) => m.community_id)))
 
       setLoading(false)
     }

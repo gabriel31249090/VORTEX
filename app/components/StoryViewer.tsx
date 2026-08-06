@@ -17,6 +17,15 @@ export default function StoryViewer({ group, onClose }: { group: StoryGroup; onC
 
   const current = group.stories[index]
 
+  // Reset the progress bar when the active story changes, using React's
+  // documented "adjust state during render" pattern instead of a
+  // setState-in-effect (which forces an extra synchronous re-render).
+  const [prevIndex, setPrevIndex] = useState(index)
+  if (index !== prevIndex) {
+    setPrevIndex(index)
+    setProgress(0)
+  }
+
   function goNext() {
     if (index < group.stories.length - 1) setIndex(i => i + 1)
     else onClose()
@@ -26,7 +35,6 @@ export default function StoryViewer({ group, onClose }: { group: StoryGroup; onC
   }
 
   useEffect(() => {
-    setProgress(0)
     startRef.current = performance.now()
 
     if (current.media_type === 'video') return // vídeo avança sozinho via onEnded

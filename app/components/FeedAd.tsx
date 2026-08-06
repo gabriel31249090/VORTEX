@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import type { CSSProperties } from 'react'
 
 type FeedAdProps = {
   ad: {
@@ -51,7 +52,7 @@ export default function FeedAd({ ad }: FeedAdProps) {
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, margin: '0 0 4px', lineHeight: 1.3 }}>{ad.title}</p>
-            {ad.description && <p style={{ color: '#8888aa', fontSize: 12, margin: 0, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>{ad.description}</p>}
+            {ad.description && <p style={{ color: '#8888aa', fontSize: 12, margin: 0, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as CSSProperties}>{ad.description}</p>}
           </div>
 
           <span style={{ color: '#555577', fontSize: 18, flexShrink: 0 }}>→</span>

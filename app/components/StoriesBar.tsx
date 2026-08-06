@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import StoryViewer, { type StoryGroup } from './StoryViewer'
 import Image from 'next/image'
@@ -17,7 +17,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
-  async function loadStories() {
+  const loadStories = useCallback(async () => {
     const { data } = await supabase
       .from('stories')
       .select('id, user_id, media_url, media_type, created_at, profiles(id, username, avatar_url)')
@@ -29,7 +29,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
     const byUser = new Map<string, StoryGroup>()
     const mine: Story[] = []
 
-    ;(data as any[]).forEach((s) => {
+    ;(data as unknown as Story[]).forEach((s) => {
       if (s.user_id === currentUserId) {
         mine.push(s)
         setMyProfile(s.profiles)
@@ -42,9 +42,13 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
 
     setGroups(Array.from(byUser.values()))
     setMyStories(mine)
-  }
+  }, [currentUserId, supabase])
 
-  useEffect(() => { loadStories() }, [currentUserId])
+  // loadStories does an async fetch and sets state after the await resolves
+  // (not synchronously) — it's also called directly from handleUpload and
+  // the story viewer's onClose, so it can't be inlined into this effect.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadStories() }, [loadStories])
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

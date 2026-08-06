@@ -10,7 +10,7 @@
  *   <GlitchText as="h2" color="#f0f0f8" glitchColor="#c8f23c">Título</GlitchText>
  */
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, type ElementType } from 'react'
 
 const WAVE_THRESH = 3
 const CHAR_MULT = 3
@@ -20,7 +20,7 @@ const WAVE_BUF = 5
 export interface GlitchTextProps
   extends React.AnchorHTMLAttributes<HTMLElement> {
   children: string
-  as?: any
+  as?: ElementType
   className?: string
   style?: React.CSSProperties
   /** Duration of each ripple wave in ms. */
@@ -52,7 +52,7 @@ export function GlitchText({
   ...props
 }: GlitchTextProps) {
   const Component = as
-  const elRef = useRef<any>(null)
+  const elRef = useRef<HTMLElement | null>(null)
 
   const stateRef = useRef({
     origTxt: children,

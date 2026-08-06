@@ -3,8 +3,8 @@ type ModerationAction = 'approve' | 'review' | 'reject'
 type ModerationResult = {
   action: ModerationAction
   reason: string
-  labels?: Record<string, any>
-  details?: Record<string, any>
+  labels?: Record<string, unknown>
+  details?: Record<string, unknown>
 }
 
 const OBVIOUS_KEYWORDS: Record<string, string[]> = {
@@ -90,7 +90,7 @@ async function aiModeration(text: string): Promise<ModerationResult> {
     const categories = result.results?.[0]?.categories || {}
     const categoryScores = result.results?.[0]?.category_scores || {}
     const flagged = result.results?.[0]?.flagged
-    const labels: Record<string, any> = { categories, categoryScores }
+    const labels: Record<string, unknown> = { categories, categoryScores }
 
     const dangerous = ['sexual', 'sexual/minors', 'hate', 'violence', 'self-harm', 'terrorism']
     const matched = Object.entries(categories)

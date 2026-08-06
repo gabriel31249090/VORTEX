@@ -60,15 +60,24 @@ export default function ScrambleText({
   const [locked, setLocked] = useState<boolean[]>(() =>
     text.split('').map(() => trigger === 'mount')
   )
+  // Tracks the text this component was last showing, so a prop change can be
+  // detected and reacted to directly during render (React's documented
+  // pattern for "adjusting state when a prop changes") instead of via a
+  // setState-in-effect, which forces an extra synchronous re-render pass.
+  const [prevText, setPrevText] = useState(text)
+  if (text !== prevText) {
+    setPrevText(text)
+    setDisplayChars(text.split('').map(() => ''))
+    setLocked(text.split('').map(() => false))
+  }
 
   const randomChar = () =>
     scrambleChars[Math.floor(Math.random() * scrambleChars.length)]
 
-  // Reset when text changes
+  // Reset the "already played" flag when text changes. This only mutates a
+  // ref (not state), so doing it in an effect is fine.
   useEffect(() => {
     hasPlayedRef.current = false
-    setDisplayChars(text.split('').map(() => ''))
-    setLocked(text.split('').map(() => false))
   }, [text])
 
   // Scramble-in animation

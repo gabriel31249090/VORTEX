@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
@@ -45,9 +45,12 @@ function SettingsSkeleton() {
   )
 }
 
+type SettingsUser = { id: string; email?: string }
+type SettingsProfile = { display_name: string | null; bio: string | null; avatar_url: string | null; banner_url: string | null }
+
 export default function SettingsPage() {
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [user, setUser] = useState<SettingsUser | null>(null)
+  const [profile, setProfile] = useState<SettingsProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [displayName, setDisplayName] = useState('')
@@ -118,6 +121,7 @@ export default function SettingsPage() {
   }
 
   async function handleSave() {
+    if (!user) return
     setSaving(true)
     setError('')
     setSuccess('')
@@ -147,7 +151,7 @@ export default function SettingsPage() {
     if (err) {
       setError(err.message)
     } else {
-      setProfile((prev: any) => ({ ...prev, display_name: displayName, bio, avatar_url, banner_url }))
+      setProfile((prev: SettingsProfile | null) => ({ ...prev, display_name: displayName, bio, avatar_url, banner_url }))
       setAvatarFile(null)
       setBannerFile(null)
       setAvatarPreview(null)
@@ -169,7 +173,7 @@ export default function SettingsPage() {
     </h2>
   )
 
-  const inputStyle: any = {
+  const inputStyle: CSSProperties = {
     width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 10, padding: '10px 14px', color: '#f0f0f8', fontSize: 14,
     outline: 'none', fontFamily: "'Syne', sans-serif", boxSizing: 'border-box', transition: 'border-color 0.2s'

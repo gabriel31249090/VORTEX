@@ -256,8 +256,8 @@ export default function CharactersPage() {
       setShowWizard(false)
       resetWizard()
       load()
-    } catch (err: any) {
-      toast.error(err.message || 'Erro ao salvar personagem')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar personagem')
     } finally {
       setSaving(false)
     }

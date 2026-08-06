@@ -33,6 +33,12 @@ type Post = {
   } | null
   communities: { name: string; slug: string } | null
 }
+// Supabase returns joined relations as an object or an array depending on
+// FK cardinality — this describes the row before it's normalized into Post.
+type RawPostRow = Omit<Post, 'profiles' | 'communities'> & {
+  profiles: Post['profiles'] | Post['profiles'][]
+  communities: Post['communities'] | Post['communities'][]
+}
 type FeedItem = Post & {
   activityId: string
   isRepost: boolean
@@ -234,7 +240,7 @@ export default function FeedPage() {
             .eq('id', payload.new.id)
             .single()
           if (newPost) {
-            const raw = newPost as any
+            const raw = newPost as unknown as RawPostRow
             const profiles = Array.isArray(raw.profiles) ? raw.profiles[0] ?? null : raw.profiles
             const communities = Array.isArray(raw.communities) ? raw.communities[0] ?? null : raw.communities
             const post: Post = { ...raw, profiles, communities }
@@ -313,10 +319,11 @@ export default function FeedPage() {
     if (postsError) console.error(postsError)
 
     const postMap = new Map(
-      (postsData || []).map((p: any) => {
-        const profiles = Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles
-        const communities = Array.isArray(p.communities) ? p.communities[0] ?? null : p.communities
-        const post: Post = { ...p, profiles, communities }
+      (postsData || []).map((p: unknown) => {
+        const raw = p as RawPostRow
+        const profiles = Array.isArray(raw.profiles) ? raw.profiles[0] ?? null : raw.profiles
+        const communities = Array.isArray(raw.communities) ? raw.communities[0] ?? null : raw.communities
+        const post: Post = { ...raw, profiles, communities }
         return [post.id, post]
       })
     )

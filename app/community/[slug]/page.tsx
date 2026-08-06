@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { now } from '@/lib/time'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
 import Image from 'next/image'
@@ -74,20 +75,20 @@ export default function CommunityPage() {
         .eq('moderation_status', 'approved')
         .order('created_at', { ascending: false })
 
-      setPosts((postsData as any) || [])
+      setPosts((postsData as unknown as Post[]) || [])
 
       const { data: memberData } = await supabase
         .from('community_members')
         .select('user_id, role, profiles:user_id(username, display_name, avatar_url)')
         .eq('community_id', communityData.id)
 
-      setMembers((memberData as any) || [])
+      setMembers((memberData as unknown as Member[]) || [])
       setMemberCount(memberData?.length || 0)
-      setIsMember(memberData?.some((m: any) => m.user_id === user.id) || false)
+      setIsMember(memberData?.some((m: { user_id: string }) => m.user_id === user.id) || false)
 
       const { data: likes } = await supabase
         .from('likes').select('post_id').eq('user_id', user.id)
-      if (likes) setLikedPosts(new Set(likes.map((l: any) => l.post_id)))
+      if (likes) setLikedPosts(new Set(likes.map((l: { post_id: string }) => l.post_id)))
 
       setLoading(false)
     }
@@ -154,7 +155,7 @@ export default function CommunityPage() {
   }
 
   function timeAgo(date: string) {
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    const diff = Math.floor((now() - new Date(date).getTime()) / 1000)
     if (diff < 60) return `${diff}s`
     if (diff < 3600) return `${Math.floor(diff / 60)}m`
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`
@@ -584,7 +585,7 @@ export default function CommunityPage() {
               )}
 
               {members.slice(0, 8).map(member => {
-                const profile = member.profiles as any
+                const profile = member.profiles
                 if (!profile) return null
                 const isOwnerMember = member.user_id === community.owner_id
 
@@ -659,38 +660,42 @@ export default function CommunityPage() {
           </div>
 
           {/* Dono */}
-          {ownerMember?.profiles && (
-            <div style={{
-              background: '#111118', border: '1px solid rgba(200,242,60,0.1)',
-              borderRadius: 16, padding: '16px 18px',
-              display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
-              transition: 'border-color 0.2s',
-            }}
-              onClick={() => router.push(`/profile/${(ownerMember.profiles as any).username}`)}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(200,242,60,0.1)')}
-            >
+          {(() => {
+            const ownerProfile = ownerMember?.profiles
+            if (!ownerProfile) return null
+            return (
               <div style={{
-                width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', position: 'relative',
-                background: (ownerMember.profiles as any).avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#000', fontWeight: 800, fontSize: 16, flexShrink: 0,
-                boxShadow: '0 0 0 2px #c8f23c, 0 0 10px rgba(200,242,60,0.2)',
-              }}>
-                {(ownerMember.profiles as any).avatar_url
-                  ? <Image src={(ownerMember.profiles as any).avatar_url} alt="" fill sizes="40px" style={{ objectFit: 'cover' }} />
-                  : getInitial((ownerMember.profiles as any).username)
-                }
+                background: '#111118', border: '1px solid rgba(200,242,60,0.1)',
+                borderRadius: 16, padding: '16px 18px',
+                display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                transition: 'border-color 0.2s',
+              }}
+                onClick={() => router.push(`/profile/${ownerProfile.username}`)}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(200,242,60,0.25)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(200,242,60,0.1)')}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', position: 'relative',
+                  background: ownerProfile.avatar_url ? 'none' : 'linear-gradient(135deg, #c8f23c, #8ab82a)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#000', fontWeight: 800, fontSize: 16, flexShrink: 0,
+                  boxShadow: '0 0 0 2px #c8f23c, 0 0 10px rgba(200,242,60,0.2)',
+                }}>
+                  {ownerProfile.avatar_url
+                    ? <Image src={ownerProfile.avatar_url} alt="" fill sizes="40px" style={{ objectFit: 'cover' }} />
+                    : getInitial(ownerProfile.username)
+                  }
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ color: '#555577', fontSize: 11, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Moderador</p>
+                  <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, margin: 0 }}>
+                    {ownerProfile.display_name || ownerProfile.username}
+                  </p>
+                </div>
+                <span style={{ color: '#c8f23c', fontSize: 16 }}>→</span>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ color: '#555577', fontSize: 11, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Moderador</p>
-                <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, margin: 0 }}>
-                  {(ownerMember.profiles as any).display_name || (ownerMember.profiles as any).username}
-                </p>
-              </div>
-              <span style={{ color: '#c8f23c', fontSize: 16 }}>→</span>
-            </div>
-          )}
+            )
+          })()}
         </aside>
       </main>
 

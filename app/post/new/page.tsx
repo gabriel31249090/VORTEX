@@ -12,6 +12,52 @@ function RippleButton({ rippleColor, ...props }: RippleButtonProps) {
   return <button {...props} />
 }
 
+function Btn({ active, onClick, title, children }: { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <RippleButton
+      onMouseDown={(e: React.MouseEvent) => { e.preventDefault(); onClick() }}
+      title={title}
+      className="vtx-btn"
+      rippleColor="rgba(200,242,60,0.25)"
+      style={{
+        background: active ? 'rgba(200,242,60,0.15)' : 'transparent',
+        border: `1px solid ${active ? 'rgba(200,242,60,0.5)' : 'rgba(255,255,255,0.08)'}`,
+        color: active ? '#c8f23c' : '#8888aa',
+        borderRadius: 8, padding: '5px 10px', cursor: 'pointer',
+        fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+        transition: 'all 0.15s', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', minWidth: 32, height: 32,
+      }}
+      onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.3)'; e.currentTarget.style.color = '#c8f23c' } }}
+      onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8888aa' } }}
+    >{children}</RippleButton>
+  )
+}
+
+function MediaBtn({ label, emoji, onClick, active, limitMB, planLabel }: { label: string; emoji: string; onClick: () => void; active: boolean; limitMB: number; planLabel: string }) {
+  return (
+    <RippleButton
+      onClick={onClick}
+      title={`Máx. ${limitMB}MB (${planLabel})`}
+      className="vtx-btn"
+      rippleColor="rgba(200,242,60,0.25)"
+      style={{
+        background: active ? 'rgba(200,242,60,0.12)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${active ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
+        color: active ? '#c8f23c' : '#8888aa',
+        borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
+        fontSize: 12, fontFamily: "'Syne', sans-serif", fontWeight: 600,
+        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+      }}
+      onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.3)'; e.currentTarget.style.color = '#c8f23c' } }}
+      onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8888aa' } }}
+    >
+      {emoji} {label}
+      <span style={{ color: '#444466', fontSize: 10, marginLeft: 2 }}>{limitMB}MB</span>
+    </RippleButton>
+  )
+}
+
 type PlanId = 'free' | 'boost' | 'mega'
 type FormatType = 'bold' | 'italic' | 'strikeThrough' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock'
 type MediaType = 'image' | 'video' | 'audio' | 'gif' | null
@@ -301,48 +347,6 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
   const planColor = userPlan === 'mega' ? '#a78bfa' : userPlan === 'boost' ? '#c8f23c' : '#555577'
   const planLabel = userPlan === 'mega' ? '👑 MEGA BOOST' : userPlan === 'boost' ? '⚡ BOOST' : 'Free'
 
-  const btn = (active: boolean, onClick: () => void, title: string, children: React.ReactNode) => (
-    <RippleButton
-      onMouseDown={(e: React.MouseEvent) => { e.preventDefault(); onClick() }}
-      title={title}
-      className="vtx-btn"
-      rippleColor="rgba(200,242,60,0.25)"
-      style={{
-        background: active ? 'rgba(200,242,60,0.15)' : 'transparent',
-        border: `1px solid ${active ? 'rgba(200,242,60,0.5)' : 'rgba(255,255,255,0.08)'}`,
-        color: active ? '#c8f23c' : '#8888aa',
-        borderRadius: 8, padding: '5px 10px', cursor: 'pointer',
-        fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-        transition: 'all 0.15s', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', minWidth: 32, height: 32,
-      }}
-      onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.3)'; e.currentTarget.style.color = '#c8f23c' } }}
-      onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8888aa' } }}
-    >{children}</RippleButton>
-  )
-
-  const mediaBtn = (label: string, emoji: string, onClick: () => void, active: boolean, limitMB: number) => (
-    <RippleButton
-      onClick={onClick}
-      title={`Máx. ${limitMB}MB (${planLabel})`}
-      className="vtx-btn"
-      rippleColor="rgba(200,242,60,0.25)"
-      style={{
-        background: active ? 'rgba(200,242,60,0.12)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${active ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
-        color: active ? '#c8f23c' : '#8888aa',
-        borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
-        fontSize: 12, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
-      }}
-      onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(200,242,60,0.3)'; e.currentTarget.style.color = '#c8f23c' } }}
-      onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#8888aa' } }}
-    >
-      {emoji} {label}
-      <span style={{ color: '#444466', fontSize: 10, marginLeft: 2 }}>{limitMB}MB</span>
-    </RippleButton>
-  )
-
   const isBlocked = !isEditing && cooldownLeft > 0
 
   if (initializing) {
@@ -415,19 +419,19 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            {btn(activeFormats.has('bold'), () => execFormat('bold'), 'Negrito (Ctrl+B)', <strong style={{ fontFamily: 'serif' }}>B</strong>)}
-            {btn(activeFormats.has('italic'), () => execFormat('italic'), 'Itálico (Ctrl+I)', <em style={{ fontFamily: 'serif' }}>I</em>)}
-            {btn(activeFormats.has('strikeThrough'), () => execFormat('strikeThrough'), 'Tachado', <span style={{ textDecoration: 'line-through' }}>S</span>)}
+            <Btn active={activeFormats.has('bold')} onClick={() => execFormat('bold')} title="Negrito (Ctrl+B)"><strong style={{ fontFamily: 'serif' }}>B</strong></Btn>
+            <Btn active={activeFormats.has('italic')} onClick={() => execFormat('italic')} title="Itálico (Ctrl+I)"><em style={{ fontFamily: 'serif' }}>I</em></Btn>
+            <Btn active={activeFormats.has('strikeThrough')} onClick={() => execFormat('strikeThrough')} title="Tachado"><span style={{ textDecoration: 'line-through' }}>S</span></Btn>
             <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-            {btn(false, () => execFormat('insertUnorderedList'), 'Lista', <span>≡ •</span>)}
-            {btn(false, () => execFormat('insertOrderedList'), 'Lista numerada', <span>≡ 1</span>)}
+            <Btn active={false} onClick={() => execFormat('insertUnorderedList')} title="Lista"><span>≡ •</span></Btn>
+            <Btn active={false} onClick={() => execFormat('insertOrderedList')} title="Lista numerada"><span>≡ 1</span></Btn>
             <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-            {btn(false, () => execFormat('formatBlock', 'h2'), 'H2', <span style={{ fontSize: 11, fontWeight: 800 }}>H2</span>)}
-            {btn(false, () => execFormat('formatBlock', 'h3'), 'H3', <span style={{ fontSize: 11, fontWeight: 800 }}>H3</span>)}
-            {btn(false, () => execFormat('formatBlock', 'blockquote'), 'Citação', <span style={{ fontFamily: 'serif', fontSize: 15 }}>"</span>)}
-            {btn(false, () => execFormat('formatBlock', 'p'), 'Parágrafo', <span style={{ fontSize: 11 }}>¶</span>)}
+            <Btn active={false} onClick={() => execFormat('formatBlock', 'h2')} title="H2"><span style={{ fontSize: 11, fontWeight: 800 }}>H2</span></Btn>
+            <Btn active={false} onClick={() => execFormat('formatBlock', 'h3')} title="H3"><span style={{ fontSize: 11, fontWeight: 800 }}>H3</span></Btn>
+            <Btn active={false} onClick={() => execFormat('formatBlock', 'blockquote')} title="Citação"><span style={{ fontFamily: 'serif', fontSize: 15 }}>&quot;</span></Btn>
+            <Btn active={false} onClick={() => execFormat('formatBlock', 'p')} title="Parágrafo"><span style={{ fontSize: 11 }}>¶</span></Btn>
             <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-            {btn(false, () => { const url = prompt('URL do link:'); if (url) { editorRef.current?.focus(); document.execCommand('createLink', false, url) } }, 'Link', <span>🔗</span>)}
+            <Btn active={false} onClick={() => { const url = prompt('URL do link:'); if (url) { editorRef.current?.focus(); document.execCommand('createLink', false, url) } }} title="Link"><span>🔗</span></Btn>
             <span style={{ marginLeft: 'auto', color: '#444466', fontSize: 12 }}>{charCount} chars</span>
           </div>
 
@@ -453,10 +457,10 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
           )}
 
           <div style={{ display: 'flex', gap: 8, padding: '12px 20px 16px', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {mediaBtn('Imagem', '🖼', () => imageRef.current?.click(), mediaType === 'image', limits.image)}
-            {mediaBtn('Vídeo', '🎬', () => videoRef.current?.click(), mediaType === 'video', limits.video)}
-            {mediaBtn('Áudio', '🎵', () => audioRef.current?.click(), mediaType === 'audio', limits.audio)}
-            {mediaBtn('GIF', '🎭', () => gifRef.current?.click(), mediaType === 'gif', limits.gif)}
+            <MediaBtn label="Imagem" emoji="🖼" onClick={() => imageRef.current?.click()} active={mediaType === 'image'} limitMB={limits.image} planLabel={planLabel} />
+            <MediaBtn label="Vídeo" emoji="🎬" onClick={() => videoRef.current?.click()} active={mediaType === 'video'} limitMB={limits.video} planLabel={planLabel} />
+            <MediaBtn label="Áudio" emoji="🎵" onClick={() => audioRef.current?.click()} active={mediaType === 'audio'} limitMB={limits.audio} planLabel={planLabel} />
+            <MediaBtn label="GIF" emoji="🎭" onClick={() => gifRef.current?.click()} active={mediaType === 'gif'} limitMB={limits.gif} planLabel={planLabel} />
           </div>
 
           <input ref={imageRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handleMediaSelect(e, 'image')} style={{ display: 'none' }} />

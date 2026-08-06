@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { now } from '@/lib/time'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import Image from 'next/image'
@@ -53,7 +54,7 @@ export default function NotificationsPage() {
         .order('created_at', { ascending: false })
         .limit(50)
 
-      setNotifications((data as any) || [])
+      setNotifications((data as unknown as Notification[]) || [])
 
       await supabase
         .from('notifications')
@@ -74,7 +75,7 @@ export default function NotificationsPage() {
   }
 
   function timeAgo(date: string) {
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    const diff = Math.floor((now() - new Date(date).getTime()) / 1000)
     if (diff < 60) return `${diff}s`
     if (diff < 3600) return `${Math.floor(diff / 60)}m`
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`
@@ -93,8 +94,8 @@ export default function NotificationsPage() {
 
   function getMessage(n: Notification) {
     const name = n.actor?.username || 'alguém'
-    if (n.type === 'like') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> curtiu seu post{n.post ? <> "<span style={{ color: '#8888aa' }}>{n.post.title}</span>"</> : ''}</>
-    if (n.type === 'comment') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> comentou no seu post{n.post ? <> "<span style={{ color: '#8888aa' }}>{n.post.title}</span>"</> : ''}</>
+    if (n.type === 'like') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> curtiu seu post{n.post ? <> &ldquo;<span style={{ color: '#8888aa' }}>{n.post.title}</span>&rdquo;</> : ''}</>
+    if (n.type === 'comment') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> comentou no seu post{n.post ? <> &ldquo;<span style={{ color: '#8888aa' }}>{n.post.title}</span>&rdquo;</> : ''}</>
     if (n.type === 'follow') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> começou a te seguir</>
     if (n.type === 'mention') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> mencionou você em um comentário</>
     if (n.type === 'plan_approved' && n.plan) return (

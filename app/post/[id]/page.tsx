@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Nav from '../../components/Nav'
@@ -64,7 +64,7 @@ export default function PostPage() {
         .select('id, title, content, html_content, media_url, likes_count, comments_count, created_at, author_id, profiles(username, avatar_url, plan, accent_color)')
         .eq('id', postId)
         .single()
-      setPost(postData as any)
+      setPost(postData as unknown as Post)
 
       const { data: commentsData } = await supabase
         .from('comments')
@@ -72,7 +72,7 @@ export default function PostPage() {
         .eq('post_id', postId)
         .order('created_at', { ascending: true })
 
-      const flat = (commentsData as any) || []
+      const flat = (commentsData as unknown as Comment[]) || []
       const map: Record<string, Comment> = {}
       const roots: Comment[] = []
       flat.forEach((c: Comment) => { map[c.id] = { ...c, replies: [] } })
@@ -193,7 +193,7 @@ export default function PostPage() {
     }).select('id, content, created_at, author_id, parent_id, profiles(username, avatar_url)').single()
 
     if (!error && data) {
-      const newC: Comment = { ...(data as any), replies: [] }
+      const newC: Comment = { ...(data as unknown as Comment), replies: [] }
       if (replyTo) {
         const replyToId = replyTo.id
         setComments(prev => {
@@ -477,10 +477,10 @@ export default function PostPage() {
                 data-rich
                 className={isMega ? 'mega-content' : undefined}
                 dangerouslySetInnerHTML={{ __html: post.html_content }}
-                style={{ color: '#8888aa', fontSize: isMega ? 16 : 15, lineHeight: 1.7, marginBottom: 16, ...(isMega ? { ['--mega-accent' as any]: accentColor } : {}) }}
+                style={{ color: '#8888aa', fontSize: isMega ? 16 : 15, lineHeight: 1.7, marginBottom: 16, ...(isMega ? { '--mega-accent': accentColor } : {}) } as CSSProperties}
               />
             ) : post.content ? (
-              <p className={isMega ? 'mega-content' : undefined} style={{ color: '#8888aa', fontSize: isMega ? 16 : 15, lineHeight: 1.7, marginBottom: 16, ...(isMega ? { ['--mega-accent' as any]: accentColor } : {}) }}>{post.content}</p>
+              <p className={isMega ? 'mega-content' : undefined} style={{ color: '#8888aa', fontSize: isMega ? 16 : 15, lineHeight: 1.7, marginBottom: 16, ...(isMega ? { '--mega-accent': accentColor } : {}) } as CSSProperties}>{post.content}</p>
             ) : null}
 
             <div style={{ display: 'flex', gap: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)' }}>

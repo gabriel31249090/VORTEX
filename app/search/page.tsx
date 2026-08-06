@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase'
+import { now } from '@/lib/time'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 
@@ -86,9 +87,9 @@ export default function SearchPage() {
         .limit(10),
     ])
 
-    setPosts((postsRes.data as any) || [])
-    setUsers((usersRes.data as any) || [])
-    setCommunities((commRes.data as any) || [])
+    setPosts((postsRes.data as unknown as PostResult[]) || [])
+    setUsers((usersRes.data as unknown as UserResult[]) || [])
+    setCommunities((commRes.data as unknown as CommunityResult[]) || [])
     setLoading(false)
   }, [])
 
@@ -99,7 +100,7 @@ export default function SearchPage() {
   }
 
   function timeAgo(date: string) {
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    const diff = Math.floor((now() - new Date(date).getTime()) / 1000)
     if (diff < 60) return `${diff}s`
     if (diff < 3600) return `${Math.floor(diff / 60)}m`
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`
@@ -244,7 +245,7 @@ export default function SearchPage() {
         {/* No results */}
         {searched && !loading && totalResults === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <p style={{ color: '#333355', fontSize: 14 }}>Nenhum resultado para "<span style={{ color: '#555577' }}>{query}</span>"</p>
+            <p style={{ color: '#333355', fontSize: 14 }}>Nenhum resultado para &ldquo;<span style={{ color: '#555577' }}>{query}</span>&rdquo;</p>
           </div>
         )}
 
@@ -254,7 +255,7 @@ export default function SearchPage() {
 
             {/* Posts */}
             {tab === 'posts' && posts.map((post, i) => {
-              const author = post.author as any
+              const author = post.author
               return (
                 <article
                   key={post.id}
@@ -291,7 +292,7 @@ export default function SearchPage() {
                     <p style={{
                       color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 10,
                       display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-                    } as any}>
+                    } as CSSProperties}>
                       {highlight(post.content.slice(0, 200), query)}
                     </p>
                   )}

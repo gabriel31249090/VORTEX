@@ -33,6 +33,18 @@ export default function AdminReportsPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  async function loadReports() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('post_reports')
+      .select('id, post_id, reason, details, created_at, reporter:profiles!post_reports_reporter_id_fkey(username), post:posts(id, title, content, profiles(username))')
+      .order('created_at', { ascending: false })
+
+    if (error) console.error(error)
+    setReports((data as unknown as Report[]) || [])
+    setLoading(false)
+  }
+
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -47,19 +59,8 @@ export default function AdminReportsPage() {
       await loadReports()
     }
     init()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  async function loadReports() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('post_reports')
-      .select('id, post_id, reason, details, created_at, reporter:profiles!post_reports_reporter_id_fkey(username), post:posts(id, title, content, profiles(username))')
-      .order('created_at', { ascending: false })
-
-    if (error) console.error(error)
-    setReports((data as any) || [])
-    setLoading(false)
-  }
 
   async function handleDismiss(reportId: string) {
     const { error } = await supabase.from('post_reports').delete().eq('id', reportId)
@@ -117,7 +118,7 @@ export default function AdminReportsPage() {
 
               {r.details && (
                 <p style={{ color: '#8888aa', fontSize: 13, marginBottom: 10, fontStyle: 'italic' }}>
-                  "{r.details}"
+                  &ldquo;{r.details}&rdquo;
                 </p>
               )}
 

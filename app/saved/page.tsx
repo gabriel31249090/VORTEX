@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase'
+import { now } from '@/lib/time'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import toast from 'react-hot-toast'
@@ -17,6 +18,12 @@ type Post = {
   created_at: string
   profiles: { username: string; avatar_url: string | null } | null
   communities: { name: string; slug: string } | null
+}
+// Supabase returns joined relations as an object or an array depending on
+// FK cardinality — this describes the row before it's normalized into Post.
+type RawPost = Omit<Post, 'profiles' | 'communities'> & {
+  profiles: Post['profiles'] | Post['profiles'][]
+  communities: Post['communities'] | Post['communities'][]
 }
 
 export default function SavedPage() {
@@ -42,7 +49,17 @@ export default function SavedPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      setPosts(data?.map((d: any) => d.post).filter(Boolean) || [])
+      setPosts((data || [])
+        .map((d: { post: RawPost | RawPost[] | null }) => {
+          const p = Array.isArray(d.post) ? d.post[0] : d.post
+          if (!p) return null
+          return {
+            ...p,
+            profiles: Array.isArray(p.profiles) ? p.profiles[0] ?? null : p.profiles,
+            communities: Array.isArray(p.communities) ? p.communities[0] ?? null : p.communities,
+          }
+        })
+        .filter((p): p is Post => Boolean(p)))
       setLoading(false)
     }
     load()
@@ -57,7 +74,7 @@ export default function SavedPage() {
   }
 
   function timeAgo(date: string) {
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    const diff = Math.floor((now() - new Date(date).getTime()) / 1000)
     if (diff < 60) return `${diff}s`
     if (diff < 3600) return `${Math.floor(diff / 60)}m`
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`
@@ -122,7 +139,7 @@ export default function SavedPage() {
 
                   <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{post.title}</h2>
                   {post.content && (
-                    <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                    <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as CSSProperties}>
                       {post.content}
                     </p>
                   )}

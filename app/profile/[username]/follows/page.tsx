@@ -55,15 +55,19 @@ export default function FollowsPage() {
           .eq('follower_id', profileData.id),
       ])
 
-      setFollowers((followersData || []).map((f: any) => f.follower))
-      setFollowing((followingData || []).map((f: any) => f.following))
+      setFollowers((followersData || [])
+        .map((f: { follower: Profile | Profile[] }) => Array.isArray(f.follower) ? f.follower[0] : f.follower)
+        .filter((p): p is Profile => Boolean(p)))
+      setFollowing((followingData || [])
+        .map((f: { following: Profile | Profile[] }) => Array.isArray(f.following) ? f.following[0] : f.following)
+        .filter((p): p is Profile => Boolean(p)))
 
       if (user) {
         const { data: myFollowing } = await supabase
           .from('follows')
           .select('following_id')
           .eq('follower_id', user.id)
-        setFollowingIds(new Set((myFollowing || []).map((f: any) => f.following_id)))
+        setFollowingIds(new Set((myFollowing || []).map((f: { following_id: string }) => f.following_id)))
       }
 
       setLoading(false)

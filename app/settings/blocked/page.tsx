@@ -31,7 +31,7 @@ export default function BlockedUsersPage() {
         .order('created_at', { ascending: false })
 
       if (error) console.error(error)
-      setRows((data as any) || [])
+      setRows((data as unknown as BlockedRow[]) || [])
       setLoading(false)
     }
     load()

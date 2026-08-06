@@ -71,14 +71,14 @@ export default function ChatPage() {
         .from('conversation_participants')
         .select('user_id, profiles(username, display_name, avatar_url)')
         .eq('conversation_id', conversationId)
-      setParticipants((parts as any) || [])
+      setParticipants((parts as unknown as Participant[]) || [])
 
       const { data: msgs } = await supabase
         .from('messages')
         .select('id, conversation_id, sender_id, content, media_url, media_type, created_at, profiles(username, avatar_url)')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
-      setMessages((msgs as any) || [])
+      setMessages((msgs as unknown as Message[]) || [])
 
       // Marca como lida
       await supabase
@@ -106,9 +106,10 @@ export default function ChatPage() {
           .eq('id', payload.new.id)
           .single()
         if (fullMsg) {
-          setMessages(prev => prev.some(m => m.id === (fullMsg as any).id) ? prev : [...prev, fullMsg as any])
+          const msg = fullMsg as unknown as Message
+          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
           // Marca como lida se a mensagem não é minha
-          if ((fullMsg as any).sender_id !== userId && userId) {
+          if (msg.sender_id !== userId && userId) {
             supabase.from('conversation_participants')
               .update({ last_read_at: new Date().toISOString() })
               .eq('conversation_id', conversationId)

@@ -13,7 +13,7 @@ export async function getBlockedIds(userId: string): Promise<Set<string>> {
     .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
 
   const set = new Set<string>()
-  ;(data || []).forEach((row: any) => {
+  ;(data || []).forEach((row: { blocker_id: string; blocked_id: string }) => {
     set.add(row.blocker_id === userId ? row.blocked_id : row.blocker_id)
   })
   return set

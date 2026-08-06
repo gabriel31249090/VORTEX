@@ -128,7 +128,7 @@ export default function Nav() {
       .order('created_at', { ascending: false })
       .limit(40)
 
-    setNotifications((data as any) || [])
+    setNotifications((data as unknown as Notification[]) || [])
     setNotifLoading(false)
 
     await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
@@ -153,8 +153,10 @@ export default function Nav() {
     if (data?.username) { setUsername(data.username); router.push(`/profile/${data.username}`) }
   }
 
+  type NavItem = { icon: string; label: string; path: string; onClick: () => void; accent?: boolean; admin?: boolean }
+
   // Todos os itens (usados na sidebar desktop, sem cortes)
-  const items = [
+  const items: NavItem[] = [
     { icon: '◆', label: 'Planos', path: '/pricing', onClick: () => router.push('/pricing') },
     { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
     { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
@@ -182,10 +184,10 @@ export default function Nav() {
     items.find(i => i.path === '/faq')!,
     items.find(i => i.path === '/profile')!,
     items.find(i => i.path === '/settings')!,
-    ...(isAdmin ? [items.find(i => (i as any).admin)!] : []),
+    ...(isAdmin ? [items.find(i => i.admin)!] : []),
   ]
 
-  function isItemActive(item: any) {
+  function isItemActive(item: NavItem) {
     return item.path !== '__notif__' && (
       pathname === item.path ||
       (item.path !== '/feed' && pathname.startsWith(item.path))
@@ -210,7 +212,7 @@ export default function Nav() {
             const isActive = isItemActive(item)
             const isNotif = item.path === '__notif__'
             const isMessages = item.path === '/messages'
-            const isAdminItem = (item as any).admin === true
+            const isAdminItem = item.admin === true
             return (
               <RippleButton
                 key={item.label}
@@ -499,8 +501,8 @@ export default function Nav() {
 
               {!notifLoading && notifications.map((notif, i) => {
                 const config = TYPE_CONFIG[notif.type]
-                const actor = notif.actor as any
-                const post = notif.post as any
+                const actor = notif.actor
+                const post = notif.post
 
                 return (
                   <div

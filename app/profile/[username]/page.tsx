@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase'
+import { now } from '@/lib/time'
 import { useRouter, useParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import Nav from '../../components/Nav'
@@ -85,7 +86,6 @@ function CropModal({
   const [zoom, setZoom] = useState(1)
   const [dragging, setDragging] = useState(false)
   const [imgNaturalSize, setImgNaturalSize] = useState({ w: 1, h: 1 })
-  const [imgDisplaySize, setImgDisplaySize] = useState({ w: 1, h: 1 })
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 })
 
   const CROP_W = isAvatar ? 220 : 460
@@ -99,15 +99,13 @@ function CropModal({
       const scaleY = CROP_H / img.naturalHeight
       const initZoom = Math.max(scaleX, scaleY)
       setZoom(initZoom)
-      setImgDisplaySize({ w: img.naturalWidth * initZoom, h: img.naturalHeight * initZoom })
       setPos({ x: 0, y: 0 })
     }
     img.src = src
   }, [src])
 
-  useEffect(() => {
-    setImgDisplaySize({ w: imgNaturalSize.w * zoom, h: imgNaturalSize.h * zoom })
-  }, [zoom, imgNaturalSize])
+  // Derived from imgNaturalSize + zoom — no need for its own state/effect.
+  const imgDisplaySize = { w: imgNaturalSize.w * zoom, h: imgNaturalSize.h * zoom }
 
   function clamp(p: { x: number; y: number }, dw: number, dh: number) {
     const maxX = 0
@@ -361,8 +359,8 @@ export default function ProfilePage() {
           .select('blocker_id, blocked_id')
           .or(`and(blocker_id.eq.${user.id},blocked_id.eq.${profileData.id}),and(blocker_id.eq.${profileData.id},blocked_id.eq.${user.id})`)
         const rows = blockRows || []
-        setIsBlocked(rows.some((r: any) => r.blocker_id === user.id))
-        setBlockedByThem(rows.some((r: any) => r.blocker_id === profileData.id))
+        setIsBlocked(rows.some((r: { blocker_id: string }) => r.blocker_id === user.id))
+        setBlockedByThem(rows.some((r: { blocker_id: string }) => r.blocker_id === profileData.id))
       }
 
       const { data: postsData } = await supabase
@@ -376,7 +374,12 @@ export default function ProfilePage() {
         .from('community_members').select('role, community:community_id(id, name, slug, description)')
         .eq('user_id', profileData.id)
       if (memberData) {
-        setCommunities(memberData.map((m: any) => ({ ...m.community, role: m.role })))
+        setCommunities(memberData
+          .map((m: { role: string; community: Omit<Community, 'role'> | Omit<Community, 'role'>[] }) => {
+            const c = Array.isArray(m.community) ? m.community[0] : m.community
+            return c ? { ...c, role: m.role } : null
+          })
+          .filter((c): c is Community => Boolean(c)))
       }
       setLoading(false)
     }
@@ -454,7 +457,7 @@ export default function ProfilePage() {
         .select('conversation_id')
         .eq('user_id', currentUserId)
 
-      const myConvIds = (myConvs || []).map((c: any) => c.conversation_id)
+      const myConvIds = (myConvs || []).map((c: { conversation_id: string }) => c.conversation_id)
 
       if (myConvIds.length > 0) {
         const { data: sharedConvs } = await supabase
@@ -463,7 +466,10 @@ export default function ProfilePage() {
           .eq('user_id', profile.id)
           .in('conversation_id', myConvIds)
 
-        const existing = (sharedConvs || []).find((c: any) => c.conversations?.is_group === false)
+        const existing = (sharedConvs || []).find((c: { conversations: { is_group: boolean } | { is_group: boolean }[] | null }) => {
+          const conv = Array.isArray(c.conversations) ? c.conversations[0] : c.conversations
+          return conv?.is_group === false
+        })
         if (existing) {
           router.push(`/messages/${existing.conversation_id}`)
           return
@@ -614,7 +620,7 @@ export default function ProfilePage() {
       setUploadingBanner(false)
     }
 
-    const updateData: any = { display_name: displayName, bio, avatar_url, banner_url }
+    const updateData: Partial<Profile> = { display_name: displayName, bio, avatar_url, banner_url }
     if (profile.plan === 'boost' || profile.plan === 'mega') {
       updateData.accent_color = accentColor
     }
@@ -638,7 +644,7 @@ export default function ProfilePage() {
   }
 
   function timeAgo(date: string) {
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    const diff = Math.floor((now() - new Date(date).getTime()) / 1000)
     if (diff < 60) return `${diff}s`
     if (diff < 3600) return `${Math.floor(diff / 60)}m`
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`
@@ -895,7 +901,7 @@ export default function ProfilePage() {
                 onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeColor}66`; e.currentTarget.style.boxShadow = `0 0 20px ${activeColor}11` }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = hasAccent ? `${activeColor}33` : 'rgba(255,255,255,0.06)'; e.currentTarget.style.boxShadow = 'none' }}>
                 <h2 style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{post.title}</h2>
-                {post.content && <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>{post.content}</p>}
+                {post.content && <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.6, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as CSSProperties}>{post.content}</p>}
                 <div style={{ display: 'flex', gap: 16 }}>
                   <span style={{ color: '#333355', fontSize: 12 }}>▲ {post.likes_count}</span>
                   <span style={{ color: '#333355', fontSize: 12 }}>💬 {post.comments_count}</span>

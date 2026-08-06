@@ -36,7 +36,7 @@ type ModerationPost = {
   content: string
   author_id: string
   moderation_reason: string | null
-  moderation_details: Record<string, any> | null
+  moderation_details: Record<string, unknown> | null
   created_at: string
   profiles: { username: string; display_name: string; avatar_url: string | null }[] | null
 }

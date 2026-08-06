@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
+import { now } from '@/lib/time'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import Image from 'next/image'
@@ -63,7 +64,7 @@ export default function MessagesPage() {
       .select('conversation_id')
       .eq('user_id', uid)
 
-    const convIds = (participantRows || []).map((r: any) => r.conversation_id)
+    const convIds = (participantRows || []).map((r: { conversation_id: string }) => r.conversation_id)
     if (convIds.length === 0) { setConversations([]); setLoading(false); return }
 
     const { data: convs } = await supabase
@@ -113,7 +114,7 @@ export default function MessagesPage() {
           .eq('conversation_id', conv.id)
           .neq('user_id', uid)
           .limit(1)
-        const other = others?.[0] as any
+        const other = others?.[0] as { user_id: string; profiles: { username: string; display_name: string | null; avatar_url: string | null } | null } | undefined
 
         items.push({
           id: conv.id,
@@ -156,9 +157,19 @@ export default function MessagesPage() {
     return () => { supabase.removeChannel(channel) }
   }, [userId, loadConversations])
 
-  // Busca de usuários pra iniciar DM
+  // Busca de usuários pra iniciar DM. Clearing the results when the search
+  // box is emptied/closed happens synchronously during render (React's
+  // documented "adjust state" pattern) so the effect below only has to
+  // handle the debounced fetch, whose setState calls are already deferred.
+  const dmSearchKey = `${showNewChat}:${search}`
+  const [prevDmSearchKey, setPrevDmSearchKey] = useState(dmSearchKey)
+  if (dmSearchKey !== prevDmSearchKey) {
+    setPrevDmSearchKey(dmSearchKey)
+    if (!showNewChat || search.trim() === '') setSearchResults([])
+  }
+
   useEffect(() => {
-    if (!showNewChat || search.trim() === '') { setSearchResults([]); return }
+    if (!showNewChat || search.trim() === '') return
     const t = setTimeout(async () => {
       setSearching(true)
       const { data } = await supabase
@@ -173,9 +184,16 @@ export default function MessagesPage() {
     return () => clearTimeout(t)
   }, [search, showNewChat, userId])
 
-  // Busca de usuários pra grupo
+  // Busca de usuários pra grupo (mesmo padrão acima)
+  const groupSearchKey = `${showNewGroup}:${groupSearch}`
+  const [prevGroupSearchKey, setPrevGroupSearchKey] = useState(groupSearchKey)
+  if (groupSearchKey !== prevGroupSearchKey) {
+    setPrevGroupSearchKey(groupSearchKey)
+    if (!showNewGroup || groupSearch.trim() === '') setGroupResults([])
+  }
+
   useEffect(() => {
-    if (!showNewGroup || groupSearch.trim() === '') { setGroupResults([]); return }
+    if (!showNewGroup || groupSearch.trim() === '') return
     const t = setTimeout(async () => {
       const { data } = await supabase
         .from('profiles')
@@ -197,7 +215,7 @@ export default function MessagesPage() {
       .select('conversation_id')
       .eq('user_id', userId)
 
-    const myConvIds = (myConvs || []).map((c: any) => c.conversation_id)
+    const myConvIds = (myConvs || []).map((c: { conversation_id: string }) => c.conversation_id)
 
     if (myConvIds.length > 0) {
       const { data: sharedConvs } = await supabase
@@ -206,7 +224,10 @@ export default function MessagesPage() {
         .eq('user_id', otherUserId)
         .in('conversation_id', myConvIds)
 
-      const existing = (sharedConvs || []).find((c: any) => c.conversations?.is_group === false)
+      const existing = (sharedConvs || []).find((c: { conversations: { is_group: boolean } | { is_group: boolean }[] | null }) => {
+        const conv = Array.isArray(c.conversations) ? c.conversations[0] : c.conversations
+        return conv?.is_group === false
+      })
       if (existing) {
         router.push(`/messages/${existing.conversation_id}`)
         return
@@ -256,7 +277,7 @@ export default function MessagesPage() {
 
   function timeAgo(date: string | null) {
     if (!date) return ''
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    const diff = Math.floor((now() - new Date(date).getTime()) / 1000)
     if (diff < 60) return 'agora'
     if (diff < 3600) return `${Math.floor(diff / 60)}m`
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`
@@ -319,7 +340,7 @@ export default function MessagesPage() {
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#444466' }}>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>💬</div>
             <p style={{ fontSize: 15, marginBottom: 8 }}>Nenhuma conversa ainda.</p>
-            <p style={{ fontSize: 13, color: '#333355' }}>Clique em "Nova" pra começar a conversar.</p>
+            <p style={{ fontSize: 13, color: '#333355' }}>Clique em &ldquo;Nova&rdquo; pra começar a conversar.</p>
           </div>
         )}
 
