@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "react-hot-toast";
 import AdPopup from "./components/AdPopup";
+import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 import PageTransition from "@/components/PageTransition";
 import "./globals.css";
 import "./styles/interactions.css";
@@ -42,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="pt">
       <body style={{ margin: 0, padding: 0, background: '#0a0a0f' }}>
+        <ServiceWorkerRegister />
         <PageTransition>{children}</PageTransition>
         <AdPopup />
         <Toaster
