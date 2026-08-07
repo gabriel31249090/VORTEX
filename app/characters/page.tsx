@@ -286,7 +286,7 @@ export default function CharactersPage() {
     <div className="min-h-screen bg-[#0b0a12] text-gray-200">
       <Nav />
 
-      <main className="max-w-5xl mx-auto px-4 py-8 md:pl-24">
+      <main className="max-w-5xl mx-auto px-4 py-8 md:pl-[252px]">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">

@@ -1,0 +1,169 @@
+diff --git a/app/characters/page.tsx b/app/characters/page.tsx
+index 31a4c4d..d05653d 100644
+--- a/app/characters/page.tsx
++++ b/app/characters/page.tsx
+@@ -286,7 +286,7 @@ export default function CharactersPage() {
+     <div className="min-h-screen bg-[#0b0a12] text-gray-200">
+       <Nav />
+ 
+-      <main className="max-w-5xl mx-auto px-4 py-8 md:pl-24">
++      <main className="max-w-5xl mx-auto px-4 py-8 md:pl-[252px]">
+         <div className="flex items-center justify-between mb-8">
+           <div>
+             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+diff --git a/app/faq/page.tsx b/app/faq/page.tsx
+index a9992b9..5349466 100644
+--- a/app/faq/page.tsx
++++ b/app/faq/page.tsx
+@@ -86,19 +86,19 @@ export default function FAQPage() {
+   return (
+     <div style={{ minHeight: '100vh', background: '#05050b', color: '#f0f0f8', fontFamily: "'Syne', sans-serif" }}>
+       <Nav />
+-      <main style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 24px 120px', paddingLeft: 'max(24px, calc(220px + 32px))' }}>
++      <main className="faq-main" style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 24px 120px', paddingLeft: 'max(24px, calc(220px + 32px))' }}>
+         <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+           <section style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
+             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(200,242,60,0.08)', border: '1px solid rgba(200,242,60,0.18)', borderRadius: 999, padding: '8px 14px', width: 'fit-content' }}>
+               <span style={{ color: '#c8f23c', fontWeight: 700, fontSize: 12 }}>🛠️ SAC & FAQ</span>
+             </div>
+-            <h1 style={{ fontSize: 42, margin: 0, fontWeight: 800, lineHeight: 1.03 }}>Precisa de ajuda? Envie seu feedback.</h1>
++            <h1 style={{ fontSize: 'clamp(28px, 6vw, 42px)', margin: 0, fontWeight: 800, lineHeight: 1.1 }}>Precisa de ajuda? Envie seu feedback.</h1>
+             <p style={{ margin: 0, color: '#b8b8c8', maxWidth: 680, fontSize: 16, lineHeight: 1.75 }}>
+               Use esta página para fazer perguntas, reportar bugs ou sugerir melhorias. Vamos usar seu retorno para tornar o VORTEX mais seguro e mais divertido para todo mundo.
+             </p>
+           </section>
+ 
+-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, alignItems: 'start' }}>
++          <div className="faq-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, alignItems: 'start' }}>
+             <div style={{ display: 'grid', gap: 18 }}>
+               {FAQ_ITEMS.map(item => (
+                 <div key={item.question} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: 22 }}>
+@@ -148,6 +148,15 @@ export default function FAQPage() {
+           </div>
+         </div>
+       </main>
++
++      <style>{`
++        @media (max-width: 767px) {
++          .faq-main { padding-left: 16px !important; }
++        }
++        @media (max-width: 860px) {
++          .faq-grid { grid-template-columns: 1fr !important; }
++        }
++      `}</style>
+     </div>
+   )
+ }
+diff --git a/app/globals.css b/app/globals.css
+index e6f6644..48087c3 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -160,6 +160,16 @@ h1, h2, h3, h4, h5, h6 {
+   border-radius: 4px;
+ }
+ 
++/* ============================================
++   Inputs no mobile — evita o auto-zoom do iOS Safari
++   (qualquer <16px de font-size em campo focado dispara zoom)
++   ============================================ */
++@media (max-width: 767px) {
++  input, textarea, select {
++    font-size: 16px !important;
++  }
++}
++
+ /* ============================================
+    Utilities — Neon
+    ============================================ */
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 8244fa6..339d5be 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,4 +1,4 @@
+-import type { Metadata } from "next";
++import type { Metadata, Viewport } from "next";
+ import { Toaster } from "react-hot-toast";
+ import AdPopup from "./components/AdPopup";
+ import PageTransition from "@/components/PageTransition";
+@@ -14,6 +14,12 @@ export const metadata: Metadata = {
+     template: "%s · VORTEX",
+   },
+   description: "Rede social moderna combinando o melhor do Reddit e Instagram. Comunidades, feed, posts, comentários e curtidas.",
++  manifest: "/manifest.json",
++  appleWebApp: {
++    capable: true,
++    statusBarStyle: "black-translucent",
++    title: "VORTEX",
++  },
+   openGraph: {
+     type: "website",
+     locale: "pt_BR",
+diff --git a/app/messages/[id]/page.tsx b/app/messages/[id]/page.tsx
+index d9be2f2..9ffed77 100644
+--- a/app/messages/[id]/page.tsx
++++ b/app/messages/[id]/page.tsx
+@@ -299,7 +299,7 @@ export default function ChatPage() {
+       </main>
+ 
+       {/* Input fixo embaixo */}
+-      <div style={{
++      <div className="chat-input-bar" style={{
+         position: 'sticky', bottom: 0,
+         background: 'rgba(10,10,15,0.95)', backdropFilter: 'blur(20px)',
+         borderTop: '1px solid rgba(255,255,255,0.06)',
+@@ -365,7 +365,7 @@ export default function ChatPage() {
+       <style>{`
+         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
+         textarea::placeholder { color: #333355; }
+-        @media (max-width: 767px) { main, header > div, div[style*="paddingLeft"] { padding-left: 16px !important; } }
++        @media (max-width: 767px) { main, header > div, .chat-input-bar { padding-left: 16px !important; } }
+       `}</style>
+     </div>
+   )
+diff --git a/public/manifest.json b/public/manifest.json
+new file mode 100644
+index 0000000..901b244
+--- /dev/null
++++ b/public/manifest.json
+@@ -0,0 +1,41 @@
++{
++  "name": "VORTEX",
++  "short_name": "VORTEX",
++  "description": "VORTEX — rede social. Converse, poste e conecte-se.",
++  "start_url": "/",
++  "scope": "/",
++  "display": "standalone",
++  "orientation": "portrait-primary",
++  "background_color": "#0a0a0a",
++  "theme_color": "#c8f23c",
++  "lang": "pt-BR",
++  "dir": "ltr",
++  "categories": ["social", "lifestyle"],
++  "icons": [
++    {
++      "src": "/icons/icon-192.png",
++      "sizes": "192x192",
++      "type": "image/png",
++      "purpose": "any"
++    },
++    {
++      "src": "/icons/icon-512.png",
++      "sizes": "512x512",
++      "type": "image/png",
++      "purpose": "any"
++    },
++    {
++      "src": "/icons/icon-maskable-192.png",
++      "sizes": "192x192",
++      "type": "image/png",
++      "purpose": "maskable"
++    },
++    {
++      "src": "/icons/icon-maskable-512.png",
++      "sizes": "512x512",
++      "type": "image/png",
++      "purpose": "maskable"
++    }
++  ],
++  "screenshots": []
++}

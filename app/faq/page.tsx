@@ -86,19 +86,19 @@ export default function FAQPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#05050b', color: '#f0f0f8', fontFamily: "'Syne', sans-serif" }}>
       <Nav />
-      <main style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 24px 120px', paddingLeft: 'max(24px, calc(220px + 32px))' }}>
+      <main className="faq-main" style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 24px 120px', paddingLeft: 'max(24px, calc(220px + 32px))' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           <section style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(200,242,60,0.08)', border: '1px solid rgba(200,242,60,0.18)', borderRadius: 999, padding: '8px 14px', width: 'fit-content' }}>
               <span style={{ color: '#c8f23c', fontWeight: 700, fontSize: 12 }}>🛠️ SAC & FAQ</span>
             </div>
-            <h1 style={{ fontSize: 42, margin: 0, fontWeight: 800, lineHeight: 1.03 }}>Precisa de ajuda? Envie seu feedback.</h1>
+            <h1 style={{ fontSize: 'clamp(28px, 6vw, 42px)', margin: 0, fontWeight: 800, lineHeight: 1.1 }}>Precisa de ajuda? Envie seu feedback.</h1>
             <p style={{ margin: 0, color: '#b8b8c8', maxWidth: 680, fontSize: 16, lineHeight: 1.75 }}>
               Use esta página para fazer perguntas, reportar bugs ou sugerir melhorias. Vamos usar seu retorno para tornar o VORTEX mais seguro e mais divertido para todo mundo.
             </p>
           </section>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, alignItems: 'start' }}>
+          <div className="faq-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, alignItems: 'start' }}>
             <div style={{ display: 'grid', gap: 18 }}>
               {FAQ_ITEMS.map(item => (
                 <div key={item.question} style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: 22 }}>
@@ -148,6 +148,15 @@ export default function FAQPage() {
           </div>
         </div>
       </main>
+
+      <style>{`
+        @media (max-width: 767px) {
+          .faq-main { padding-left: 16px !important; }
+        }
+        @media (max-width: 860px) {
+          .faq-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   )
 }

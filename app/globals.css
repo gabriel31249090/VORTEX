@@ -161,6 +161,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================
+   Inputs no mobile — evita o auto-zoom do iOS Safari
+   (qualquer <16px de font-size em campo focado dispara zoom)
+   ============================================ */
+@media (max-width: 767px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* ============================================
    Utilities — Neon
    ============================================ */
 .neon-text {

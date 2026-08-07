@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "react-hot-toast";
 import AdPopup from "./components/AdPopup";
 import PageTransition from "@/components/PageTransition";
@@ -14,6 +14,12 @@ export const metadata: Metadata = {
     template: "%s · VORTEX",
   },
   description: "Rede social moderna combinando o melhor do Reddit e Instagram. Comunidades, feed, posts, comentários e curtidas.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "VORTEX",
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",
