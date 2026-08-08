@@ -49,8 +49,8 @@ export default function LandingFooter() {
           <FooterCol
             title="Legal"
             links={[
-              { label: 'Termos', href: '/terms' },
-              { label: 'Privacidade', href: '/privacy' },
+              { label: 'Termos', href: '/termos' },
+              { label: 'Privacidade', href: '/privacidade' },
               { label: 'Contato', href: 'mailto:contato@vortex.app' },
               { label: 'Status', href: '#' },
             ]}

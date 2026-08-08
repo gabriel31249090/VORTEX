@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [aceitouTermos, setAceitouTermos] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -36,6 +37,12 @@ export default function RegisterPage() {
   async function handleRegister() {
     setLoading(true)
     setError('')
+
+    if (!aceitouTermos) {
+      setError('Você precisa aceitar os Termos de Uso e a Política de Privacidade.')
+      setLoading(false)
+      return
+    }
 
     if (username.length < 3) {
       setError('Username deve ter pelo menos 3 caracteres.')
@@ -156,6 +163,26 @@ export default function RegisterPage() {
               />
             </div>
           ))}
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
+            <input
+              type="checkbox"
+              id="aceite-termos"
+              checked={aceitouTermos}
+              onChange={e => setAceitouTermos(e.target.checked)}
+              style={{ marginTop: 2, width: 16, height: 16, accentColor: '#c8f23c', cursor: 'pointer', flexShrink: 0 }}
+            />
+            <label htmlFor="aceite-termos" style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.5, cursor: 'pointer' }}>
+              Li e aceito os{' '}
+              <Link href="/termos" target="_blank" style={{ color: '#c8f23c', textDecoration: 'none', fontWeight: 600 }}>
+                Termos de Uso
+              </Link>{' '}
+              e a{' '}
+              <Link href="/privacidade" target="_blank" style={{ color: '#c8f23c', textDecoration: 'none', fontWeight: 600 }}>
+                Política de Privacidade
+              </Link>
+            </label>
+          </div>
 
           {error && (
             <p style={{ color: '#ff4466', fontSize: 13, marginBottom: 16 }}>{error}</p>
