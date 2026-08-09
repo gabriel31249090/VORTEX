@@ -127,6 +127,23 @@ export default function CommunityPage() {
       await supabase.from('posts').update({ likes_count: posts.find(p => p.id === postId)!.likes_count + 1 }).eq('id', postId)
       setLikedPosts(prev => new Set(prev).add(postId))
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: p.likes_count + 1 } : p))
+
+      const likedPost = posts.find(p => p.id === postId)
+      if (likedPost && likedPost.author_id !== userId) {
+        await supabase.from('notifications').insert({
+          user_id: likedPost.author_id, actor_id: userId, type: 'like', post_id: postId
+        })
+        fetch('/api/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientId: likedPost.author_id,
+            title: 'Nova curtida',
+            body: `curtiu seu post "${likedPost.title}"`.slice(0, 120),
+            url: `/post/${postId}`,
+          }),
+        }).catch(() => {})
+      }
     }
   }
 
