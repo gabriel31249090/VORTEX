@@ -8,19 +8,24 @@ import Image from 'next/image'
 
 type Notification = {
   id: string
-  type: 'like' | 'comment' | 'follow'
+  type: 'like' | 'comment' | 'follow' | 'mention' | 'plan_approved' | 'message'
   read: boolean
   created_at: string
   post_id: string | null
+  conversation_id: string | null
   actor: { id: string; username: string; display_name: string | null; avatar_url: string | null }
   post?: { id: string; title: string } | null
 }
 
-const TYPE_CONFIG = {
+const TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
   like: { icon: '▲', label: 'curtiu sua publicação', color: '#c8f23c' },
   comment: { icon: '💬', label: 'comentou em sua publicação', color: '#60a5fa' },
   follow: { icon: '→', label: 'começou a te seguir', color: '#a78bfa' },
+  mention: { icon: '@', label: 'mencionou você em um comentário', color: '#c8f23c' },
+  plan_approved: { icon: '⚡', label: 'aprovou seu plano', color: '#c8f23c' },
+  message: { icon: '✉', label: 'te mandou uma mensagem', color: '#60aaff' },
 }
+const DEFAULT_TYPE_CONFIG = { icon: '•', label: 'nova notificação', color: '#8888aa' }
 
 function timeAgo(date: string) {
   const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
@@ -120,7 +125,7 @@ export default function Nav() {
     const { data } = await supabase
       .from('notifications')
       .select(`
-        id, type, read, created_at, post_id,
+        id, type, read, created_at, post_id, conversation_id,
         actor:actor_id ( id, username, display_name, avatar_url ),
         post:post_id ( id, title )
       `)
@@ -500,7 +505,7 @@ export default function Nav() {
               )}
 
               {!notifLoading && notifications.map((notif, i) => {
-                const config = TYPE_CONFIG[notif.type]
+                const config = TYPE_CONFIG[notif.type] || DEFAULT_TYPE_CONFIG
                 const actor = notif.actor
                 const post = notif.post
 
@@ -510,6 +515,7 @@ export default function Nav() {
                     onClick={() => {
                       closeNotifications()
                       if (notif.type === 'follow') router.push(`/profile/${actor.username}`)
+                      else if (notif.type === 'message' && notif.conversation_id) router.push(`/messages/${notif.conversation_id}`)
                       else if (post) router.push(`/post/${post.id}`)
                     }}
                     className="vtx-card"
