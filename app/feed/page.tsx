@@ -420,8 +420,6 @@ export default function FeedPage() {
     } else {
       await supabase.from('likes').update({ vote_type: nextVote }).eq('post_id', postId).eq('user_id', userId)
     }
-    await supabase.from('posts').update({ likes_count: post.likes_count + delta }).eq('id', postId)
-
     if (type === 'up' && nextVote === 'up' && post.author_id !== userId) {
       await supabase.from('notifications').insert({
         user_id: post.author_id, actor_id: userId, type: 'like', post_id: postId

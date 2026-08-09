@@ -119,12 +119,10 @@ export default function CommunityPage() {
     const isLiked = likedPosts.has(postId)
     if (isLiked) {
       await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', userId)
-      await supabase.from('posts').update({ likes_count: posts.find(p => p.id === postId)!.likes_count - 1 }).eq('id', postId)
       setLikedPosts(prev => { const next = new Set(prev); next.delete(postId); return next })
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: p.likes_count - 1 } : p))
     } else {
       await supabase.from('likes').insert({ post_id: postId, user_id: userId })
-      await supabase.from('posts').update({ likes_count: posts.find(p => p.id === postId)!.likes_count + 1 }).eq('id', postId)
       setLikedPosts(prev => new Set(prev).add(postId))
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count: p.likes_count + 1 } : p))
 
