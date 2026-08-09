@@ -178,6 +178,9 @@ export default function ChatPage() {
       clearMedia()
 
       if (otherParticipant) {
+        await supabase.from('notifications').insert({
+          user_id: otherParticipant.user_id, actor_id: userId, type: 'message', conversation_id: conversationId
+        })
         fetch('/api/push/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

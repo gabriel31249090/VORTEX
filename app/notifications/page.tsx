@@ -11,10 +11,11 @@ type PlanId = 'free' | 'boost' | 'mega'
 
 type Notification = {
   id: string
-  type: 'like' | 'comment' | 'follow' | 'mention' | 'plan_approved'
+  type: 'like' | 'comment' | 'follow' | 'mention' | 'plan_approved' | 'message'
   read: boolean
   created_at: string
   post_id: string | null
+  conversation_id: string | null
   plan: PlanId | null
   actor: {
     username: string
@@ -46,7 +47,7 @@ export default function NotificationsPage() {
       const { data } = await supabase
         .from('notifications')
         .select(`
-          id, type, read, created_at, post_id, plan,
+          id, type, read, created_at, post_id, conversation_id, plan,
           actor:actor_id(username, avatar_url),
           post:post_id(title)
         `)
@@ -88,6 +89,7 @@ export default function NotificationsPage() {
     if (type === 'comment') return { icon: '💬', color: '#60aaff', bg: 'rgba(96,170,255,0.15)' }
     if (type === 'follow') return { icon: '◉', color: '#ff88cc', bg: 'rgba(255,136,204,0.15)' }
     if (type === 'mention') return { icon: '@', color: '#c8f23c', bg: 'rgba(200,242,60,0.15)' }
+    if (type === 'message') return { icon: '✉', color: '#60aaff', bg: 'rgba(96,170,255,0.15)' }
     if (type === 'plan_approved') return { icon: '⚡', color: '#c8f23c', bg: 'rgba(200,242,60,0.15)' }
     return { icon: '•', color: '#8888aa', bg: 'rgba(136,136,170,0.15)' }
   }
@@ -98,6 +100,7 @@ export default function NotificationsPage() {
     if (n.type === 'comment') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> comentou no seu post{n.post ? <> &ldquo;<span style={{ color: '#8888aa' }}>{n.post.title}</span>&rdquo;</> : ''}</>
     if (n.type === 'follow') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> começou a te seguir</>
     if (n.type === 'mention') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> mencionou você em um comentário</>
+    if (n.type === 'message') return <><strong style={{ color: '#f0f0f8' }}>@{name}</strong> te mandou uma mensagem</>
     if (n.type === 'plan_approved' && n.plan) return (
       <>Seu plano <strong style={{ color: n.plan === 'mega' ? '#a78bfa' : '#c8f23c' }}>{PLAN_LABELS[n.plan]}</strong> foi ativado! 🎉</>
     )
@@ -191,6 +194,7 @@ export default function NotificationsPage() {
                 onClick={() => {
                   if (isPlanNotif) router.push('/pricing')
                   else if (n.type === 'follow' && n.actor?.username) router.push(`/profile/${n.actor.username}`)
+                  else if (n.type === 'message' && n.conversation_id) router.push(`/messages/${n.conversation_id}`)
                   else if (n.post_id) router.push(`/post/${n.post_id}`)
                 }}
                 style={{
