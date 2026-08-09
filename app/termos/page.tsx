@@ -12,9 +12,8 @@ export const metadata = {
 
 const ULTIMA_ATUALIZACAO = "8 de agosto de 2026";
 
-// TODO(Wayne): troque pelos seus dados reais antes de publicar.
-const EMAIL_CONTATO = "contato@vortextalkanything.com";
-const EMAIL_DENUNCIA = "seguranca@vortextalkanything.com";
+const EMAIL_CONTATO = "gabriel31249090@gmail.com";
+const EMAIL_DENUNCIA = "gabriel31249090@gmail.com";
 
 const SECOES = [
   { id: "aceitacao", titulo: "1. Aceitação dos termos" },

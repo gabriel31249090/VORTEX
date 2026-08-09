@@ -51,7 +51,7 @@ export default function LandingFooter() {
             links={[
               { label: 'Termos', href: '/termos' },
               { label: 'Privacidade', href: '/privacidade' },
-              { label: 'Contato', href: 'mailto:contato@vortex.app' },
+              { label: 'Contato', href: 'mailto:gabriel31249090@gmail.com' },
               { label: 'Status', href: '#' },
             ]}
           />

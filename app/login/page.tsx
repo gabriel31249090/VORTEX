@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { fadeInUp, shakeError } from '@/lib/animations'
+import OAuthButtons from '../components/OAuthButtons'
 
 const BlackHoleBackground = dynamic(() => import('../components/BlackHoleBackground'), { ssr: false })
 const ScrambleText = dynamic(() => import('../components/ScrambleText'), { ssr: false })
@@ -78,6 +79,8 @@ export default function LoginPage() {
           background: '#111118', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 20, padding: 32, opacity: 0
         }}>
+          <OAuthButtons />
+
           <div style={{ marginBottom: 20 }}>
             <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 8 }}>Email</label>
             <input

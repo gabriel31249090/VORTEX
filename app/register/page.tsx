@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { fadeInUp, shakeError } from '@/lib/animations'
+import OAuthButtons from '../components/OAuthButtons'
 
 const ScrambleText = dynamic(() => import('../components/ScrambleText'), { ssr: false })
 
@@ -171,6 +172,8 @@ export default function RegisterPage() {
           background: '#111118', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 20, padding: 32, opacity: 0
         }}>
+          <OAuthButtons />
+
           {[
             { label: 'Username', value: username, type: 'text', placeholder: 'seunome', onChange: (v: string) => setUsername(v.toLowerCase().replace(/\s/g, '')) },
             { label: 'Email', value: email, type: 'email', placeholder: 'seu@email.com', onChange: setEmail },

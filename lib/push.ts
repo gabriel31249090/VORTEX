@@ -11,7 +11,7 @@ function ensureVapid() {
     throw new Error('Chaves VAPID não configuradas no ambiente.')
   }
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:contato@vortex.app',
+    process.env.VAPID_SUBJECT || 'mailto:gabriel31249090@gmail.com',
     publicKey,
     privateKey
   )

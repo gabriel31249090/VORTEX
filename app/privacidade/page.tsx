@@ -14,8 +14,7 @@ export const metadata = {
 
 const ULTIMA_ATUALIZACAO = "8 de agosto de 2026";
 
-// TODO(Wayne): troque pelos seus dados reais antes de publicar.
-const EMAIL_CONTATO = "privacidade@vortextalkanything.com";
+const EMAIL_CONTATO = "gabriel31249090@gmail.com";
 const RESPONSAVEL = "Gabriel [seu nome completo], pessoa física responsável pelo VORTEX";
 
 const SECOES = [
