@@ -51,7 +51,8 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
       if (ativo) setUserId(user.id)
 
       // maybeSingle: usuário recém-logado via OAuth pode ainda não ter
-      // nenhuma linha em profiles (só existe depois desse onboarding).
+      // preenchido esses campos, mas a linha em profiles já existe
+      // (criada no signup/trigger) — por isso usamos update, não upsert.
       const { data: profile } = await supabase
         .from('profiles')
         .select('username, birth_date, terms_accepted_at, terms_version')
@@ -107,13 +108,20 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
       }
     }
 
-    const updates: Record<string, unknown> = { id: userId }
+    const updates: Record<string, unknown> = {}
     if (faltando?.username) { updates.username = cleanUsername; updates.display_name = cleanUsername }
     if (faltando?.birthDate) updates.birth_date = birthDate
     if (faltando?.termos) { updates.terms_accepted_at = new Date().toISOString(); updates.terms_version = TERMS_VERSION }
 
-    const { error: upsertError } = await supabase.from('profiles').upsert(updates)
-    if (upsertError) {
+    // update, não upsert: a linha em profiles sempre existe (criada no
+    // signup), e upsert tentava um INSERT que travava em colunas
+    // NOT NULL (como username) quando elas não estavam no payload.
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+
+    if (updateError) {
       setError('Não deu pra salvar, tenta de novo.')
       setSalvando(false)
       return
