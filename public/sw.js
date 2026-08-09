@@ -66,3 +66,41 @@ self.addEventListener('fetch', (event) => {
 
   // Qualquer outra coisa (API, Supabase, chunks, mídia) -> não intercepta
 });
+
+// Notificações push (mensagens, menções etc.) — chega mesmo com o app fechado.
+self.addEventListener('push', (event) => {
+  let payload = { title: 'VORTEX', body: '', url: '/' };
+  if (event.data) {
+    try {
+      payload = { ...payload, ...event.data.json() };
+    } catch {
+      payload.body = event.data.text();
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || 'VORTEX', {
+      body: payload.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: payload.url || '/' },
+    })
+  );
+});
+
+// Clique na notificação: foca uma aba já aberta do app ou abre uma nova.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
+      const existing = clientsArr.find((c) => c.url.includes(self.location.origin));
+      if (existing) {
+        existing.navigate(url);
+        return existing.focus();
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

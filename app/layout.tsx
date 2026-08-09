@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Toaster } from "react-hot-toast";
 import AdPopup from "./components/AdPopup";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
+import TermsGate from "./components/TermsGate";
 import PageTransition from "@/components/PageTransition";
 import "./globals.css";
 import "./styles/interactions.css";
@@ -44,7 +45,9 @@ export default function RootLayout({
     <html lang="pt">
       <body style={{ margin: 0, padding: 0, background: '#0a0a0f' }}>
         <ServiceWorkerRegister />
-        <PageTransition>{children}</PageTransition>
+        <TermsGate>
+          <PageTransition>{children}</PageTransition>
+        </TermsGate>
         <AdPopup />
         <Toaster
           position="bottom-center"

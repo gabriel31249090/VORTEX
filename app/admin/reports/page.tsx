@@ -12,6 +12,7 @@ const REASON_LABELS: Record<string, string> = {
   odio: 'Discurso de ódio',
   violencia: 'Violência',
   assedio: 'Assédio ou bullying',
+  exploracao_infantil: 'Exploração infantil',
   fake_news: 'Informação falsa',
   outro: 'Outro motivo',
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
+import PushToggle from '../components/PushToggle'
 
 function SettingsSkeleton() {
   const block = (w: string, h: number) => (
@@ -317,6 +318,8 @@ export default function SettingsPage() {
             </div>
             <span style={{ color: '#555577', fontSize: 16 }}>→</span>
           </div>
+
+          <PushToggle />
         </div>
 
         {section('Zona de perigo')}

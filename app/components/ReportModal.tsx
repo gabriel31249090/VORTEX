@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-export type ReportReason = 'spam' | 'sexual' | 'odio' | 'violencia' | 'assedio' | 'fake_news' | 'outro'
+export type ReportReason = 'spam' | 'sexual' | 'odio' | 'violencia' | 'assedio' | 'fake_news' | 'exploracao_infantil' | 'outro'
 
 const REASONS: { value: ReportReason; label: string }[] = [
   { value: 'spam', label: 'Spam ou propaganda' },
@@ -10,6 +10,7 @@ const REASONS: { value: ReportReason; label: string }[] = [
   { value: 'odio', label: 'Discurso de ódio' },
   { value: 'violencia', label: 'Violência' },
   { value: 'assedio', label: 'Assédio ou bullying' },
+  { value: 'exploracao_infantil', label: 'Exploração infantil' },
   { value: 'fake_news', label: 'Informação falsa' },
   { value: 'outro', label: 'Outro motivo' },
 ]

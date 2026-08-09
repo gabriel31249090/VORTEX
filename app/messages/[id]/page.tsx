@@ -176,6 +176,19 @@ export default function ChatPage() {
     if (!error) {
       setText('')
       clearMedia()
+
+      if (otherParticipant) {
+        fetch('/api/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientId: otherParticipant.user_id,
+            title: `Nova mensagem`,
+            body: text.trim() ? text.trim().slice(0, 120) : 'Enviou uma mídia',
+            url: `/messages/${conversationId}`,
+          }),
+        }).catch(() => {})
+      }
     }
     setSending(false)
   }

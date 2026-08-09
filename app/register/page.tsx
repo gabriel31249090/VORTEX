@@ -9,6 +9,21 @@ import { fadeInUp, shakeError } from '@/lib/animations'
 
 const ScrambleText = dynamic(() => import('../components/ScrambleText'), { ssr: false })
 
+// Sobe esse número se o conteúdo de /termos ou /privacidade mudar de forma
+// relevante — o TermsGate usa isso pra saber quando pedir aceite de novo.
+const TERMS_VERSION = '1.0'
+
+function calcularIdade(dataNascimento: string) {
+  const hoje = new Date()
+  const nascimento = new Date(dataNascimento)
+  let idade = hoje.getFullYear() - nascimento.getFullYear()
+  const aindaNaoFezAniversario =
+    hoje.getMonth() < nascimento.getMonth() ||
+    (hoje.getMonth() === nascimento.getMonth() && hoje.getDate() < nascimento.getDate())
+  if (aindaNaoFezAniversario) idade--
+  return idade
+}
+
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -17,6 +32,7 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [aceitouTermos, setAceitouTermos] = useState(false)
+  const [birthDate, setBirthDate] = useState('')
   const router = useRouter()
   const supabase = createClient()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -37,6 +53,19 @@ export default function RegisterPage() {
   async function handleRegister() {
     setLoading(true)
     setError('')
+
+    if (!birthDate) {
+      setError('Informe sua data de nascimento.')
+      setLoading(false)
+      return
+    }
+
+    const idade = calcularIdade(birthDate)
+    if (idade < 13) {
+      setError('Você precisa ter pelo menos 13 anos para criar uma conta.')
+      setLoading(false)
+      return
+    }
 
     if (!aceitouTermos) {
       setError('Você precisa aceitar os Termos de Uso e a Política de Privacidade.')
@@ -79,6 +108,9 @@ export default function RegisterPage() {
     if (data.user) {
       await supabase.from('profiles').insert({
         id: data.user.id, username, display_name: username,
+        birth_date: birthDate,
+        terms_accepted_at: new Date().toISOString(),
+        terms_version: TERMS_VERSION,
       })
     }
 
@@ -163,6 +195,24 @@ export default function RegisterPage() {
               />
             </div>
           ))}
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 8 }}>Data de nascimento</label>
+            <input
+              type="date"
+              value={birthDate}
+              onChange={e => setBirthDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+              style={{
+                width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 12, padding: '12px 16px', color: birthDate ? '#f0f0f8' : '#555577', fontSize: 14,
+                outline: 'none', fontFamily: "'Syne', sans-serif", transition: 'border-color 0.2s',
+                boxSizing: 'border-box', colorScheme: 'dark',
+              }}
+              onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
+              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
+            />
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
             <input

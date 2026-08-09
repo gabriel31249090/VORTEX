@@ -218,6 +218,16 @@ export default function PostPage() {
           await supabase.from('notifications').insert({
             user_id: mentioned.id, actor_id: userId, type: 'mention', post_id: postId
           })
+          fetch('/api/push/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipientId: mentioned.id,
+              title: 'Você foi mencionado',
+              body: newComment.trim().slice(0, 120),
+              url: `/post/${postId}`,
+            }),
+          }).catch(() => {})
         }
       }
 
