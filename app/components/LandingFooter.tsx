@@ -52,7 +52,7 @@ export default function LandingFooter() {
               { label: 'Termos', href: '/termos' },
               { label: 'Privacidade', href: '/privacidade' },
               { label: 'Contato', href: 'mailto:gabriel31249090@gmail.com' },
-              { label: 'Status', href: '#' },
+              { label: 'Suporte', href: '/faq' },
             ]}
           />
         </div>

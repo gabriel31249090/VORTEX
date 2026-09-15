@@ -1,21 +1,18 @@
 {
-  "name": "VORTEX",
-  "short_name": "VORTEX",
-  "description": "VORTEX — rede social. Converse, poste e conecte-se.",
-  "start_url": "/",
-  "scope": "/",
-  "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#0a0a0a",
-  "theme_color": "#c8f23c",
-  "lang": "pt-BR",
-  "dir": "ltr",
-  "categories": ["social", "lifestyle"],
-  "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "screenshots": []
+ "id":"/","name":"VORTEX","short_name":"VORTEX",
+ "description":"VORTEX — comunidades, stories, mensagens e feed cronológico.",
+ "start_url":"/","scope":"/","display":"standalone","orientation":"any",
+ "background_color":"#0a0a0f","theme_color":"#0a0a0f","lang":"pt-BR","dir":"ltr",
+ "categories":["social","lifestyle"],
+ "icons":[
+  {"src":"/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+  {"src":"/icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+  {"src":"/icons/icon-maskable-192.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
+  {"src":"/icons/icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+ ],
+ "shortcuts":[
+  {"name":"Feed","short_name":"Feed","url":"/feed","icons":[{"src":"/icons/icon-192.png","sizes":"192x192"}]},
+  {"name":"Publicar","short_name":"Publicar","url":"/post/new","icons":[{"src":"/icons/icon-192.png","sizes":"192x192"}]},
+  {"name":"Mensagens","short_name":"Mensagens","url":"/messages","icons":[{"src":"/icons/icon-192.png","sizes":"192x192"}]}
+ ]
 }

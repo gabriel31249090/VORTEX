@@ -2,7 +2,8 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AtSign, Bell, CircleHelp, Gem, Heart, Home, LogOut, Mail, MessageCircle, MessagesSquare, MoreHorizontal, Orbit, Plus, Settings, ShieldCheck, UserPlus, UserRound, Users, X, Zap } from 'lucide-react'
 import RippleButton from './RippleButton'
 import Image from 'next/image'
 
@@ -17,15 +18,15 @@ type Notification = {
   post?: { id: string; title: string } | null
 }
 
-const TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
-  like: { icon: '▲', label: 'curtiu sua publicação', color: '#c8f23c' },
-  comment: { icon: '💬', label: 'comentou em sua publicação', color: '#60a5fa' },
-  follow: { icon: '→', label: 'começou a te seguir', color: '#a78bfa' },
-  mention: { icon: '@', label: 'mencionou você em um comentário', color: '#c8f23c' },
-  plan_approved: { icon: '⚡', label: 'aprovou seu plano', color: '#c8f23c' },
-  message: { icon: '✉', label: 'te mandou uma mensagem', color: '#60aaff' },
+const TYPE_CONFIG: Record<string, { icon: ReactNode; label: string; color: string }> = {
+  like: { icon: <Heart size={11}/>, label: 'curtiu sua publicação', color: '#c8f23c' },
+  comment: { icon: <MessageCircle size={11}/>, label: 'comentou em sua publicação', color: '#60a5fa' },
+  follow: { icon: <UserPlus size={11}/>, label: 'começou a te seguir', color: '#a78bfa' },
+  mention: { icon: <AtSign size={11}/>, label: 'mencionou você em um comentário', color: '#c8f23c' },
+  plan_approved: { icon: <Zap size={11}/>, label: 'aprovou seu plano', color: '#c8f23c' },
+  message: { icon: <Mail size={11}/>, label: 'te mandou uma mensagem', color: '#60aaff' },
 }
-const DEFAULT_TYPE_CONFIG = { icon: '•', label: 'nova notificação', color: '#8888aa' }
+const DEFAULT_TYPE_CONFIG = { icon: <Bell size={11}/>, label: 'nova notificação', color: '#8888aa' }
 
 function timeAgo(date: string) {
   const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
@@ -66,52 +67,28 @@ export default function Nav() {
         setIsAdmin(data.is_admin === true)
       }
 
-      const { count } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('read', false)
-      setUnreadCount(count || 0)
-
-      await checkDmUnread(user.id)
+      await refreshUnreadCounts()
     }
     load()
-  }, [pathname])
+  }, [])
 
-  async function checkDmUnread(uid: string) {
-    const { data: myParts } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id, last_read_at')
-      .eq('user_id', uid)
-
-    if (!myParts || myParts.length === 0) { setDmUnreadCount(0); return }
-
-    let unreadConvs = 0
-    for (const part of myParts) {
-      const { data: lastMsg } = await supabase
-        .from('messages')
-        .select('created_at, sender_id')
-        .eq('conversation_id', part.conversation_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (lastMsg && lastMsg.sender_id !== uid && new Date(lastMsg.created_at) > new Date(part.last_read_at)) {
-        unreadConvs++
-      }
-    }
-    setDmUnreadCount(unreadConvs)
+  async function refreshUnreadCounts() {
+    const { data, error } = await supabase.rpc('navigation_unread_counts')
+    if (error || !data) return
+    const counts = data as { notifications?: number | string; messages?: number | string }
+    setUnreadCount(Number(counts.notifications) || 0)
+    setDmUnreadCount(Number(counts.messages) || 0)
   }
 
   useEffect(() => {
     if (!userId) return
     const channel = supabase
-      .channel('nav-dm-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        checkDmUnread(userId)
-      })
+      .channel(`nav-counters-${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, refreshUnreadCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, refreshUnreadCounts)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   async function openNotifications() {
@@ -158,20 +135,20 @@ export default function Nav() {
     if (data?.username) { setUsername(data.username); router.push(`/profile/${data.username}`) }
   }
 
-  type NavItem = { icon: string; label: string; path: string; onClick: () => void; accent?: boolean; admin?: boolean }
+  type NavItem = { icon: ReactNode; label: string; path: string; onClick: () => void; accent?: boolean; admin?: boolean }
 
   // Todos os itens (usados na sidebar desktop, sem cortes)
   const items: NavItem[] = [
-    { icon: '◆', label: 'Planos', path: '/pricing', onClick: () => router.push('/pricing') },
-    { icon: '⌂', label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
-    { icon: '⊞', label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
-    { icon: '＋', label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
-    { icon: '❓', label: 'Ajuda', path: '/faq', onClick: () => router.push('/faq') },
-    { icon: '✉', label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
-    { icon: '🔔', label: 'Notificações', path: '__notif__', onClick: openNotifications },
-    { icon: '◉', label: 'Perfil', path: '/profile', onClick: handleProfileClick },
-    { icon: '⚙', label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
-    ...(isAdmin ? [{ icon: '🛡️', label: 'Admin', path: '/admin', admin: true, onClick: () => router.push('/admin') }] : []),
+    { icon: <Gem size={18}/>, label: 'Planos', path: '/pricing', onClick: () => router.push('/pricing') },
+    { icon: <Home size={18}/>, label: 'Feed', path: '/feed', onClick: () => router.push('/feed') },
+    { icon: <Users size={18}/>, label: 'Comunidades', path: '/communities', onClick: () => router.push('/communities') },
+    { icon: <Plus size={19}/>, label: 'Publicar', path: '/post/new', accent: true, onClick: () => router.push('/post/new') },
+    { icon: <CircleHelp size={18}/>, label: 'Ajuda', path: '/faq', onClick: () => router.push('/faq') },
+    { icon: <MessagesSquare size={18}/>, label: 'Mensagens', path: '/messages', onClick: () => router.push('/messages') },
+    { icon: <Bell size={18}/>, label: 'Notificações', path: '__notif__', onClick: openNotifications },
+    { icon: <UserRound size={18}/>, label: 'Perfil', path: '/profile', onClick: handleProfileClick },
+    { icon: <Settings size={18}/>, label: 'Config', path: '/settings', onClick: () => router.push('/settings') },
+    ...(isAdmin ? [{ icon: <ShieldCheck size={18}/>, label: 'Admin', path: '/admin', admin: true, onClick: () => router.push('/admin') }] : []),
   ]
 
   // Itens principais da barra mobile (máx. 6, com Publicar no centro)
@@ -209,7 +186,7 @@ export default function Nav() {
         zIndex: 100, fontFamily: "'Syne', sans-serif"
       }} className="nav-sidebar">
         <div onClick={() => router.push('/feed')} style={{ padding: '0 20px 32px', cursor: 'pointer' }}>
-          <span style={{ fontSize: 20, fontWeight: 800, color: '#c8f23c', textShadow: '0 0 20px rgba(200,242,60,0.5)' }}>◈ VORTEX</span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: '#c8f23c', textShadow: '0 0 20px rgba(200,242,60,0.5)', display: 'inline-flex', alignItems: 'center', gap: 8 }}><Orbit size={20}/> VORTEX</span>
         </div>
 
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px' }}>
@@ -301,7 +278,7 @@ export default function Nav() {
             onMouseEnter={e => { e.currentTarget.style.color = '#ff4466' }}
             onMouseLeave={e => { e.currentTarget.style.color = '#555577' }}
           >
-            <span style={{ fontSize: 18 }}>⏻</span>
+            <LogOut size={18}/>
             <span>Sair</span>
           </RippleButton>
         </div>
@@ -377,7 +354,7 @@ export default function Nav() {
             color: moreOpen ? '#c8f23c' : '#666688', flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 19, lineHeight: 1 }}>⋯</span>
+          <MoreHorizontal size={19}/>
           <span style={{ fontSize: 9, fontWeight: 600 }}>Mais</span>
         </RippleButton>
       </nav>
@@ -430,7 +407,7 @@ export default function Nav() {
                 color: '#ff4466', fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer',
               }}
             >
-              ⏻ Sair
+              <LogOut size={16}/> Sair
             </RippleButton>
           </div>
         </>
@@ -479,7 +456,7 @@ export default function Nav() {
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#f0f0f8' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#8888aa' }}
-              >✕</RippleButton>
+              ><X size={16}/></RippleButton>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
@@ -499,7 +476,7 @@ export default function Nav() {
 
               {!notifLoading && notifications.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 40, opacity: 0.2 }}>🔔</div>
+                  <div style={{ opacity: 0.25 }}><Bell size={40}/></div>
                   <p style={{ color: '#333355', fontSize: 14 }}>Nenhuma notificação ainda.</p>
                 </div>
               )}
@@ -596,7 +573,6 @@ export default function Nav() {
       )}
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }

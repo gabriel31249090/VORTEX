@@ -8,6 +8,7 @@ import FeedAd from './FeedAd'
 import ReportModal, { type ReportReason } from './ReportModal'
 import { likeBurst } from '@/lib/animations'
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter'
+import { ArrowBigDown, ArrowBigUp, Crown, Flag, MessageCircle, MoreHorizontal, Repeat2, Share2, Trash2, Zap } from 'lucide-react'
 
 type PlanId = 'free' | 'boost' | 'mega'
 type VoteType = 'up' | 'down' | null
@@ -48,7 +49,7 @@ function getPlanStyle(plan: PlanId, accentColor: string | null) {
     avatarShadow: `0 0 10px ${color}88`,
     hoverBorder: `${color}88`,
     hoverShadow: `0 0 24px ${color}1a`,
-    badgeEl: <span style={{ fontSize: 12, lineHeight: 1 }}>👑</span>,
+    badgeEl: <Crown size={13} strokeWidth={2}/>,
     stripColor: color,
   }
   if (plan === 'boost') return {
@@ -57,7 +58,7 @@ function getPlanStyle(plan: PlanId, accentColor: string | null) {
     avatarShadow: `0 0 10px ${color}66`,
     hoverBorder: `${color}66`,
     hoverShadow: `0 0 20px ${color}14`,
-    badgeEl: <span style={{ fontSize: 12, lineHeight: 1 }}>⚡</span>,
+    badgeEl: <Zap size={13} strokeWidth={2}/>,
     stripColor: color,
   }
   return {
@@ -135,7 +136,7 @@ export default function PostCard({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {isRepostFeedItem && repostedByUsername && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#555577', fontSize: 13, paddingLeft: 4 }}>
-          <span>🔁</span>
+          <Repeat2 size={14}/>
           <span>@{repostedByUsername} republicou</span>
         </div>
       )}
@@ -221,7 +222,7 @@ export default function PostCard({
                   fontSize: 18, padding: '2px 6px', lineHeight: 1, borderRadius: 6,
                 }}
               >
-                ⋯
+                <MoreHorizontal size={18}/>
               </button>
               {menuOpen && (
                 <>
@@ -243,7 +244,7 @@ export default function PostCard({
                         fontFamily: "'Syne', sans-serif",
                       }}
                     >
-                      🚩 Denunciar
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Flag size={14}/> Denunciar</span>
                     </button>
                     {isAdmin && (
                       <button
@@ -255,7 +256,7 @@ export default function PostCard({
                           fontFamily: "'Syne', sans-serif",
                         }}
                       >
-                        🗑️ Excluir (admin)
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Trash2 size={14}/> Excluir (admin)</span>
                       </button>
                     )}
                   </div>
@@ -309,7 +310,7 @@ export default function PostCard({
                   fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
                 }}
               >
-                <span className="vtx-icon-wiggle">▲</span>
+                <ArrowBigUp className="vtx-icon-wiggle" size={16}/>
               </RippleButton>
 
               <span style={{
@@ -330,7 +331,7 @@ export default function PostCard({
                   fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
                 }}
               >
-                ▼
+                <ArrowBigDown size={16}/>
               </RippleButton>
             </div>
 
@@ -347,7 +348,7 @@ export default function PostCard({
               onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
               onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
             >
-              💬 {post.comments_count}
+              <MessageCircle size={15}/> {post.comments_count}
             </RippleButton>
 
             <RippleButton
@@ -363,7 +364,7 @@ export default function PostCard({
                 display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
               }}
             >
-              🔁 {post.reposts_count ?? 0}
+              <Repeat2 size={15}/> {post.reposts_count ?? 0}
             </RippleButton>
 
             <RippleButton
@@ -379,7 +380,7 @@ export default function PostCard({
               onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
               onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
             >
-              ↗ Compartilhar
+              <Share2 size={15}/> Compartilhar
             </RippleButton>
           </div>
         </div>

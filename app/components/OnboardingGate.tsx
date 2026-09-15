@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { isPublicPath } from '@/lib/routes'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 
@@ -38,8 +40,15 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
   const [error, setError] = useState('')
   const [salvando, setSalvando] = useState(false)
   const supabase = createClient()
+  const pathname = usePathname()
+  const publicPage = isPublicPath(pathname)
 
   useEffect(() => {
+    if (publicPage) {
+      setChecking(false)
+      setFaltando(null)
+      return
+    }
     let ativo = true
 
     async function checar() {
@@ -75,7 +84,7 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
 
     const { data: listener } = supabase.auth.onAuthStateChange(() => checar())
     return () => { ativo = false; listener.subscription.unsubscribe() }
-  }, [])
+  }, [publicPage])
 
   async function completar() {
     setError('')

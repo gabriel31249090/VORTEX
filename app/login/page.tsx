@@ -1,162 +1,31 @@
 'use client'
-
-import { useState, useEffect, useRef } from 'react'
+import { useEffect,useRef,useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { fadeInUp, shakeError } from '@/lib/animations'
+import { ArrowRight,Orbit } from 'lucide-react'
+import { fadeInUp,shakeError } from '@/lib/animations'
 import OAuthButtons from '../components/OAuthButtons'
-
-const BlackHoleBackground = dynamic(() => import('../components/BlackHoleBackground'), { ssr: false })
-const ScrambleText = dynamic(() => import('../components/ScrambleText'), { ssr: false })
-
-export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
-  const cardRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (cardRef.current) fadeInUp(cardRef.current, { duration: 500 })
-  }, [])
-
-  useEffect(() => {
-    if (error && cardRef.current) shakeError(cardRef.current)
-  }, [error])
-
-  async function handleLogin() {
-    setLoading(true)
-    setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError('Email ou senha incorretos.')
-    } else {
-      router.push('/feed')
-    }
-    setLoading(false)
-  }
-
-  return (
-    <div style={{
-      minHeight: '100vh', background: '#0a0a0f',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '0 16px', fontFamily: "'Syne', sans-serif",
-      position: 'relative', overflow: 'hidden'
-    }}>
-      <BlackHoleBackground intensity={0.7} particleCount={2500} />
-
-      {/* Background glow */}
-      <div style={{
-        position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)',
-        width: 400, height: 400, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(200,242,60,0.06) 0%, transparent 70%)',
-        pointerEvents: 'none', zIndex: 1
-      }} />
-
-      <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 2 }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ filter: 'drop-shadow(0 0 20px rgba(200,242,60,0.6))' }}>
-            <ScrambleText
-              text="◈ VORTEX"
-              as="div"
-              trigger="mount"
-              duration={1.2}
-              color="#c8f23c"
-              glitchColor="#f0f0f8"
-              className="vtx-login-logo"
-            />
-          </div>
-          <p style={{ color: '#555577', marginTop: 8, fontSize: 14 }}>Bem-vindo de volta</p>
-        </div>
-
-        {/* Card */}
-        <div ref={cardRef} style={{
-          background: '#111118', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 20, padding: 32, opacity: 0
-        }}>
-          <OAuthButtons />
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 8 }}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              style={{
-                width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 12, padding: '12px 16px', color: '#f0f0f8', fontSize: 14,
-                outline: 'none', fontFamily: "'Syne', sans-serif", transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
-              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
-            />
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ color: '#8888aa', fontSize: 13, display: 'block', marginBottom: 8 }}>Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              style={{
-                width: '100%', background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 12, padding: '12px 16px', color: '#f0f0f8', fontSize: 14,
-                outline: 'none', fontFamily: "'Syne', sans-serif", transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={e => (e.target.style.borderColor = 'rgba(200,242,60,0.4)')}
-              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
-            />
-          </div>
-
-          {error && (
-            <p style={{ color: '#ff4466', fontSize: 13, marginBottom: 16 }}>{error}</p>
-          )}
-
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            style={{
-              width: '100%', background: '#c8f23c', color: '#000', fontWeight: 700,
-              padding: '13px', borderRadius: 12, border: 'none', cursor: 'pointer',
-              fontSize: 15, fontFamily: "'Syne', sans-serif",
-              boxShadow: '0 0 20px rgba(200,242,60,0.3)',
-              transition: 'all 0.2s', opacity: loading ? 0.6 : 1
-            }}
-            onMouseEnter={e => { if (!loading) e.currentTarget.style.boxShadow = '0 0 30px rgba(200,242,60,0.6), 0 0 60px rgba(200,242,60,0.2)' }}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 0 20px rgba(200,242,60,0.3)')}
-          >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-
-          <p style={{ textAlign: 'center', color: '#555577', fontSize: 13, marginTop: 20 }}>
-            Não tem conta?{' '}
-            <Link href="/register" style={{ color: '#c8f23c', textDecoration: 'none', fontWeight: 600 }}>
-              Criar conta
-            </Link>
-          </p>
-        </div>
-      </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
-        input::placeholder { color: #333355; }
-        .vtx-login-logo {
-          font-family: 'Syne', sans-serif;
-          font-size: 36px;
-          font-weight: 800;
-          letter-spacing: -1px;
-        }
-      `}</style>
-    </div>
-  )
+const ScrambleText=dynamic(()=>import('../components/ScrambleText'),{ssr:false})
+export default function LoginPage(){
+ const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false)
+ const router=useRouter(),supabase=createClient(),cardRef=useRef<HTMLDivElement>(null)
+ useEffect(()=>{if(cardRef.current)fadeInUp(cardRef.current,{duration:500})},[])
+ useEffect(()=>{if(error&&cardRef.current)shakeError(cardRef.current)},[error])
+ async function handleLogin(){if(!email.trim()||!password){setError('Preencha email e senha.');return}setLoading(true);setError('');const{error:e}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(e)setError('Email ou senha incorretos.');else router.push('/feed');setLoading(false)}
+ return <main className="vtx-auth-page">
+  <div className="vtx-login-atmosphere" aria-hidden="true"><div className="vtx-space-aura vtx-space-aura--green"/><div className="vtx-space-aura vtx-space-aura--purple"/><div className="vtx-space-orbit vtx-space-orbit--one"/><div className="vtx-space-orbit vtx-space-orbit--two"/></div>
+  <section className="vtx-auth-shell">
+   <Link href="/" className="vtx-auth-brand"><span className="vtx-auth-mark"><Orbit size={24}/></span><ScrambleText text="VORTEX" as="span" trigger="mount" duration={0.9} color="#c8f23c" glitchColor="#f0f0f8" className="vtx-login-logo"/></Link>
+   <p className="vtx-auth-kicker">Bem-vindo de volta</p>
+   <div ref={cardRef} className="vtx-auth-card" style={{opacity:0}}><OAuthButtons/>
+    <label className="vtx-field"><span>Email</span><input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com"/></label>
+    <label className="vtx-field"><span>Senha</span><input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&handleLogin()}/></label>
+    {error&&<p className="vtx-form-error" role="alert">{error}</p>}
+    <button onClick={handleLogin} disabled={loading} className="neon-btn vtx-auth-submit">{loading?'Entrando…':<>Entrar <ArrowRight size={17}/></>}</button>
+    <p className="vtx-auth-switch">Não tem conta? <Link href="/register">Criar conta</Link></p>
+   </div>
+  </section>
+ </main>
 }

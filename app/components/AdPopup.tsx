@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { isPublicPath } from '@/lib/routes'
 import { createClient } from '@/lib/supabase'
 import RippleButton from './RippleButton'
 import Image from 'next/image'
@@ -17,8 +19,10 @@ export default function AdPopup() {
   const [ad, setAd] = useState<Ad | null>(null)
   const [visible, setVisible] = useState(false)
   const [userPlan, setUserPlan] = useState<string | null>(null)
+  const pathname = usePathname()
 
   useEffect(() => {
+    if (isPublicPath(pathname)) return
     // Só mostra 1x por sessão
     const seen = sessionStorage.getItem('vortex_popup_seen')
     if (seen) return
@@ -52,7 +56,7 @@ export default function AdPopup() {
       setTimeout(() => setVisible(true), 2000)
     }
     load()
-  }, [])
+  }, [pathname])
 
   function handleClose() {
     setVisible(false)
