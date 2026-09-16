@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import StoryViewer, { type StoryGroup } from './StoryViewer'
 import Image from 'next/image'
+import { Plus } from 'lucide-react'
 
 type StoryProfile = { id: string; username: string; avatar_url: string | null }
 type Story = { id: string; user_id: string; media_url: string; media_type: 'image' | 'video'; created_at: string; profiles: StoryProfile }
@@ -28,26 +29,24 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
 
     const byUser = new Map<string, StoryGroup>()
     const mine: Story[] = []
+    let ownProfile: StoryProfile | null = null
 
-    ;(data as unknown as Story[]).forEach((s) => {
-      if (s.user_id === currentUserId) {
-        mine.push(s)
-        setMyProfile(s.profiles)
+    ;(data as unknown as Story[]).forEach((story) => {
+      if (story.user_id === currentUserId) {
+        mine.push(story)
+        ownProfile = story.profiles
         return
       }
-      const existing = byUser.get(s.user_id)
-      if (existing) existing.stories.push(s)
-      else byUser.set(s.user_id, { user: s.profiles, stories: [s] })
+      const existing = byUser.get(story.user_id)
+      if (existing) existing.stories.push(story)
+      else byUser.set(story.user_id, { user: story.profiles, stories: [story] })
     })
 
     setGroups(Array.from(byUser.values()))
     setMyStories(mine)
+    if (ownProfile) setMyProfile(ownProfile)
   }, [currentUserId, supabase])
 
-  // loadStories does an async fetch and sets state after the await resolves
-  // (not synchronously) — it's also called directly from handleUpload and
-  // the story viewer's onClose, so it can't be inlined into this effect.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadStories() }, [loadStories])
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -67,7 +66,6 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
     }
 
     const { data: urlData } = supabase.storage.from('stories').getPublicUrl(path)
-
     await supabase.from('stories').insert({
       user_id: currentUserId,
       media_url: urlData.publicUrl,
@@ -79,11 +77,13 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
     loadStories()
   }
 
+  const hasNetworkStories = groups.length > 0 || myStories.length > 0
+
   return (
-    <div style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '4px 4px 16px', marginBottom: 8 }}>
-      {/* Seu story / botão de adicionar */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        <div
+    <>
+      <div className={`vtx-stories-bar ${hasNetworkStories ? '' : 'is-empty'}`}>
+        <button
+          className="vtx-story-item vtx-story-item--mine"
           onClick={() => {
             if (myStories.length > 0 && myProfile) {
               setViewerGroup({ user: myProfile, stories: myStories })
@@ -91,62 +91,60 @@ export default function StoriesBar({ currentUserId }: { currentUserId: string })
               fileInputRef.current?.click()
             }
           }}
-          style={{
-            width: 58, height: 58, borderRadius: '50%', position: 'relative', cursor: 'pointer',
-            border: myStories.length > 0 ? '2px solid #c8f23c' : '2px dashed rgba(255,255,255,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: '#111118', overflow: 'hidden',
-          }}
         >
-          {myStories.length > 0 ? (
-            <Image src={myStories[myStories.length - 1].media_url} alt="" fill sizes="58px" style={{ objectFit: 'cover' }} />
-          ) : uploading ? (
-            <span style={{ fontSize: 11, color: '#c8f23c' }}>...</span>
-          ) : (
-            <span style={{ fontSize: 22, color: '#555577' }}>+</span>
-          )}
-          {myStories.length > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
-              style={{
-                position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: '50%',
-                background: '#c8f23c', color: '#000', border: '2px solid #0a0a0f', fontSize: 12,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
-              }}
-            >
-              +
-            </button>
-          )}
-        </div>
-        <span style={{ fontSize: 11, color: '#8888aa' }}>Você</span>
-        <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleUpload} style={{ display: 'none' }} />
-      </div>
-
-      {groups.map((g) => (
-        <div key={g.user.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <div
-            onClick={() => setViewerGroup(g)}
-            style={{ width: 58, height: 58, borderRadius: '50%', cursor: 'pointer', border: '2px solid #c8f23c', padding: 2 }}
-          >
-            <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: '#1a1a28', position: 'relative' }}>
-              {g.user.avatar_url ? (
-                <Image src={g.user.avatar_url} alt="" fill sizes="58px" style={{ objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c8f23c', fontWeight: 800 }}>
-                  {g.user.username?.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-          </div>
-          <span style={{ fontSize: 11, color: '#8888aa', maxWidth: 58, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {g.user.username}
+          <span className={`vtx-story-avatar ${myStories.length > 0 ? 'has-story' : ''}`}>
+            {myStories.length > 0 ? (
+              <Image
+                src={myStories[myStories.length - 1].media_url}
+                alt=""
+                fill
+                sizes="44px"
+                style={{ objectFit: 'cover' }}
+              />
+            ) : (
+              <Plus size={18} />
+            )}
           </span>
-        </div>
-      ))}
+          <span className="vtx-story-name">{uploading ? 'Enviando…' : myStories.length > 0 ? 'Seu story' : 'Criar story'}</span>
+        </button>
+
+        {groups.map((group) => (
+          <button
+            key={group.user.id}
+            className="vtx-story-item"
+            onClick={() => setViewerGroup(group)}
+          >
+            <span className="vtx-story-avatar has-story">
+              <span className="vtx-story-avatar-inner">
+                {group.user.avatar_url ? (
+                  <Image src={group.user.avatar_url} alt="" fill sizes="44px" style={{ objectFit: 'cover' }} />
+                ) : (
+                  group.user.username?.charAt(0).toUpperCase()
+                )}
+              </span>
+            </span>
+            <span className="vtx-story-name">{group.user.username}</span>
+          </button>
+        ))}
+
+        {groups.length === 0 && (
+          <span className="vtx-stories-empty-copy">
+            Stories de quem você acompanha aparecem aqui.
+          </span>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          onChange={handleUpload}
+          style={{ display: 'none' }}
+        />
+      </div>
 
       {viewerGroup && (
         <StoryViewer group={viewerGroup} onClose={() => { setViewerGroup(null); loadStories() }} />
       )}
-    </div>
+    </>
   )
 }

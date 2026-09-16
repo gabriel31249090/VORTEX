@@ -20,14 +20,14 @@ test('feed has a desktop discovery rail and composer', async () => {
   const composer = await read('app/components/FeedComposer.tsx')
   assert.match(feed, /FeedRightRail/)
   assert.match(feed, /FeedComposer/)
-  assert.match(rail, /Comunidades para explorar/)
+  assert.match(rail, /Comunidades em destaque/)
   assert.match(composer, /Compartilhe algo com a comunidade/)
 })
 
 test('visual feed styles include responsive desktop and mobile layouts', async () => {
   const css = await read('app/globals.css')
   assert.match(css, /\.vtx-reddit-shell/)
-  assert.match(css, /grid-template-columns: minmax\(0, 790px\) 300px/)
+  assert.match(css, /grid-template-columns: minmax\(620px, 1fr\) minmax\(280px, 330px\)/)
   assert.match(css, /\.vtx-mobile-vote/)
   assert.match(css, /@media \(max-width: 767px\)/)
 })
