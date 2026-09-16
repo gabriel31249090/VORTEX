@@ -12,7 +12,7 @@
 //   post/avatar): NÃO é interceptado — vai direto pra rede, como se o SW
 //   não existisse. Isso evita servir feed/chat desatualizado.
 
-const CACHE_VERSION = 'vortex-shell-v1';
+const CACHE_VERSION = 'vortex-shell-v2';
 const OFFLINE_URL = '/offline.html';
 
 const PRECACHE_ASSETS = [

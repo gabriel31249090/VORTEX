@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { applyEditorCommand, getActiveFormats, insertEditorText, type EditorCommand } from '@/lib/rich-text'
 
 type RippleButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   rippleColor?: string
@@ -59,13 +60,12 @@ function MediaBtn({ label, emoji, onClick, active, limitMB, planLabel }: { label
 }
 
 type PlanId = 'free' | 'boost' | 'mega'
-type FormatType = 'bold' | 'italic' | 'strikeThrough' | 'insertUnorderedList' | 'insertOrderedList' | 'formatBlock'
 type MediaType = 'image' | 'video' | 'audio' | 'gif' | null
 
 const UPLOAD_LIMITS: Record<PlanId, { image: number; video: number; audio: number; gif: number }> = {
   free:  { image: 2,   video: 10,  audio: 5,   gif: 2 },
-  boost: { image: 10,  video: 100, audio: 50,  gif: 10 },
-  mega:  { image: 50,  video: 500, audio: 200, gif: 50 },
+  boost: { image: 10,  video: 50,  audio: 50,  gif: 10 },
+  mega:  { image: 50,  video: 50,  audio: 50,  gif: 50 },
 }
 
 // Cooldown entre posts, em segundos, por plano (só se aplica ao criar, não ao editar)
@@ -169,16 +169,13 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
   }, [cooldownLeft])
 
   function updateActiveFormats() {
-    const formats = new Set<string>()
-    if (document.queryCommandState('bold')) formats.add('bold')
-    if (document.queryCommandState('italic')) formats.add('italic')
-    if (document.queryCommandState('strikeThrough')) formats.add('strikeThrough')
-    setActiveFormats(formats)
+    if (!editorRef.current) return
+    setActiveFormats(getActiveFormats(editorRef.current))
   }
 
-  function execFormat(command: FormatType, value?: string) {
-    editorRef.current?.focus()
-    document.execCommand(command, false, value)
+  function execFormat(command: EditorCommand, value?: string) {
+    if (!editorRef.current) return
+    applyEditorCommand(editorRef.current, command, value)
     updateActiveFormats()
   }
 
@@ -192,7 +189,10 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
       if (e.key.toLowerCase() === 'b') { e.preventDefault(); execFormat('bold') }
       if (e.key.toLowerCase() === 'i') { e.preventDefault(); execFormat('italic') }
     }
-    if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;') }
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      if (editorRef.current) insertEditorText(editorRef.current, '    ')
+    }
   }
 
   function handleMediaSelect(e: React.ChangeEvent<HTMLInputElement>, type: MediaType) {
@@ -431,7 +431,7 @@ export default function PostEditor({ postId, communityId = null }: PostEditorPro
             <Btn active={false} onClick={() => execFormat('formatBlock', 'blockquote')} title="Citação"><span style={{ fontFamily: 'serif', fontSize: 15 }}>&quot;</span></Btn>
             <Btn active={false} onClick={() => execFormat('formatBlock', 'p')} title="Parágrafo"><span style={{ fontSize: 11 }}>¶</span></Btn>
             <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-            <Btn active={false} onClick={() => { const url = prompt('URL do link:'); if (url) { editorRef.current?.focus(); document.execCommand('createLink', false, url) } }} title="Link"><span>🔗</span></Btn>
+            <Btn active={false} onClick={() => { const url = prompt('URL do link:'); if (url) execFormat('createLink', url) }} title="Link"><span>🔗</span></Btn>
             <span style={{ marginLeft: 'auto', color: '#444466', fontSize: 12 }}>{charCount} chars</span>
           </div>
 

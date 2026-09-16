@@ -172,7 +172,14 @@ export default function PostCard({
             <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
           ) : (
             <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-              <img src={post.media_url} alt={post.title} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', display: 'block' }} />
+              <Image
+                src={post.media_url}
+                alt={post.title}
+                width={1200}
+                height={800}
+                sizes="(max-width: 760px) 100vw, 720px"
+                style={{ width: '100%', height: 'auto', maxHeight: 520, objectFit: 'cover', display: 'block' }}
+              />
             </div>
           )
         )}

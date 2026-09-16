@@ -19,6 +19,7 @@ type Message = {
 
 type Participant = {
   user_id: string
+  last_read_at: string | null
   profiles: { username: string; display_name: string | null; avatar_url: string | null } | null
 }
 
@@ -34,9 +35,12 @@ export default function ChatPage() {
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [typingUserIds, setTypingUserIds] = useState<Set<string>>(new Set())
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const chatChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const router = useRouter()
   const params = useParams()
   const supabase = createClient()
@@ -69,7 +73,7 @@ export default function ChatPage() {
 
       const { data: parts } = await supabase
         .from('conversation_participants')
-        .select('user_id, profiles(username, display_name, avatar_url)')
+        .select('user_id, last_read_at, profiles(username, display_name, avatar_url)')
         .eq('conversation_id', conversationId)
       setParticipants((parts as unknown as Participant[]) || [])
 
@@ -92,10 +96,10 @@ export default function ChatPage() {
     load()
   }, [conversationId])
 
-  // Realtime: novas mensagens dessa conversa
+  // Realtime focado nesta conversa: mensagens, leitura e indicador de digitação.
   useEffect(() => {
     const channel = supabase
-      .channel(`chat-${conversationId}`)
+      .channel(`chat-${conversationId}`, { config: { broadcast: { self: false } } })
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${conversationId}`,
@@ -106,21 +110,45 @@ export default function ChatPage() {
           .eq('id', payload.new.id)
           .single()
         if (fullMsg) {
-          const msg = fullMsg as unknown as Message
-          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
-          // Marca como lida se a mensagem não é minha
-          if (msg.sender_id !== userId && userId) {
+          const incoming = fullMsg as unknown as Message
+          setMessages(prev => prev.some(m => m.id === incoming.id) ? prev : [...prev, incoming])
+          if (incoming.sender_id !== userId && userId) {
+            const readAt = new Date().toISOString()
             supabase.from('conversation_participants')
-              .update({ last_read_at: new Date().toISOString() })
+              .update({ last_read_at: readAt })
               .eq('conversation_id', conversationId)
               .eq('user_id', userId)
               .then(() => {})
+            setParticipants(prev => prev.map(p => p.user_id === userId ? { ...p, last_read_at: readAt } : p))
           }
         }
       })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'conversation_participants',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload) => {
+        const row = payload.new as { user_id?: string; last_read_at?: string | null }
+        if (!row.user_id) return
+        setParticipants(prev => prev.map(p => p.user_id === row.user_id ? { ...p, last_read_at: row.last_read_at ?? null } : p))
+      })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        const typedBy = payload?.userId as string | undefined
+        if (!typedBy || typedBy === userId) return
+        setTypingUserIds(prev => {
+          const next = new Set(prev)
+          if (payload?.typing) next.add(typedBy)
+          else next.delete(typedBy)
+          return next
+        })
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    chatChannelRef.current = channel
+    return () => {
+      chatChannelRef.current = null
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+      supabase.removeChannel(channel)
+    }
   }, [conversationId, userId])
 
   useEffect(() => {
@@ -139,6 +167,26 @@ export default function ChatPage() {
     setMediaFile(null)
     setMediaPreview(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleTextChange(value: string) {
+    setText(value)
+    if (!userId || !chatChannelRef.current) return
+
+    chatChannelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId, typing: value.trim().length > 0 },
+    })
+
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = setTimeout(() => {
+      chatChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId, typing: false },
+      })
+    }, 1200)
   }
 
   async function handleSend() {
@@ -175,6 +223,11 @@ export default function ChatPage() {
 
     if (!error) {
       setText('')
+      chatChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId, typing: false },
+      })
       clearMedia()
 
       if (otherParticipant) {
@@ -214,6 +267,10 @@ export default function ChatPage() {
   const otherParticipant = !isGroup ? participants.find(p => p.user_id !== userId) : null
   const headerTitle = isGroup ? (groupName || 'Grupo') : (otherParticipant?.profiles?.display_name || otherParticipant?.profiles?.username || 'Usuário')
   const headerAvatar = isGroup ? null : otherParticipant?.profiles?.avatar_url
+  const otherLastReadAt = otherParticipant?.last_read_at ? new Date(otherParticipant.last_read_at).getTime() : 0
+  const typingLabel = typingUserIds.size > 0
+    ? (isGroup ? 'alguém está digitando…' : 'digitando…')
+    : null
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Syne', sans-serif" }}>
@@ -241,7 +298,9 @@ export default function ChatPage() {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ color: '#f0f0f8', fontWeight: 700, fontSize: 14, margin: 0 }}>{headerTitle}</p>
-            {isGroup && <p style={{ color: '#555577', fontSize: 11, margin: 0 }}>{participants.length} membros</p>}
+            {typingLabel
+              ? <p style={{ color: '#c8f23c', fontSize: 11, margin: 0 }}>{typingLabel}</p>
+              : isGroup && <p style={{ color: '#555577', fontSize: 11, margin: 0 }}>{participants.length} membros</p>}
           </div>
         </div>
       </header>
@@ -293,7 +352,7 @@ export default function ChatPage() {
                     <video src={msg.media_url} controls style={{ maxWidth: '100%', borderRadius: 10, display: 'block' }} />
                   )}
                   {msg.media_url && (msg.media_type === 'image' || msg.media_type === 'gif') && (
-                    <img src={msg.media_url} alt="" style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 10, display: 'block' }} />
+                    <Image src={msg.media_url} alt="" width={640} height={480} sizes="(max-width: 680px) 70vw, 460px" style={{ maxWidth: '100%', width: 'auto', height: 'auto', maxHeight: 280, borderRadius: 10, display: 'block' }} />
                   )}
                   {msg.media_url && msg.media_type === 'audio' && (
                     <audio src={msg.media_url} controls style={{ maxWidth: 220 }} />
@@ -306,6 +365,11 @@ export default function ChatPage() {
                 </div>
                 <p style={{ color: '#444466', fontSize: 10, margin: `3px ${isMine ? '4px' : '4px'} 0`, textAlign: isMine ? 'right' : 'left' }}>
                   {timeLabel(msg.created_at)}
+                  {isMine && !isGroup && (
+                    <span style={{ marginLeft: 5, color: new Date(msg.created_at).getTime() <= otherLastReadAt ? '#c8f23c' : '#444466' }}>
+                      {new Date(msg.created_at).getTime() <= otherLastReadAt ? '✓✓' : '✓'}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -347,7 +411,7 @@ export default function ChatPage() {
 
             <textarea
               value={text}
-              onChange={e => setText(e.target.value)}
+              onChange={e => handleTextChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Digite uma mensagem..."
               rows={1}

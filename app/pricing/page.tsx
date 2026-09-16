@@ -52,7 +52,7 @@ const plans = [
       'Cor de destaque personalizada no perfil',
       'Caracteres e emojis especiais no nome',
       'Foto de perfil: até 10MB',
-      'Vídeos: até 100MB',
+      'Vídeos: até 50MB',
       'Áudio: até 50MB',
       'Destaque visual nos posts',
     ],
@@ -76,8 +76,8 @@ const plans = [
       'Fontes e formatação especial nos posts',
       'Cor customizada nos posts',
       'Foto de perfil: até 50MB',
-      'Vídeos: até 500MB',
-      'Áudio: até 200MB',
+      'Vídeos: até 50MB',
+      'Áudio: até 50MB',
       'Crop e reposicionamento de foto/banner',
       'Suporte prioritário',
     ],
@@ -213,15 +213,13 @@ export default function PricingPage() {
 
       if (storageError) throw new Error('Erro ao enviar comprovante: ' + storageError.message)
 
-      const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
-      const receiptUrl = urlData?.publicUrl ?? path
-
       const { error: dbError } = await supabase
         .from('plan_requests')
         .insert({
           user_id: userId,
           plan: payingPlan.id,
-          receipt_url: receiptUrl,
+          receipt_path: path,
+          receipt_url: path,
           status: 'pending',
         })
 

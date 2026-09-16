@@ -1274,3 +1274,34 @@ img, video, canvas, svg {
 .vtx-system-state{min-height:100vh;padding:40px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;color:var(--text)}.vtx-system-state h1{font-size:clamp(28px,5vw,44px);max-width:700px}.vtx-system-state p{max-width:560px;color:var(--text-2)}.vtx-system-mark{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;color:var(--green);background:var(--green-dim);border:1px solid rgba(200,242,60,.2)}.vtx-system-mark--error{color:var(--danger);background:rgba(255,68,102,.08);border-color:rgba(255,68,102,.2)}.vtx-system-code{font:700 12px var(--mono);letter-spacing:.18em;color:var(--green)}.vtx-system-action{margin-top:8px;padding:12px 18px;border:0;border-radius:12px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer}.vtx-system-spinner{color:var(--green);animation:vtx-spin .8s linear infinite}@keyframes vtx-spin{to{transform:rotate(360deg)}}
 @media(max-width:767px){.landing-hero{min-height:auto;padding-top:54px}.vtx-space-orbit,.vtx-space-core{left:74%;top:30%;opacity:.45}.vtx-space-orbit--one{width:330px;height:135px}.vtx-space-orbit--two{width:270px;height:270px}.vtx-space-core{width:72px;height:72px}.vtx-auth-card{padding:24px 20px;border-radius:18px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.vtx-page-enter,.vtx-system-spinner{animation:none!important}}
+
+
+/* VORTEX 1.0 · motion/accessibility/performance */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.vtx-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 420px;
+}
+
+.vtx-feed-toolbar {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.vtx-empty-panel {
+  border: 1px dashed rgba(255,255,255,0.1);
+  background: rgba(17,17,24,0.55);
+  border-radius: var(--radius-lg);
+}

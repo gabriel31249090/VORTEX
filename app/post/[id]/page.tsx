@@ -208,7 +208,6 @@ export default function PostPage() {
       } else {
         setComments(prev => [...prev, newC])
       }
-      await supabase.from('posts').update({ comments_count: (post?.comments_count || 0) + 1 }).eq('id', postId)
       setPost(prev => prev ? { ...prev, comments_count: prev.comments_count + 1 } : prev)
 
       const mentions = [...newComment.matchAll(/@(\w+)/g)].map(m => m[1])

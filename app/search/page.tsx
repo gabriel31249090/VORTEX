@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, type CSSProperties } from 'react'
 import { createClient } from '@/lib/supabase'
 import { now } from '@/lib/time'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
 type SearchTab = 'posts' | 'users' | 'communities'
@@ -62,36 +62,29 @@ export default function SearchPage() {
 
     setLoading(true)
     setSearched(true)
-    const term = q.trim()
+    const { data, error } = await supabase.rpc('search_vortex', {
+      term: q.trim(),
+      limit_count: 20,
+    })
 
-    const [postsRes, usersRes, commRes] = await Promise.all([
-      supabase
-        .from('posts')
-        .select('id, title, content, likes_count, comments_count, created_at, author:author_id(username, display_name, avatar_url)')
-        .or(`title.ilike.%${term}%,content.ilike.%${term}%`)
-        .eq('moderation_status', 'approved')
-        .order('likes_count', { ascending: false })
-        .limit(20),
+    if (error) {
+      console.error(error)
+      setPosts([]); setUsers([]); setCommunities([])
+      setLoading(false)
+      return
+    }
 
-      supabase
-        .from('profiles')
-        .select('id, username, display_name, bio, avatar_url')
-        .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
-        .limit(15),
+    const payload = (data || {}) as {
+      posts?: PostResult[]
+      users?: UserResult[]
+      communities?: CommunityResult[]
+    }
 
-      supabase
-        .from('communities')
-        .select('id, slug, name, description, members_count, icon')
-        .or(`name.ilike.%${term}%,description.ilike.%${term}%`)
-        .order('members_count', { ascending: false })
-        .limit(10),
-    ])
-
-    setPosts((postsRes.data as unknown as PostResult[]) || [])
-    setUsers((usersRes.data as unknown as UserResult[]) || [])
-    setCommunities((commRes.data as unknown as CommunityResult[]) || [])
+    setPosts(payload.posts || [])
+    setUsers(payload.users || [])
+    setCommunities(payload.communities || [])
     setLoading(false)
-  }, [])
+  }, [supabase])
 
   function handleQueryChange(value: string) {
     setQuery(value)
