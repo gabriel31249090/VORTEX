@@ -14,10 +14,9 @@ export const metadata:Metadata={
   applicationName:'VORTEX',
   title:{default:'VORTEX — sua rede, no seu ritmo',template:'%s · VORTEX'},
   description:'Rede social open source com comunidades, stories, mensagens e feed cronológico.',
-  alternates:{canonical:'/'},
   manifest:'/manifest.json',
   appleWebApp:{capable:true,statusBarStyle:'black-translucent',title:'VORTEX'},
-  openGraph:{type:'website',locale:'pt_BR',siteName:'VORTEX',url:'/',title:'VORTEX — sua rede, no seu ritmo',description:'Comunidades, stories, mensagens e conteúdo em um fluxo que você controla.'},
+  openGraph:{type:'website',locale:'pt_BR',siteName:'VORTEX',title:'VORTEX — sua rede, no seu ritmo',description:'Comunidades, stories, mensagens e conteúdo em um fluxo que você controla.'},
   twitter:{card:'summary_large_image',title:'VORTEX — sua rede, no seu ritmo',description:'Comunidades, stories, mensagens e conteúdo em um fluxo que você controla.'},
   robots:{index:true,follow:true},
 }

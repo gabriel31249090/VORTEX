@@ -15,7 +15,8 @@ type PlanRequest = {
   user_id: string
   plan: PlanId
   status: string
-  receipt_url: string
+  receipt_url: string | null
+  receipt_path: string | null
   created_at: string
   profiles: { username: string; display_name: string; avatar_url: string; plan: PlanId }
 }
@@ -409,7 +410,7 @@ export default function AdminPage() {
                         <span style={{ color: '#333355', fontSize: 11 }}>{new Date(req.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
-                    <a href={req.receipt_url} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#8888aa', fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>📎 Ver comprovante</a>
+                    <a href={`/api/admin/receipt/${req.id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#8888aa', fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>📎 Ver comprovante</a>
                     {requestsFilter === 'pending' && (
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => handleRequest(req.id, req.user_id, req.plan, 'rejected')} disabled={processingId === req.id} style={{ padding: '8px 18px', borderRadius: 50, border: '1px solid rgba(255,68,68,0.3)', background: 'rgba(255,68,68,0.06)', color: '#ff4444', fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: processingId === req.id ? 0.5 : 1 }}>✕ Rejeitar</button>
