@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
 test('feed uses the consolidated cursor RPC', async () => {
   const source = await read('app/feed/page.tsx')
-  assert.match(source, /rpc\('feed_page'/)
+  assert.match(source, /rpc\('feed_page_v2'/)
   assert.doesNotMatch(source, /channel\('feed-realtime'/)
   assert.doesNotMatch(source, /from\('feed_activity'\)/)
 })
