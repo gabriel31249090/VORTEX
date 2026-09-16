@@ -1,17 +1,29 @@
 'use client'
 
-import { useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import RippleButton from './RippleButton'
 import FeedAd from './FeedAd'
 import ReportModal, { type ReportReason } from './ReportModal'
 import { likeBurst } from '@/lib/animations'
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter'
-import { ArrowBigDown, ArrowBigUp, Crown, Flag, MessageCircle, MoreHorizontal, Repeat2, Share2, Trash2, Zap } from 'lucide-react'
+import {
+  ArrowBigDown,
+  ArrowBigUp,
+  Crown,
+  Flag,
+  MessageCircle,
+  MoreHorizontal,
+  Play,
+  Repeat2,
+  Share2,
+  Trash2,
+  Zap,
+} from 'lucide-react'
 
 type PlanId = 'free' | 'boost' | 'mega'
 type VoteType = 'up' | 'down' | null
+export type FeedViewMode = 'card' | 'compact'
 
 type Post = {
   id: string
@@ -32,44 +44,10 @@ function isVideo(url: string) {
   return /\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(url)
 }
 
-function getAuthorColor(plan: PlanId, accentColor: string | null): string {
-  if (plan === 'mega' && accentColor) return accentColor
+function getAuthorColor(plan: PlanId, accentColor: string | null) {
+  if ((plan === 'boost' || plan === 'mega') && accentColor) return accentColor
   if (plan === 'mega') return '#a78bfa'
-  if (plan === 'boost' && accentColor) return accentColor
-  if (plan === 'boost') return '#c8f23c'
   return '#c8f23c'
-}
-
-function getPlanStyle(plan: PlanId, accentColor: string | null) {
-  const color = getAuthorColor(plan, accentColor)
-
-  if (plan === 'mega') return {
-    border: `1px solid ${color}44`,
-    shadow: `0 0 20px ${color}12`,
-    avatarShadow: `0 0 10px ${color}88`,
-    hoverBorder: `${color}88`,
-    hoverShadow: `0 0 24px ${color}1a`,
-    badgeEl: <Crown size={13} strokeWidth={2}/>,
-    stripColor: color,
-  }
-  if (plan === 'boost') return {
-    border: `1px solid ${color}40`,
-    shadow: `0 0 16px ${color}10`,
-    avatarShadow: `0 0 10px ${color}66`,
-    hoverBorder: `${color}66`,
-    hoverShadow: `0 0 20px ${color}14`,
-    badgeEl: <Zap size={13} strokeWidth={2}/>,
-    stripColor: color,
-  }
-  return {
-    border: '1px solid rgba(255,255,255,0.06)',
-    shadow: 'none',
-    avatarShadow: '0 0 8px rgba(200,242,60,0.2)',
-    hoverBorder: 'rgba(200,242,60,0.35)',
-    hoverShadow: '0 0 20px rgba(200,242,60,0.08)',
-    badgeEl: null,
-    stripColor: null,
-  }
 }
 
 function getInitial(username: string) {
@@ -77,19 +55,21 @@ function getInitial(username: string) {
 }
 
 function timeAgo(date: string) {
-  const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  const diff = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 1000))
   if (diff < 60) return `${diff}s`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`
+  if (diff < 3600) return `${Math.floor(diff / 60)}min`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`
-  return `${Math.floor(diff / 86400)}d`
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`
+  return new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
 }
 
-const DOWNVOTE_COLOR = '#ff4466'
+const DOWNVOTE_COLOR = '#ff5b78'
 
 export interface PostCardProps {
   post: Post
   index: number
   voteType: VoteType
+  viewMode: FeedViewMode
   onVote: (postId: string, type: 'up' | 'down') => void
   onShare: (postId: string) => void
   onRepost: (postId: string) => void
@@ -108,6 +88,7 @@ export default function PostCard({
   post,
   index,
   voteType,
+  viewMode,
   onVote,
   onShare,
   onRepost,
@@ -127,269 +108,261 @@ export default function PostCard({
   const [reportOpen, setReportOpen] = useState(false)
 
   const authorPlan: PlanId = post.profiles?.plan || 'free'
-  const authorAccent = post.profiles?.accent_color || null
-  const planStyle = getPlanStyle(authorPlan, authorAccent)
-  const authorColor = getAuthorColor(authorPlan, authorAccent)
-  const isMega = authorPlan === 'mega'
+  const authorColor = getAuthorColor(authorPlan, post.profiles?.accent_color || null)
+  const hasMedia = Boolean(post.media_url)
+  const video = post.media_url ? isVideo(post.media_url) : false
+
+  const goToPost = () => router.push(`/post/${post.id}`)
+
+  const vote = (event: MouseEvent<HTMLElement>, type: 'up' | 'down') => {
+    event.stopPropagation()
+    likeBurst(event.currentTarget as HTMLElement)
+    onVote(post.id, type)
+  }
+
+  const Menu = () => (
+    <div className="vtx-post-menu-wrap">
+      <button
+        className="vtx-post-icon-btn"
+        onClick={(event) => {
+          event.stopPropagation()
+          setMenuOpen((value) => !value)
+        }}
+        aria-label="Mais opções"
+        title="Mais opções"
+      >
+        <MoreHorizontal size={18} />
+      </button>
+      {menuOpen && (
+        <>
+          <button
+            className="vtx-post-menu-scrim"
+            aria-label="Fechar menu"
+            onClick={(event) => {
+              event.stopPropagation()
+              setMenuOpen(false)
+            }}
+          />
+          <div className="vtx-post-menu">
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                setMenuOpen(false)
+                setReportOpen(true)
+              }}
+            >
+              <Flag size={14} /> Denunciar
+            </button>
+            {isAdmin && (
+              <button
+                className="vtx-post-menu-danger"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setMenuOpen(false)
+                  if (confirm('Excluir este post como admin?')) onAdminDelete(post.id)
+                }}
+              >
+                <Trash2 size={14} /> Excluir (admin)
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="vtx-feed-entry">
       {isRepostFeedItem && repostedByUsername && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#555577', fontSize: 13, paddingLeft: 4 }}>
-          <Repeat2 size={14}/>
+        <div className="vtx-repost-label">
+          <Repeat2 size={13} />
           <span>@{repostedByUsername} republicou</span>
         </div>
       )}
 
       <article
-        className="vtx-card"
+        className={`vtx-reddit-post vtx-reddit-post--${viewMode}`}
         style={{
-          background: '#111118',
-          border: planStyle.border,
-          borderRadius: 16, overflow: 'hidden',
-          boxShadow: planStyle.shadow,
-          animation: `fadeUp 0.4s ease ${Math.min(index, 5) * 0.05}s both`,
-          transition: 'border-color 0.2s, box-shadow 0.2s',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.borderColor = planStyle.hoverBorder
-          e.currentTarget.style.boxShadow = planStyle.hoverShadow
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.borderColor = planStyle.border.replace('1px solid ', '')
-          e.currentTarget.style.boxShadow = planStyle.shadow
-        }}
+          '--author-accent': authorColor,
+          animationDelay: `${Math.min(index, 5) * 25}ms`,
+        } as CSSProperties}
       >
-        {authorPlan !== 'free' && planStyle.stripColor && (
-          <div style={{
-            height: 2,
-            background: `linear-gradient(90deg, transparent, ${planStyle.stripColor}99, transparent)`,
-          }} />
-        )}
+        <aside className="vtx-vote-rail" aria-label="Votação">
+          <button
+            className={`vtx-vote-btn ${voteType === 'up' ? 'is-up' : ''}`}
+            onClick={(event) => vote(event, 'up')}
+            aria-label="Votar positivamente"
+            title="Votar positivamente"
+          >
+            <ArrowBigUp size={20} />
+          </button>
+          <span className={`vtx-vote-score ${voteType ? `is-${voteType}` : ''}`}>{animatedScore}</span>
+          <button
+            className={`vtx-vote-btn vtx-vote-btn--down ${voteType === 'down' ? 'is-down' : ''}`}
+            onClick={(event) => vote(event, 'down')}
+            aria-label="Votar negativamente"
+            title="Votar negativamente"
+          >
+            <ArrowBigDown size={20} />
+          </button>
+        </aside>
 
-        {post.media_url && (
-          isVideo(post.media_url) ? (
-            <video src={post.media_url} controls onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: 400, display: 'block', background: '#000' }} />
-          ) : (
-            <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-              <Image
-                src={post.media_url}
-                alt={post.title}
-                width={1200}
-                height={800}
-                sizes="(max-width: 760px) 100vw, 720px"
-                style={{ width: '100%', height: 'auto', maxHeight: 520, objectFit: 'cover', display: 'block' }}
-              />
-            </div>
-          )
-        )}
-
-        <div style={{ padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%', position: 'relative',
-              background: post.profiles?.avatar_url ? 'none'
-                : `linear-gradient(135deg, ${authorColor}, ${authorColor}99)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#000', fontWeight: 800, fontSize: 13, flexShrink: 0,
-              boxShadow: planStyle.avatarShadow, overflow: 'hidden',
-            }}>
-              {post.profiles?.avatar_url
-                ? <Image src={post.profiles.avatar_url} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} />
-                : getInitial(post.profiles?.username || '?')
-              }
-            </div>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span
-                style={{ color: '#f0f0f8', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-                onClick={e => { e.stopPropagation(); router.push(`/profile/${post.profiles?.username}`) }}
-                onMouseEnter={e => (e.currentTarget.style.color = authorColor)}
-                onMouseLeave={e => (e.currentTarget.style.color = '#f0f0f8')}
-              >
-                @{post.profiles?.username || 'usuário'}
-              </span>
-              {planStyle.badgeEl}
-              {post.communities && (
-                <span
-                  style={{ color: '#c8f23c', fontSize: 13, cursor: 'pointer' }}
-                  onClick={e => { e.stopPropagation(); router.push(`/community/${post.communities!.slug}`) }}
-                >
-                  em v/{post.communities.name}
-                </span>
+        <div className="vtx-post-main">
+          <header className="vtx-post-meta">
+            <button
+              className="vtx-post-avatar"
+              onClick={(event) => {
+                event.stopPropagation()
+                if (post.profiles?.username) router.push(`/profile/${post.profiles.username}`)
+              }}
+              aria-label={`Abrir perfil de ${post.profiles?.username || 'usuário'}`}
+              style={{ '--author-accent': authorColor } as CSSProperties}
+            >
+              {post.profiles?.avatar_url ? (
+                <Image src={post.profiles.avatar_url} alt="" fill sizes="24px" style={{ objectFit: 'cover' }} />
+              ) : (
+                getInitial(post.profiles?.username || '?')
               )}
-              <span style={{ color: '#444466', fontSize: 13 }}>· {timeAgo(post.created_at)}</span>
-            </div>
+            </button>
 
-            {/* Menu de opções */}
-            <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div className="vtx-post-meta-line">
+              {post.communities ? (
+                <button
+                  className="vtx-community-link"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    router.push(`/community/${post.communities!.slug}`)
+                  }}
+                >
+                  v/{post.communities.name}
+                </button>
+              ) : (
+                <span className="vtx-community-link vtx-community-link--plain">v/geral</span>
+              )}
+              <span className="vtx-meta-dot">•</span>
+              <span className="vtx-posted-by">por</span>
               <button
-                onClick={() => setMenuOpen(v => !v)}
-                style={{
-                  background: 'none', border: 'none', color: '#555577', cursor: 'pointer',
-                  fontSize: 18, padding: '2px 6px', lineHeight: 1, borderRadius: 6,
+                className="vtx-author-link"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  if (post.profiles?.username) router.push(`/profile/${post.profiles.username}`)
                 }}
               >
-                <MoreHorizontal size={18}/>
+                @{post.profiles?.username || 'usuário'}
               </button>
-              {menuOpen && (
-                <>
-                  <div
-                    onClick={() => setMenuOpen(false)}
-                    style={{ position: 'fixed', inset: 0, zIndex: 9 }}
-                  />
-                  <div style={{
-                    position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 10,
-                    background: '#18181f', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 10, overflow: 'hidden', minWidth: 160,
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                  }}>
-                    <button
-                      onClick={() => { setMenuOpen(false); setReportOpen(true) }}
-                      style={{
-                        width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none',
-                        border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 13,
-                        fontFamily: "'Syne', sans-serif",
-                      }}
-                    >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Flag size={14}/> Denunciar</span>
-                    </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => { setMenuOpen(false); if (confirm('Excluir este post como admin?')) onAdminDelete(post.id) }}
-                        style={{
-                          width: '100%', textAlign: 'left', padding: '10px 14px', background: 'none',
-                          border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)',
-                          color: '#ff4466', cursor: 'pointer', fontSize: 13,
-                          fontFamily: "'Syne', sans-serif",
-                        }}
-                      >
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Trash2 size={14}/> Excluir (admin)</span>
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
 
-          <div onClick={() => router.push(`/post/${post.id}`)} style={{ cursor: 'pointer' }}>
-            <h2 style={isMega ? {
-              fontFamily: "'Playfair Display', serif", fontStyle: 'italic', fontWeight: 700,
-              fontSize: 18, marginBottom: 8, lineHeight: 1.3,
-              backgroundImage: `linear-gradient(100deg, ${authorColor}, #f0f0f8 55%, ${authorColor})`,
-              backgroundSize: '200% auto',
-              WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-              WebkitTextFillColor: 'transparent',
-              animation: 'megaShine 6s ease infinite',
-              transition: 'color 0.2s',
-            } : {
-              color: '#f0f0f8',
-              fontWeight: 700, fontSize: 17, marginBottom: 8, lineHeight: 1.3,
-              transition: 'color 0.2s',
-            }}>
-              {post.title}
-            </h2>
-            {post.content && (
-              <p style={{ color: '#8888aa', fontSize: 14, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as CSSProperties}>
-                {post.content}
-              </p>
+              {authorPlan !== 'free' && (
+                <span className={`vtx-plan-mini vtx-plan-mini--${authorPlan}`} title={authorPlan === 'mega' ? 'MEGA BOOST' : 'BOOST'}>
+                  {authorPlan === 'mega' ? <Crown size={11} /> : <Zap size={11} />}
+                </span>
+              )}
+
+              <span className="vtx-meta-dot">•</span>
+              <span className="vtx-post-time">{timeAgo(post.created_at)}</span>
+            </div>
+
+            <Menu />
+          </header>
+
+          <div className={`vtx-post-content-grid ${hasMedia && viewMode === 'compact' ? 'has-thumbnail' : ''}`}>
+            <button className="vtx-post-copy" onClick={goToPost}>
+              <h2>{post.title}</h2>
+              {post.content && (
+                <p className="vtx-post-excerpt">{post.content}</p>
+              )}
+            </button>
+
+            {post.media_url && viewMode === 'compact' && (
+              <button className="vtx-post-thumb" onClick={goToPost} aria-label="Abrir mídia da publicação">
+                {video ? (
+                  <span className="vtx-post-thumb-video">
+                    <Play size={22} fill="currentColor" />
+                  </span>
+                ) : (
+                  <Image
+                    src={post.media_url}
+                    alt=""
+                    fill
+                    sizes="112px"
+                    style={{ objectFit: 'cover' }}
+                  />
+                )}
+              </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+          {post.media_url && viewMode === 'card' && (
+            <div className="vtx-post-media">
+              {video ? (
+                <video
+                  src={post.media_url}
+                  controls
+                  preload="metadata"
+                  onClick={(event) => event.stopPropagation()}
+                />
+              ) : (
+                <button onClick={goToPost} className="vtx-post-media-button" aria-label="Abrir publicação">
+                  <Image
+                    src={post.media_url}
+                    alt={post.title}
+                    width={1280}
+                    height={960}
+                    sizes="(max-width: 820px) 100vw, 760px"
+                    style={{ width: '100%', height: 'auto', maxHeight: 620, objectFit: 'contain', display: 'block' }}
+                  />
+                </button>
+              )}
+            </div>
+          )}
 
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              background: voteType ? (voteType === 'up' ? `${authorColor}1a` : `${DOWNVOTE_COLOR}1a`) : 'transparent',
-              border: `1px solid ${voteType ? (voteType === 'up' ? `${authorColor}66` : `${DOWNVOTE_COLOR}66`) : 'rgba(255,255,255,0.08)'}`,
-              borderRadius: 50, overflow: 'hidden',
-              boxShadow: voteType ? `0 0 10px ${(voteType === 'up' ? authorColor : DOWNVOTE_COLOR)}33` : 'none',
-              transition: 'all 0.2s',
-            }}>
-              <RippleButton
-                onClick={(e) => { likeBurst(e.currentTarget as HTMLElement); onVote(post.id, 'up') }}
-                className="vtx-btn"
-                rippleColor={`${authorColor}55`}
-                style={{
-                  background: 'transparent', border: 'none',
-                  color: voteType === 'up' ? authorColor : '#555577',
-                  padding: '5px 10px', cursor: 'pointer',
-                  fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                }}
+          <footer className="vtx-post-actions">
+            <div className="vtx-mobile-vote">
+              <button
+                className={voteType === 'up' ? 'is-up' : ''}
+                onClick={(event) => vote(event, 'up')}
+                aria-label="Votar positivamente"
               >
-                <ArrowBigUp className="vtx-icon-wiggle" size={16}/>
-              </RippleButton>
-
-              <span style={{
-                fontSize: 13, fontWeight: 700, minWidth: 20, textAlign: 'center',
-                color: voteType ? (voteType === 'up' ? authorColor : DOWNVOTE_COLOR) : '#8888aa',
-              }}>
-                {animatedScore}
-              </span>
-
-              <RippleButton
-                onClick={(e) => { likeBurst(e.currentTarget as HTMLElement); onVote(post.id, 'down') }}
-                className="vtx-btn"
-                rippleColor={`${DOWNVOTE_COLOR}55`}
-                style={{
-                  background: 'transparent', border: 'none',
-                  color: voteType === 'down' ? DOWNVOTE_COLOR : '#555577',
-                  padding: '5px 10px', cursor: 'pointer',
-                  fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                }}
+                <ArrowBigUp size={17} />
+              </button>
+              <strong className={voteType ? `is-${voteType}` : ''}>{animatedScore}</strong>
+              <button
+                className={voteType === 'down' ? 'is-down' : ''}
+                onClick={(event) => vote(event, 'down')}
+                aria-label="Votar negativamente"
               >
-                <ArrowBigDown size={16}/>
-              </RippleButton>
+                <ArrowBigDown size={17} />
+              </button>
             </div>
 
-            <RippleButton
-              onClick={() => router.push(`/post/${post.id}`)}
-              className="vtx-btn"
-              rippleColor="rgba(200,242,60,0.2)"
-              style={{
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
-                color: '#555577', padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
-            >
-              <MessageCircle size={15}/> {post.comments_count}
-            </RippleButton>
+            <button className="vtx-action-btn" onClick={goToPost}>
+              <MessageCircle size={16} />
+              <span>{post.comments_count}</span>
+              <span className="vtx-action-label">Comentários</span>
+            </button>
 
-            <RippleButton
-              onClick={() => onRepost(post.id)}
-              className="vtx-btn"
-              rippleColor="rgba(200,242,60,0.2)"
-              style={{
-                background: isReposted ? 'rgba(200,242,60,0.1)' : 'transparent',
-                border: `1px solid ${isReposted ? 'rgba(200,242,60,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                color: isReposted ? '#c8f23c' : '#555577',
-                padding: '5px 12px', borderRadius: 50, cursor: 'pointer',
-                fontSize: 13, fontFamily: "'Syne', sans-serif", fontWeight: 600,
-                display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s'
+            <button
+              className={`vtx-action-btn ${isReposted ? 'is-active' : ''}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                onRepost(post.id)
               }}
             >
-              <Repeat2 size={15}/> {post.reposts_count ?? 0}
-            </RippleButton>
+              <Repeat2 size={16} />
+              <span>{post.reposts_count ?? 0}</span>
+              <span className="vtx-action-label">Republicar</span>
+            </button>
 
-            <RippleButton
-              onClick={() => onShare(post.id)}
-              className="vtx-btn"
-              rippleColor="rgba(200,242,60,0.2)"
-              style={{
-                background: 'transparent', border: 'none',
-                color: '#555577', cursor: 'pointer',
-                fontSize: 13, fontFamily: "'Syne', sans-serif",
-                marginLeft: 'auto', transition: 'color 0.2s'
+            <button
+              className="vtx-action-btn"
+              onClick={(event) => {
+                event.stopPropagation()
+                onShare(post.id)
               }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#f0f0f8')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#555577')}
             >
-              <Share2 size={15}/> Compartilhar
-            </RippleButton>
-          </div>
+              <Share2 size={16} />
+              <span className="vtx-action-label">Compartilhar</span>
+            </button>
+          </footer>
         </div>
       </article>
 

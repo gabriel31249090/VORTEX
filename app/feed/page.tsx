@@ -4,12 +4,14 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
-import RippleButton from '../components/RippleButton'
-import PostCard from '../components/PostCard'
+import PostCard, { type FeedViewMode } from '../components/PostCard'
 import StoriesBar from '../components/StoriesBar'
+import FeedComposer from '../components/FeedComposer'
+import FeedRightRail from '../components/FeedRightRail'
 import type { ReportReason } from '../components/ReportModal'
 import toast from 'react-hot-toast'
 import BackgroundGradient from '../components/BackgroundGradient'
+import { Globe2, LayoutList, RefreshCw, Rows3, Search, Users2 } from 'lucide-react'
 
 type PlanId = 'free' | 'boost' | 'mega'
 type VoteType = 'up' | 'down'
@@ -70,95 +72,26 @@ const AD_INTERVAL = 40
 
 function SkeletonCard() {
   return (
-    <div
-      className="surface"
-      style={{
-        borderRadius: 'var(--radius-lg)',
-        padding: 20,
-        marginBottom: 16,
-        minHeight: 200,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent)',
-          animation: 'shimmer 1.4s infinite',
-        }}
-      />
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            background: 'var(--surface-3)',
-          }}
-        />
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              width: 120,
-              height: 12,
-              borderRadius: 4,
-              background: 'var(--surface-3)',
-              marginBottom: 6,
-            }}
-          />
-          <div
-            style={{
-              width: 80,
-              height: 10,
-              borderRadius: 4,
-              background: 'var(--surface-2)',
-            }}
-          />
+    <div className="vtx-reddit-post vtx-feed-skeleton" aria-hidden="true">
+      <aside className="vtx-vote-rail">
+        <span className="vtx-skeleton-block vtx-skeleton-vote" />
+        <span className="vtx-skeleton-block vtx-skeleton-score" />
+        <span className="vtx-skeleton-block vtx-skeleton-vote" />
+      </aside>
+      <div className="vtx-post-main">
+        <div className="vtx-skeleton-meta">
+          <span className="vtx-skeleton-block vtx-skeleton-avatar" />
+          <span className="vtx-skeleton-block" style={{ width: 160, height: 10 }} />
+        </div>
+        <span className="vtx-skeleton-block" style={{ width: '82%', height: 16, marginTop: 12 }} />
+        <span className="vtx-skeleton-block" style={{ width: '58%', height: 12, marginTop: 9 }} />
+        <span className="vtx-skeleton-block" style={{ width: '36%', height: 12, marginTop: 7 }} />
+        <div className="vtx-skeleton-actions">
+          <span className="vtx-skeleton-block" />
+          <span className="vtx-skeleton-block" />
+          <span className="vtx-skeleton-block" />
         </div>
       </div>
-      <div
-        style={{
-          width: '90%',
-          height: 14,
-          borderRadius: 4,
-          background: 'var(--surface-3)',
-          marginBottom: 8,
-        }}
-      />
-      <div
-        style={{
-          width: '70%',
-          height: 14,
-          borderRadius: 4,
-          background: 'var(--surface-3)',
-          marginBottom: 8,
-        }}
-      />
-      <div
-        style={{
-          width: '50%',
-          height: 14,
-          borderRadius: 4,
-          background: 'var(--surface-3)',
-        }}
-      />
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
     </div>
   )
 }
@@ -175,6 +108,8 @@ export default function FeedPage() {
   const [userPlan, setUserPlan] = useState<PlanId>('free')
   const [isAdmin, setIsAdmin] = useState(false)
   const [tab, setTab] = useState<FeedTab>('geral')
+  const [viewMode, setViewMode] = useState<FeedViewMode>('card')
+  const [profileSummary, setProfileSummary] = useState<{ username: string | null; avatar_url: string | null }>({ username: null, avatar_url: null })
   const [cursor, setCursor] = useState<string | null>(null)
   const [feedAds, setFeedAds] = useState<
     { id: string; title: string; description: string | null; image_url: string | null; link_url: string }[]
@@ -194,12 +129,13 @@ export default function FeedPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('plan, is_admin')
+        .select('plan, is_admin, username, avatar_url')
         .eq('id', user.id)
         .single()
       const plan = (profile?.plan as PlanId) || 'free'
       setUserPlan(plan)
       setIsAdmin(!!profile?.is_admin)
+      setProfileSummary({ username: profile?.username || null, avatar_url: profile?.avatar_url || null })
 
       if (plan === 'free') {
         const { data: ads } = await supabase
@@ -216,6 +152,15 @@ export default function FeedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem('vortex-feed-view')
+    if (saved === 'card' || saved === 'compact') setViewMode(saved)
+  }, [])
+
+  function changeView(next: FeedViewMode) {
+    setViewMode(next)
+    window.localStorage.setItem('vortex-feed-view', next)
+  }
 
   async function loadPosts(feedTab: FeedTab, cursorAt: string | null, replace = false) {
     if (replace) setLoading(true)
@@ -429,102 +374,96 @@ export default function FeedPage() {
   }
 
   return (
-    <main
-      style={{
-        position: 'relative',
-        minHeight: '100vh',
-        background: 'var(--bg)',
-      }}
-    >
-      {/* Background leve (CSS puro, 0kb JS) — substitui o BlackHoleBackground */}
+    <main className="vtx-feed-page" style={{ position: 'relative', minHeight: '100vh', background: 'var(--bg)' }}>
       <BackgroundGradient variant="feed" />
+      <Nav />
 
-      <div style={{ position: 'relative', zIndex: 2 }}>
-        <div className="vtx-shell">
-          <div style={{ width: '100%', maxWidth: 720 }}>
-            {userId && <StoriesBar currentUserId={userId} />}
+      <div className="vtx-reddit-shell" style={{ position: 'relative', zIndex: 2 }}>
+        <section className="vtx-feed-column">
+          <header className="vtx-feed-heading">
+            <div className="vtx-feed-heading-copy">
+              <h1>Início</h1>
+              <p>Comunidades, pessoas e conversas em um fluxo mais limpo.</p>
+            </div>
+            <button className="vtx-feed-search-trigger" onClick={() => router.push('/search')}>
+              <Search size={15} />
+              <span>Buscar no VORTEX</span>
+            </button>
+          </header>
 
-            <div style={{ paddingTop: 16, paddingBottom: 64 }}>
-              <Nav />
+          <FeedComposer username={profileSummary.username} avatarUrl={profileSummary.avatar_url} />
 
-          {/* Tabs */}
-          <div
-            className="vtx-feed-toolbar"
-            style={{
-              display: 'flex',
-              gap: 8,
-              margin: '24px 0',
-              padding: 4,
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: 12,
-              border: '1px solid var(--border)',
-            }}
-          >
-            {(['geral', 'seguindo'] as FeedTab[]).map((t) => (
-              <RippleButton
-                key={t}
-                onClick={() => switchTab(t)}
-                className={tab === t ? 'vtx-btn-glow' : 'vtx-btn'}
-                rippleColor={tab === t ? 'rgba(0,0,0,0.25)' : 'rgba(200,242,60,0.25)'}
-                style={{
-                  flex: 1,
-                  padding: '9px 0',
-                  borderRadius: 9,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontFamily: "'Syne', sans-serif",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  transition: 'all 0.2s',
-                  background: tab === t ? '#c8f23c' : 'transparent',
-                  color: tab === t ? '#000' : '#8888aa',
-                }}
+          {userId && (
+            <div className="vtx-stories-shell">
+              <StoriesBar currentUserId={userId} />
+            </div>
+          )}
+
+          <div className="vtx-feed-controls" aria-label="Controles do feed">
+            <div className="vtx-feed-tabs">
+              <button
+                className={`vtx-feed-tab ${tab === 'geral' ? 'is-active' : ''}`}
+                onClick={() => switchTab('geral')}
               >
-                {t === 'geral' ? '🌐 Geral' : '👥 Seguindo'}
-              </RippleButton>
-            ))}
-            <RippleButton
-              onClick={() => loadPosts(tab, null, true)}
-              className="vtx-btn"
-              rippleColor="rgba(200,242,60,0.2)"
-              aria-label="Atualizar feed"
-              title="Atualizar feed"
-              style={{
-                width: 42,
-                flexShrink: 0,
-                borderRadius: 9,
-                border: '1px solid var(--border)',
-                background: 'rgba(255,255,255,0.03)',
-                color: '#8888aa',
-                cursor: 'pointer',
-                fontSize: 18,
-              }}
-            >
-              ↻
-            </RippleButton>
+                <Globe2 size={15} />
+                <span>Geral</span>
+              </button>
+              <button
+                className={`vtx-feed-tab ${tab === 'seguindo' ? 'is-active' : ''}`}
+                onClick={() => switchTab('seguindo')}
+              >
+                <Users2 size={15} />
+                <span>Seguindo</span>
+              </button>
+            </div>
+
+            <div className="vtx-view-switch" aria-label="Modo de visualização">
+              <button
+                className={`vtx-view-btn ${viewMode === 'card' ? 'is-active' : ''}`}
+                onClick={() => changeView('card')}
+                aria-label="Visualização em cartões"
+                title="Cartões"
+              >
+                <Rows3 size={16} />
+              </button>
+              <button
+                className={`vtx-view-btn ${viewMode === 'compact' ? 'is-active' : ''}`}
+                onClick={() => changeView('compact')}
+                aria-label="Visualização compacta"
+                title="Compacto"
+              >
+                <LayoutList size={16} />
+              </button>
+              <button
+                className="vtx-refresh-btn"
+                onClick={() => loadPosts(tab, null, true)}
+                aria-label="Atualizar feed"
+                title="Atualizar"
+              >
+                <RefreshCw size={15} />
+              </button>
+            </div>
           </div>
 
           {loading && (
             <div>
-              {[1, 2, 3].map((i) => (
-                <SkeletonCard key={i} />
-              ))}
+              {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
             </div>
           )}
 
           {!loading && tab === 'seguindo' && posts.length === 0 && (
             <EmptyState
               icon="👥"
-              title="Você ainda não segue ninguém."
-              subtitle="Siga pessoas para ver os posts delas aqui."
+              title="Seu feed de seguindo está vazio."
+              subtitle="Siga pessoas para montar um feed só com quem você acompanha."
             />
           )}
 
           {!loading && tab === 'geral' && posts.length === 0 && (
             <EmptyState
               icon="🌀"
-              title="Nenhum post ainda."
-              subtitle="Seja o primeiro!"
+              title="Nenhuma conversa por aqui ainda."
+              subtitle="Crie a primeira publicação e dê início ao feed."
             />
           )}
 
@@ -537,26 +476,27 @@ export default function FeedPage() {
             const adToShow = showAd
               ? feedAds[Math.floor(position / AD_INTERVAL - 1) % feedAds.length]
               : null
+
             return (
-              <div key={item.activityId}>
-                <PostCard
-                  post={item}
-                  index={i}
-                  voteType={votes.get(item.id) ?? null}
-                  isReposted={repostedIds.has(item.id)}
-                  isRepostFeedItem={item.isRepost}
-                  repostedByUsername={item.repostedByUsername}
-                  showAd={!!showAd}
-                  adToShow={adToShow}
-                  adPosition={position}
-                  isAdmin={isAdmin}
-                  onVote={handleVote}
-                  onRepost={handleRepost}
-                  onShare={handleShare}
-                  onReport={handleReportPost}
-                  onAdminDelete={handleAdminDelete}
-                />
-              </div>
+              <PostCard
+                key={item.activityId}
+                post={item}
+                index={i}
+                viewMode={viewMode}
+                voteType={votes.get(item.id) ?? null}
+                isReposted={repostedIds.has(item.id)}
+                isRepostFeedItem={item.isRepost}
+                repostedByUsername={item.repostedByUsername}
+                showAd={!!showAd}
+                adToShow={adToShow}
+                adPosition={position}
+                isAdmin={isAdmin}
+                onVote={handleVote}
+                onRepost={handleRepost}
+                onShare={handleShare}
+                onReport={handleReportPost}
+                onAdminDelete={handleAdminDelete}
+              />
             )
           })}
 
@@ -564,9 +504,7 @@ export default function FeedPage() {
 
           {loadingMore && (
             <div>
-              {[0, 1, 2].map((i) => (
-                <SkeletonCard key={i} />
-              ))}
+              {[0, 1].map((i) => <SkeletonCard key={i} />)}
             </div>
           )}
 
@@ -574,18 +512,18 @@ export default function FeedPage() {
             <div
               style={{
                 textAlign: 'center',
-                padding: '40px 0',
+                padding: '34px 0',
                 color: 'var(--text-3)',
-                fontSize: 13,
+                fontSize: 12,
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              Você chegou ao fim ✦
+              fim do feed · você chegou até aqui ✦
             </div>
           )}
-        </div>
-          </div>
-        </div>
+        </section>
+
+        <FeedRightRail />
       </div>
     </main>
   )
