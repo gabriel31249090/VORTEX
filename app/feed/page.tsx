@@ -8,6 +8,8 @@ import PostCard, { type FeedViewMode } from '../components/PostCard'
 import StoriesBar from '../components/StoriesBar'
 import FeedComposer from '../components/FeedComposer'
 import FeedRightRail from '../components/FeedRightRail'
+import FeedDiscoveryEnd from '../components/FeedDiscoveryEnd'
+import FeedSortMenu, { type FeedSort } from '../components/FeedSortMenu'
 import type { ReportReason } from '../components/ReportModal'
 import toast from 'react-hot-toast'
 import BackgroundGradient from '../components/BackgroundGradient'
@@ -64,6 +66,7 @@ type FeedRow = {
   reposter_username: string | null
   viewer_vote: VoteType | null
   viewer_reposted: boolean
+  rank_score: number
 }
 type FeedTab = 'geral' | 'seguindo'
 
@@ -108,9 +111,12 @@ export default function FeedPage() {
   const [userPlan, setUserPlan] = useState<PlanId>('free')
   const [isAdmin, setIsAdmin] = useState(false)
   const [tab, setTab] = useState<FeedTab>('geral')
+  const [sortMode, setSortMode] = useState<FeedSort>('recent')
   const [viewMode, setViewMode] = useState<FeedViewMode>('card')
   const [profileSummary, setProfileSummary] = useState<{ username: string | null; avatar_url: string | null }>({ username: null, avatar_url: null })
-  const [cursor, setCursor] = useState<string | null>(null)
+  const [cursorScore, setCursorScore] = useState<number | null>(null)
+  const [cursorAt, setCursorAt] = useState<string | null>(null)
+  const [cursorPostId, setCursorPostId] = useState<string | null>(null)
   const [feedAds, setFeedAds] = useState<
     { id: string; title: string; description: string | null; image_url: string | null; link_url: string }[]
   >([])
@@ -146,7 +152,12 @@ export default function FeedPage() {
         if (ads) setFeedAds(ads)
       }
 
-      await loadPosts('geral', null, true)
+      const savedSort = window.localStorage.getItem('vortex-feed-sort')
+      const initialSort: FeedSort = savedSort === 'hot' || savedSort === 'top' || savedSort === 'recent'
+        ? savedSort
+        : 'recent'
+      setSortMode(initialSort)
+      await loadPosts('geral', initialSort, null, true)
     }
     init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,13 +173,27 @@ export default function FeedPage() {
     window.localStorage.setItem('vortex-feed-view', next)
   }
 
-  async function loadPosts(feedTab: FeedTab, cursorAt: string | null, replace = false) {
+  type FeedCursor = {
+    score: number | null
+    at: string | null
+    postId: string | null
+  }
+
+  async function loadPosts(
+    feedTab: FeedTab,
+    sort: FeedSort,
+    cursor: FeedCursor | null,
+    replace = false
+  ) {
     if (replace) setLoading(true)
     else setLoadingMore(true)
 
-    const { data, error } = await supabase.rpc('feed_page', {
+    const { data, error } = await supabase.rpc('feed_page_v2', {
       feed_mode: feedTab,
-      cursor_at: cursorAt,
+      sort_mode: sort,
+      cursor_score: cursor?.score ?? null,
+      cursor_at: cursor?.at ?? null,
+      cursor_post_id: cursor?.postId ?? null,
       limit_count: PAGE_SIZE,
     })
 
@@ -232,7 +257,10 @@ export default function FeedPage() {
     if (replace) setPosts(newItems)
     else setPosts((prev) => [...prev, ...newItems])
 
-    setCursor(rows.length ? rows[rows.length - 1].activity_at : cursorAt)
+    const last = rows.length ? rows[rows.length - 1] : null
+    setCursorScore(last?.rank_score ?? null)
+    setCursorAt(last?.activity_at ?? null)
+    setCursorPostId(last?.post_id ?? null)
     setHasMore(rows.length === PAGE_SIZE)
     setLoading(false)
     setLoadingMore(false)
@@ -247,20 +275,41 @@ export default function FeedPage() {
         !loading &&
         userId
       ) {
-        loadPosts(tab, cursor, false)
+        loadPosts(tab, sortMode, {
+          score: cursorScore,
+          at: cursorAt,
+          postId: cursorPostId,
+        }, false)
       }
     }, { threshold: 0.1 })
     if (loaderRef.current) observer.observe(loaderRef.current)
     return () => observer.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMore, loadingMore, loading, cursor, userId, tab])
+  }, [hasMore, loadingMore, loading, cursorScore, cursorAt, cursorPostId, userId, tab, sortMode])
+
+  function resetCursor() {
+    setCursorScore(null)
+    setCursorAt(null)
+    setCursorPostId(null)
+  }
 
   function switchTab(newTab: FeedTab) {
+    if (newTab === tab) return
     setTab(newTab)
-    setCursor(null)
+    resetCursor()
     setHasMore(true)
     setPosts([])
-    if (userId) loadPosts(newTab, null, true)
+    if (userId) loadPosts(newTab, sortMode, null, true)
+  }
+
+  function changeSort(next: FeedSort) {
+    if (next === sortMode) return
+    setSortMode(next)
+    window.localStorage.setItem('vortex-feed-sort', next)
+    resetCursor()
+    setHasMore(true)
+    setPosts([])
+    if (userId) loadPosts(tab, next, null, true)
   }
 
   async function handleVote(postId: string, type: VoteType) {
@@ -400,7 +449,8 @@ export default function FeedPage() {
           )}
 
           <div className="vtx-feed-controls" aria-label="Controles do feed">
-            <div className="vtx-feed-tabs">
+            <div className="vtx-feed-controls-left">
+              <div className="vtx-feed-tabs">
               <button
                 className={`vtx-feed-tab ${tab === 'geral' ? 'is-active' : ''}`}
                 onClick={() => switchTab('geral')}
@@ -415,6 +465,9 @@ export default function FeedPage() {
                 <Users2 size={15} />
                 <span>Seguindo</span>
               </button>
+              </div>
+
+              <FeedSortMenu value={sortMode} onChange={changeSort} />
             </div>
 
             <div className="vtx-view-switch" aria-label="Modo de visualização">
@@ -436,7 +489,7 @@ export default function FeedPage() {
               </button>
               <button
                 className="vtx-refresh-btn"
-                onClick={() => loadPosts(tab, null, true)}
+                onClick={() => { resetCursor(); loadPosts(tab, sortMode, null, true) }}
                 aria-label="Atualizar feed"
                 title="Atualizar"
               >
@@ -452,19 +505,25 @@ export default function FeedPage() {
           )}
 
           {!loading && tab === 'seguindo' && posts.length === 0 && (
-            <EmptyState
-              icon="👥"
-              title="Seu feed de seguindo está vazio."
-              subtitle="Siga pessoas para montar um feed só com quem você acompanha."
-            />
+            <>
+              <EmptyState
+                icon="👥"
+                title="Seu feed de seguindo está vazio."
+                subtitle="Siga pessoas para montar um feed só com quem você acompanha."
+              />
+              <FeedDiscoveryEnd empty />
+            </>
           )}
 
           {!loading && tab === 'geral' && posts.length === 0 && (
-            <EmptyState
-              icon="🌀"
-              title="Nenhuma conversa por aqui ainda."
-              subtitle="Crie a primeira publicação e dê início ao feed."
-            />
+            <>
+              <EmptyState
+                icon="🌀"
+                title="Nenhuma conversa por aqui ainda."
+                subtitle="Crie a primeira publicação e encontre pessoas e comunidades abaixo."
+              />
+              <FeedDiscoveryEnd empty />
+            </>
           )}
 
           {posts.map((item, i) => {
@@ -509,17 +568,7 @@ export default function FeedPage() {
           )}
 
           {!hasMore && posts.length > 0 && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '34px 0',
-                color: 'var(--text-3)',
-                fontSize: 12,
-                fontFamily: "'JetBrains Mono', monospace",
-              }}
-            >
-              fim do feed · você chegou até aqui ✦
-            </div>
+            <FeedDiscoveryEnd />
           )}
         </section>
 
