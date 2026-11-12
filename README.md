@@ -1,3 +1,18 @@
+<!-- GABRIEL_KIT_CYBERPUNK_V1 -->
+<div align="center">
+
+<img src="assets/readme-cyber.svg" alt="Banner VORTEX" width="100%" />
+
+<br/>
+
+**Projeto de rede social com publicações, comunidades, comentários e moderação.**
+
+<a href="https://github.com/gabriel31249090/VORTEX">📦 Repositório</a> · <a href="https://project-1ktk5.vercel.app">🌐 Abrir projeto</a>
+
+</div>
+
+---
+
 # VORTEX — Política de Privacidade, Termos de Uso e Moderação
 
 ## O que tem aqui
